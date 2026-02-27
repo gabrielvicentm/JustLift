@@ -24,14 +24,9 @@ type BackendResponse = {
   google_id?: string;
 };
 
-const GOOGLE_CLIENT_ID =
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ??
-  '1095255863830-ftbv7flv5une920gav2ppm2fmnjno9ho.apps.googleusercontent.com';
-
-const maskToken = (token?: string) => {
-  if (!token) return null;
-  if (token.length <= 20) return token;
-  return `${token.slice(0, 10)}...${token.slice(-10)}`;
+type GoogleConfigResponse = {
+  googleClientId?: string;
+  message?: string;
 };
 
 export default function Register() {
@@ -40,30 +35,44 @@ export default function Register() {
   const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const [step, setStep] = useState<'register' | 'verify'>('register');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    console.log('[GoogleAuth][Frontend][Register] configure:start', {
-      googleClientId: GOOGLE_CLIENT_ID,
-      apiBaseUrl: api.defaults.baseURL,
-    });
-    GoogleSignin.configure({
-      webClientId: GOOGLE_CLIENT_ID,
-      scopes: ['profile', 'email'],
-      offlineAccess: false,
-    });
-    console.log('[GoogleAuth][Frontend][Register] configure:done');
+    const loadGoogleConfig = async () => {
+      try {
+        const response = await api.get<GoogleConfigResponse>('/user/google/config');
+        const fetchedClientId = response.data?.googleClientId?.trim() ?? '';
+
+        if (!fetchedClientId) {
+          setError('GOOGLE_CLIENT_ID vazio no backend.');
+          return;
+        }
+
+        setGoogleClientId(fetchedClientId);
+        GoogleSignin.configure({
+          webClientId: fetchedClientId,
+          scopes: ['profile', 'email'],
+          offlineAccess: false,
+        });
+      } catch {
+        setError('Nao foi possivel carregar configuracao Google do backend.');
+      }
+    };
+
+    loadGoogleConfig();
   }, []);
 
   const saveTokens = async (accessToken?: string, refreshToken?: string) => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     await AsyncStorage.setItem('accessToken', accessToken);
     if (refreshToken) {
@@ -73,7 +82,7 @@ export default function Register() {
 
   const handleRegister = async () => {
     const cleanUsername = username.trim();
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     const cleanSenha = senha.trim();
 
     setMessage('');
@@ -92,14 +101,68 @@ export default function Register() {
         senha: cleanSenha,
       });
 
-      setMessage(response.data.message ?? t('register_success_default'));
+      setPendingEmail(cleanEmail);
+      setStep('verify');
+      setMessage(response.data.message ?? 'Codigo enviado para seu email.');
+    } catch (err) {
+      const axiosError = err as AxiosError<BackendResponse>;
+      const backendMessage = axiosError.response?.data?.message ?? t('register_error_default');
+      setError(backendMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleVerifyCode = async () => {
+    const cleanCode = verificationCode.trim();
+
+    setMessage('');
+    setError('');
+
+    if (!pendingEmail || !cleanCode) {
+      setError('Email e codigo sao obrigatorios.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post<BackendResponse>('/user/register/verify', {
+        email: pendingEmail,
+        code: cleanCode,
+      });
+
+      setMessage(response.data.message ?? 'Conta criada com sucesso.');
       setTimeout(() => {
         router.replace('./Login');
       }, 800);
     } catch (err) {
       const axiosError = err as AxiosError<BackendResponse>;
-      const backendMessage = axiosError.response?.data?.message ?? t('register_error_default');
+      const backendMessage = axiosError.response?.data?.message ?? 'Erro ao confirmar codigo.';
+      setError(backendMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setMessage('');
+    setError('');
+
+    if (!pendingEmail) {
+      setError('Email nao encontrado para reenvio.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post<BackendResponse>('/user/register/resend', {
+        email: pendingEmail,
+      });
+
+      setMessage(response.data.message ?? 'Novo codigo enviado.');
+    } catch (err) {
+      const axiosError = err as AxiosError<BackendResponse>;
+      const backendMessage = axiosError.response?.data?.message ?? 'Erro ao reenviar codigo.';
       setError(backendMessage);
     } finally {
       setLoading(false);
@@ -112,59 +175,36 @@ export default function Register() {
     setLoading(true);
 
     try {
-      console.log('[GoogleAuth][Frontend][Register] flow:start');
-      if (!GOOGLE_CLIENT_ID) {
+      if (!googleClientId) {
         throw new Error('GOOGLE_CLIENT_ID_MISSING');
       }
 
-      console.log('[GoogleAuth][Frontend][Register] hasPlayServices:start');
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      console.log('[GoogleAuth][Frontend][Register] hasPlayServices:ok');
 
-      // Forca exibicao do seletor de conta em vez de login silencioso.
       try {
         await GoogleSignin.signOut();
-      } catch (signOutErr) {
-        console.log('[GoogleAuth][Frontend][Register] signOut:skip', signOutErr);
+      } catch {
+        // no-op
       }
 
-      console.log('[GoogleAuth][Frontend][Register] signIn:start');
       const signInResult = (await GoogleSignin.signIn()) as any;
-      console.log('[GoogleAuth][Frontend][Register] signIn:rawResult', signInResult);
       const idToken = signInResult?.data?.idToken ?? signInResult?.idToken;
       const googleId = signInResult?.data?.user?.id ?? signInResult?.user?.id;
-      console.log('[GoogleAuth][Frontend][Register] signIn:parsed', {
-        googleId,
-        idTokenLength: idToken?.length ?? 0,
-        idTokenMasked: maskToken(idToken),
-      });
 
       if (!idToken) {
         throw new Error('GOOGLE_TOKEN_MISSING');
       }
 
-      console.log('[GoogleAuth][Frontend][Register] api:/user/google/register:start', {
-        googleId,
-        username: username.trim() || null,
-      });
       const response = await api.post<BackendResponse>('/user/google/register', {
         googleIdToken: idToken,
         google_id: googleId,
         username: username.trim() || undefined,
       });
-      console.log('[GoogleAuth][Frontend][Register] api:/user/google/register:success', response.data);
 
       await saveTokens(response.data.accessToken, response.data.refreshToken);
       setMessage(response.data.message ?? 'Cadastro Google realizado com sucesso.');
       router.replace('/(tabs)/home_tab');
     } catch (err: any) {
-      console.error('[GoogleAuth][Frontend][Register] flow:error', {
-        code: err?.code,
-        message: err?.message,
-        stack: err?.stack,
-        responseStatus: err?.response?.status,
-        responseData: err?.response?.data,
-      });
       if (err?.code === statusCodes.SIGN_IN_CANCELLED) {
         setError('Cadastro com Google cancelado.');
       } else if (err?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
@@ -177,12 +217,17 @@ export default function Register() {
         setError('GOOGLE_CLIENT_ID nao configurado.');
       } else {
         const axiosError = err as AxiosError<BackendResponse>;
-        const backendMessage =
-          axiosError.response?.data?.message ??
-          (!axiosError.response
-            ? `Sem conexao com o servidor (${api.defaults.baseURL}) - ${axiosError.message}.`
-            : 'Falha no cadastro com Google.');
-        setError(backendMessage);
+        const responseMessage = axiosError.response?.data?.message;
+        const status = axiosError.response?.status;
+        const method = axiosError.config?.method?.toUpperCase() ?? 'POST';
+        const url = axiosError.config?.url ?? '/user/google/register';
+        if (responseMessage) {
+          setError(`${responseMessage} [${status ?? '-'} ${method} ${url}]`);
+        } else if (!axiosError.response) {
+          setError(`Sem conexao com o servidor (${api.defaults.baseURL}) - ${axiosError.message}.`);
+        } else {
+          setError(`Falha no cadastro com Google. [${status ?? '-'} ${method} ${url}]`);
+        }
       }
     } finally {
       setLoading(false);
@@ -195,56 +240,97 @@ export default function Register() {
         <Text style={styles.title}>{t('register_title')}</Text>
         <Text style={styles.subtitle}>{t('register_subtitle')}</Text>
 
-        <TextInput
-          placeholder={t('register_username_placeholder')}
-          placeholderTextColor={theme.colors.mutedText}
-          autoCapitalize="none"
-          value={username}
-          onChangeText={setUsername}
-          style={styles.input}
-          editable={!loading}
-        />
+        {step === 'register' ? (
+          <>
+            <TextInput
+              placeholder={t('register_username_placeholder')}
+              placeholderTextColor={theme.colors.mutedText}
+              autoCapitalize="none"
+              value={username}
+              onChangeText={setUsername}
+              style={styles.input}
+              editable={!loading}
+            />
 
-        <TextInput
-          placeholder={t('register_email_placeholder')}
-          placeholderTextColor={theme.colors.mutedText}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-          editable={!loading}
-        />
+            <TextInput
+              placeholder={t('register_email_placeholder')}
+              placeholderTextColor={theme.colors.mutedText}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              style={styles.input}
+              editable={!loading}
+            />
 
-        <TextInput
-          placeholder={t('register_password_placeholder')}
-          placeholderTextColor={theme.colors.mutedText}
-          secureTextEntry
-          value={senha}
-          onChangeText={setSenha}
-          style={styles.input}
-          editable={!loading}
-        />
+            <TextInput
+              placeholder={t('register_password_placeholder')}
+              placeholderTextColor={theme.colors.mutedText}
+              secureTextEntry
+              value={senha}
+              onChangeText={setSenha}
+              style={styles.input}
+              editable={!loading}
+            />
 
-        <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleRegister}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={theme.colors.buttonText} />
-          ) : (
-            <Text style={styles.buttonText}>{t('register_button')}</Text>
-          )}
-        </Pressable>
+            <Pressable
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={theme.colors.buttonText} />
+              ) : (
+                <Text style={styles.buttonText}>Enviar codigo</Text>
+              )}
+            </Pressable>
 
-        <Pressable
-          style={[styles.googleButton, loading && styles.buttonDisabled]}
-          onPress={handleGoogleRegister}
-          disabled={loading}
-        >
-          <Text style={styles.googleButtonText}>Cadastrar com Google</Text>
-        </Pressable>
+            <Pressable
+              style={[styles.googleButton, loading && styles.buttonDisabled]}
+              onPress={handleGoogleRegister}
+              disabled={loading}
+            >
+              <Text style={styles.googleButtonText}>Cadastrar com Google</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.subtitle}>Digite o codigo enviado para {pendingEmail}</Text>
+            <TextInput
+              placeholder="Codigo de 6 digitos"
+              placeholderTextColor={theme.colors.mutedText}
+              keyboardType="number-pad"
+              value={verificationCode}
+              onChangeText={setVerificationCode}
+              style={styles.input}
+              editable={!loading}
+            />
+
+            <Pressable
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleVerifyCode}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={theme.colors.buttonText} />
+              ) : (
+                <Text style={styles.buttonText}>Confirmar codigo</Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={[styles.secondaryButton, loading && styles.buttonDisabled]}
+              onPress={handleResendCode}
+              disabled={loading}
+            >
+              <Text style={styles.secondaryButtonText}>Reenviar codigo</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setStep('register')} disabled={loading}>
+              <Text style={styles.link}>Alterar dados de cadastro</Text>
+            </Pressable>
+          </>
+        )}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {message ? <Text style={styles.success}>{message}</Text> : null}
@@ -302,6 +388,20 @@ function createStyles(theme: AppTheme) {
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 6,
+    },
+    secondaryButton: {
+      backgroundColor: 'transparent',
+      borderRadius: 10,
+      height: 42,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    secondaryButtonText: {
+      color: theme.colors.text,
+      fontWeight: '600',
+      fontSize: 14,
     },
     googleButton: {
       backgroundColor: '#ffffff',
