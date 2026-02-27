@@ -7,6 +7,7 @@ const authGoogleController = require('../controller/authGoogleController');
 
 router.post('/register',  authController.register);
 router.post('/login', authController.login);
+router.get('/google/config', authGoogleController.getGoogleConfig);
 router.post('/google/login', authGoogleController.googleLogin);
 router.post('/google/register', authGoogleController.googleRegister);
 //router.post('/refresh', authController.handleRefresh);

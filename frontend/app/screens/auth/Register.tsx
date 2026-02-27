@@ -1,3 +1,4 @@
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '@/app/config/api';
 import { useI18n } from '@/providers/I18nProvider';
@@ -24,9 +25,10 @@ type BackendResponse = {
   google_id?: string;
 };
 
-const GOOGLE_CLIENT_ID =
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ??
-  '1095255863830-ftbv7flv5une920gav2ppm2fmnjno9ho.apps.googleusercontent.com';
+type GoogleConfigResponse = {
+  googleClientId?: string;
+  message?: string;
+};
 
 const maskToken = (token?: string) => {
   if (!token) return null;
@@ -44,20 +46,47 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    console.log('[GoogleAuth][Frontend][Register] configure:start', {
-      googleClientId: GOOGLE_CLIENT_ID,
-      apiBaseUrl: api.defaults.baseURL,
-    });
-    GoogleSignin.configure({
-      webClientId: GOOGLE_CLIENT_ID,
-      scopes: ['profile', 'email'],
-      offlineAccess: false,
-    });
-    console.log('[GoogleAuth][Frontend][Register] configure:done');
+    const loadGoogleConfig = async () => {
+      try {
+        const response = await api.get<GoogleConfigResponse>('/user/google/config');
+        const fetchedClientId = response.data?.googleClientId?.trim() ?? '';
+
+        console.log('[GoogleAuth][Frontend][Register] configure:start', {
+          googleClientId: fetchedClientId,
+          apiBaseUrl: api.defaults.baseURL,
+        });
+
+        if (!fetchedClientId) {
+          setError('GOOGLE_CLIENT_ID vazio no backend.');
+          return;
+        }
+
+        setGoogleClientId(fetchedClientId);
+        GoogleSignin.configure({
+          webClientId: fetchedClientId,
+          scopes: ['profile', 'email'],
+          offlineAccess: false,
+        });
+        console.log('[GoogleAuth][Frontend][Register] configure:done');
+      } catch (err: any) {
+        console.log(
+          '[GoogleAuth][Frontend][Register] configure:error',
+          JSON.stringify({
+            message: err?.message,
+            status: err?.response?.status,
+            data: err?.response?.data,
+          })
+        );
+        setError('Nao foi possivel carregar configuracao Google do backend.');
+      }
+    };
+
+    loadGoogleConfig();
   }, []);
 
   const saveTokens = async (accessToken?: string, refreshToken?: string) => {
@@ -113,7 +142,7 @@ export default function Register() {
 
     try {
       console.log('[GoogleAuth][Frontend][Register] flow:start');
-      if (!GOOGLE_CLIENT_ID) {
+      if (!googleClientId) {
         throw new Error('GOOGLE_CLIENT_ID_MISSING');
       }
 
@@ -158,13 +187,16 @@ export default function Register() {
       setMessage(response.data.message ?? 'Cadastro Google realizado com sucesso.');
       router.replace('/(tabs)/home_tab');
     } catch (err: any) {
-      console.error('[GoogleAuth][Frontend][Register] flow:error', {
+      const debugPayload = {
         code: err?.code,
         message: err?.message,
         stack: err?.stack,
         responseStatus: err?.response?.status,
         responseData: err?.response?.data,
-      });
+        requestUrl: err?.config?.url,
+        requestBaseURL: err?.config?.baseURL,
+      };
+      console.log('[GoogleAuth][Frontend][Register] flow:error', JSON.stringify(debugPayload));
       if (err?.code === statusCodes.SIGN_IN_CANCELLED) {
         setError('Cadastro com Google cancelado.');
       } else if (err?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
@@ -177,12 +209,17 @@ export default function Register() {
         setError('GOOGLE_CLIENT_ID nao configurado.');
       } else {
         const axiosError = err as AxiosError<BackendResponse>;
-        const backendMessage =
-          axiosError.response?.data?.message ??
-          (!axiosError.response
-            ? `Sem conexao com o servidor (${api.defaults.baseURL}) - ${axiosError.message}.`
-            : 'Falha no cadastro com Google.');
-        setError(backendMessage);
+        const responseMessage = axiosError.response?.data?.message;
+        const status = axiosError.response?.status;
+        const method = axiosError.config?.method?.toUpperCase() ?? 'POST';
+        const url = axiosError.config?.url ?? '/user/google/register';
+        if (responseMessage) {
+          setError(`${responseMessage} [${status ?? '-'} ${method} ${url}]`);
+        } else if (!axiosError.response) {
+          setError(`Sem conexao com o servidor (${api.defaults.baseURL}) - ${axiosError.message}.`);
+        } else {
+          setError(`Falha no cadastro com Google. [${status ?? '-'} ${method} ${url}]`);
+        }
       }
     } finally {
       setLoading(false);
