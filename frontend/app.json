@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "RECEITA FEDERAL",
+    "slug": "TIGRINHO",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/RECEITAFEDERAL.png",
+    "scheme": "frontend",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/RECEITAFEDERAL.png",
+        "backgroundImage": "./assets/images/RECEITAFEDERAL.png",
+        "monochromeImage": "./assets/images/RECEITAFEDERAL.png"
+      },
+      "usesCleartextTraffic": true,
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.gabrielvicentm.app_treino"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/RECEITAFEDERAL.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "@react-native-google-signin/google-signin"
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/RECEITAFEDERAL.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-web-browser",
+      "expo-video",
+      "expo-font",
+      "expo-image"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b4280e36-bede-4e43-a6cd-20efacd69eb0"
+      }
+    }
+  }
+}
