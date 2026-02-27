@@ -1,6 +1,16 @@
 const authgoogleService = require('../service/authgoogleService');
 const authService = require('../service/authService');
 
+exports.getGoogleConfig = async (_req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(500).json({ message: 'GOOGLE_CLIENT_ID nao configurado no backend.' });
+  }
+
+  return res.status(200).json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+  });
+};
+
 exports.googleLogin = async (req, res) => {
   try {
     const { googleIdToken, google_id: googleId } = req.body;
