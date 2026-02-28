@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -11,115 +11,102 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { AxiosError } from "axios";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api } from "@/app/config/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMyProfileQuery } from "@/app/features/profile/hooks";
+import {
+  getApiErrorMessage,
+  profileKeys,
+  updateMyProfile,
+  uploadImageToR2,
+} from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 
-type PresignResponse = {
-  key: string;
-  uploadUrl: string;
-  publicUrl: string | null;
-};
-
 export default function EditarPerfilScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [loading, setLoading] = useState(false);
   const [nomeExibicao, setNomeExibicao] = useState("");
   const [biografia, setBiografia] = useState("");
   const [fotoPerfilUri, setFotoPerfilUri] = useState<string | null>(null);
   const [fotoPerfilUrl, setFotoPerfilUrl] = useState<string | null>(null);
   const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [formHydrated, setFormHydrated] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const getAuthHeader = async () => {
-    const token = await AsyncStorage.getItem("accessToken");
-    if (!token) {
-      throw new Error("NOT_AUTHENTICATED");
+  const profileQuery = useMyProfileQuery();
+
+  useEffect(() => {
+    if (!formHydrated && profileQuery.data) {
+      setNomeExibicao(profileQuery.data.nome_exibicao ?? "");
+      setBiografia(profileQuery.data.biografia ?? "");
+      setFotoPerfilUrl(profileQuery.data.foto_perfil ?? null);
+      setBannerUrl(profileQuery.data.banner ?? null);
+      setFormHydrated(true);
     }
-    return { Authorization: `Bearer ${token}` };
-  };
+  }, [formHydrated, profileQuery.data]);
 
-  const getApiErrorMessage = (err: unknown) => {
-    if ((err as Error).message === "NOT_AUTHENTICATED") {
-      return "Faça login para atualizar o perfil.";
+  useEffect(() => {
+    if (profileQuery.error) {
+      setError(getApiErrorMessage(profileQuery.error, "carregar perfil"));
     }
+  }, [profileQuery.error]);
 
-    const axiosError = err as AxiosError<{ message?: string } | string>;
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      let finalFotoPerfilUrl = fotoPerfilUrl;
+      let finalBannerUrl = bannerUrl;
 
-    if (!axiosError.response) {
-      return `Sem conexão com o backend (${api.defaults.baseURL}).`;
-    }
+      if (fotoPerfilUri) {
+        setSuccess("Enviando foto de perfil...");
+        finalFotoPerfilUrl = await uploadImageToR2(fotoPerfilUri, `perfil_${Date.now()}.jpg`);
+      }
 
-    const { status, data } = axiosError.response;
-    if (typeof data === "string" && data.trim().length > 0) {
-      return `Erro ${status}: ${data}`;
-    }
+      if (bannerUri) {
+        setSuccess("Enviando banner...");
+        finalBannerUrl = await uploadImageToR2(bannerUri, `banner_${Date.now()}.jpg`);
+      }
 
-    if (data && typeof data === "object" && "message" in data && data.message) {
-      return String(data.message);
-    }
+      setSuccess("Salvando perfil...");
+      await updateMyProfile({
+        nome_exibicao: nomeExibicao.trim(),
+        biografia: biografia.trim(),
+        foto_perfil: finalFotoPerfilUrl,
+        banner: finalBannerUrl,
+      });
 
-    return `Erro ${status} ao atualizar perfil.`;
-  };
+      return {
+        foto_perfil: finalFotoPerfilUrl,
+        banner: finalBannerUrl,
+      };
+    },
+    onSuccess: async (result) => {
+      setFotoPerfilUrl(result.foto_perfil ?? null);
+      setBannerUrl(result.banner ?? null);
+      setFotoPerfilUri(null);
+      setBannerUri(null);
+      setSuccess("Perfil atualizado com sucesso!");
 
-  const uploadImageToR2 = async (
-    uri: string,
-    filename: string,
-    contentType = "image/jpeg",
-  ): Promise<string | null> => {
-    const headers = await getAuthHeader();
-
-    const presignResponse = await api.post<PresignResponse>(
-      "/media/presign",
-      {
-        filename,
-        contentType,
-        size: 0,
-      },
-      { headers },
-    );
-
-    const { uploadUrl, publicUrl, key } = presignResponse.data;
-
-    const fileResponse = await fetch(uri);
-    const fileBlob = await fileResponse.blob();
-
-    const putResult = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-      body: fileBlob,
-    });
-
-    if (!putResult.ok) {
-      throw new Error(`Falha no upload para R2 (HTTP ${putResult.status})`);
-    }
-
-    await api.post(
-      "/media/complete",
-      {
-        key,
-        contentType,
-        size: fileBlob.size,
-      },
-      { headers },
-    );
-
-    return publicUrl ?? key;
-  };
+      await queryClient.invalidateQueries({ queryKey: profileKeys.me() });
+      setTimeout(() => {
+        router.back();
+      }, 1000);
+    },
+    onError: (err) => {
+      setError(getApiErrorMessage(err, "atualizar perfil"));
+    },
+  });
 
   const handleSelectFotoPerfil = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        setError("Permissão de galeria não concedida");
+        setError("Permissao de galeria nao concedida");
         return;
       }
 
@@ -143,7 +130,7 @@ export default function EditarPerfilScreen() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        setError("Permissão de galeria não concedida");
+        setError("Permissao de galeria nao concedida");
         return;
       }
 
@@ -163,67 +150,40 @@ export default function EditarPerfilScreen() {
     }
   };
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = () => {
     setError("");
     setSuccess("");
 
     if (!nomeExibicao.trim()) {
-      setError("Nome de exibição é obrigatório");
+      setError("Nome de exibicao e obrigatorio");
       return;
     }
 
     if (nomeExibicao.trim().length < 2) {
-      setError("Nome de exibição deve ter pelo menos 2 caracteres");
+      setError("Nome de exibicao deve ter pelo menos 2 caracteres");
       return;
     }
 
     if (biografia.length > 500) {
-      setError("Biografia não pode ter mais de 500 caracteres");
+      setError("Biografia nao pode ter mais de 500 caracteres");
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const headers = await getAuthHeader();
-
-      let finalFotoPerfilUrl = fotoPerfilUrl;
-      let finalBannerUrl = bannerUrl;
-
-      if (fotoPerfilUri) {
-        setSuccess("Enviando foto de perfil...");
-        finalFotoPerfilUrl = await uploadImageToR2(fotoPerfilUri, `perfil_${Date.now()}.jpg`);
-        setFotoPerfilUri(null);
-      }
-
-      if (bannerUri) {
-        setSuccess("Enviando banner...");
-        finalBannerUrl = await uploadImageToR2(bannerUri, `banner_${Date.now()}.jpg`);
-        setBannerUri(null);
-      }
-
-      setSuccess("Salvando perfil...");
-      await api.put(
-        "/profile/updateProfile",
-        {
-          nome_exibicao: nomeExibicao.trim(),
-          biografia: biografia.trim(),
-          foto_perfil: finalFotoPerfilUrl,
-          banner: finalBannerUrl,
-        },
-        { headers },
-      );
-
-      setSuccess("Perfil atualizado com sucesso!");
-      setTimeout(() => {
-        router.back();
-      }, 1500);
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
+    updateMutation.mutate();
   };
+
+  const loading = profileQuery.isLoading || updateMutation.isPending;
+
+  if (profileQuery.isLoading && !formHydrated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centeredBlock}>
+          <ActivityIndicator color={theme.colors.text} />
+          <Text style={styles.loadingText}>Carregando perfil...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -271,7 +231,7 @@ export default function EditarPerfilScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Nome de Exibição</Text>
+          <Text style={styles.label}>Nome de Exibicao</Text>
           <TextInput
             style={styles.input}
             placeholder="Digite seu nome"
@@ -288,7 +248,7 @@ export default function EditarPerfilScreen() {
           <Text style={styles.label}>Biografia</Text>
           <TextInput
             style={[styles.input, styles.textarea]}
-            placeholder="Conte um pouco sobre você"
+            placeholder="Conte um pouco sobre voce"
             placeholderTextColor={theme.colors.mutedText}
             value={biografia}
             onChangeText={setBiografia}
@@ -334,6 +294,17 @@ function createStyles(theme: AppTheme) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    centeredBlock: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+    },
+    loadingText: {
+      color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: "500",
     },
     scrollContent: {
       padding: 16,

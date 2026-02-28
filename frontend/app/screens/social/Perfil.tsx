@@ -1,162 +1,185 @@
 import { useMemo, useState } from "react";
-import * as ImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
+  Alert,
+  FlatList,
   Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { AxiosError } from "axios";
-import { api } from "@/app/config/api";
+import {
+  useDeleteMyPostMutation,
+  useMyPostsQuery,
+  useMyProfileQuery,
+  useUpdateMyPostMutation,
+} from "@/app/features/profile/hooks";
+import { getApiErrorMessage } from "@/app/features/profile/service";
+import type { MyPost } from "@/app/features/profile/types";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import { useRouter } from "expo-router";
 
-type PresignResponse = {
-  key: string;
-  uploadUrl: string;
-  expiresIn: number;
-  publicUrl: string | null;
-};
-
 export default function PerfilScreen() {
   const { theme } = useAppTheme();
   const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>("");
-  const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handlePickAndUpload = async () => {
-    setError("");
-    setStatus("");
+  const [actionError, setActionError] = useState("");
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setError("Permissão da galeria não concedida.");
-      return;
-    }
+  const profileQuery = useMyProfileQuery();
+  const postsQuery = useMyPostsQuery();
+  const updatePostMutation = useUpdateMyPostMutation();
+  const deletePostMutation = useDeleteMyPostMutation();
 
-    const pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      quality: 0.9,
-    });
+  const loading = profileQuery.isLoading || postsQuery.isLoading;
+  const refreshing = profileQuery.isRefetching || postsQuery.isRefetching;
 
-    if (pickerResult.canceled || pickerResult.assets.length === 0) {
-      return;
-    }
+  const errorMessage = profileQuery.error
+    ? getApiErrorMessage(profileQuery.error, "carregar perfil")
+    : postsQuery.error
+      ? getApiErrorMessage(postsQuery.error, "carregar posts")
+      : actionError;
 
-    const asset = pickerResult.assets[0];
-    const filename = asset.fileName ?? `foto-${Date.now()}.jpg`;
-    const contentType = asset.mimeType ?? "image/jpeg";
-    const size = asset.fileSize;
+  const profile = profileQuery.data;
+  const posts = postsQuery.data ?? [];
 
-    setSelectedImageUri(asset.uri);
-    setLoading(true);
-    setStatus("Gerando URL de upload...");
+  const handleRefresh = async () => {
+    await Promise.all([profileQuery.refetch(), postsQuery.refetch()]);
+  };
 
+  const handleToggleFinished = async (item: MyPost) => {
+    setActionError("");
     try {
-      const presign = await api.post<PresignResponse>("/media/presign", {
-        filename,
-        contentType,
-        size,
+      await updatePostMutation.mutateAsync({
+        postId: item.id,
+        payload: { finalizado: !item.finalizado },
       });
-
-      const uploadUrl = presign.data.uploadUrl;
-      const key = presign.data.key;
-      const publicUrl = presign.data.publicUrl;
-
-      setStatus("Enviando arquivo para R2...");
-      const fileResponse = await fetch(asset.uri);
-      const fileBlob = await fileResponse.blob();
-
-      const putResult = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": contentType,
-        },
-        body: fileBlob,
-      });
-
-      if (!putResult.ok) {
-        throw new Error(`Falha no upload para R2 (HTTP ${putResult.status})`);
-      }
-
-      setStatus("Confirmando upload no backend...");
-      await api.post("/media/complete", { key, contentType, size });
-
-      setUploadedImageUrl(publicUrl);
-      setStatus("Upload concluído com sucesso.");
     } catch (err) {
-      console.error(err);
-      const axiosError = err as AxiosError<{ message?: string }>;
-      const backendMessage = axiosError.response?.data?.message;
-
-      if (backendMessage) {
-        setError(backendMessage);
-      } else if (!axiosError.response) {
-        setError(`Sem conexão com o backend (${api.defaults.baseURL}).`);
-      } else {
-        setError("Não foi possível concluir o upload da imagem.");
-      }
-
-      setStatus("");
-    } finally {
-      setLoading(false);
+      setActionError(getApiErrorMessage(err, "atualizar post"));
     }
   };
 
+  const handleDeletePost = (postId: number) => {
+    Alert.alert(
+      "Remover post",
+      "Tem certeza que deseja remover este post de treino?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Remover",
+          style: "destructive",
+          onPress: async () => {
+            setActionError("");
+            try {
+              await deletePostMutation.mutateAsync(postId);
+            } catch (err) {
+              setActionError(getApiErrorMessage(err, "remover post"));
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const renderPostItem = ({ item }: { item: MyPost }) => {
+    const totalExercicios = Number(item.total_exercicios ?? 0);
+    const totalSeries = Number(item.total_series ?? 0);
+
+    return (
+      <View style={styles.postCard}>
+        <Text style={styles.postTitle}>Treino #{item.id}</Text>
+        <Text style={styles.postText}>Data: {item.data}</Text>
+        <Text style={styles.postText}>Exercicios: {totalExercicios}</Text>
+        <Text style={styles.postText}>Series: {totalSeries}</Text>
+        <Text style={styles.postText}>Duracao: {item.duracao ?? 0} min</Text>
+        <Text style={styles.postText}>Peso total: {item.peso_total ?? 0} kg</Text>
+        <Text style={styles.postText}>Status: {item.finalizado ? "Concluido" : "Em andamento"}</Text>
+
+        <View style={styles.postActionsRow}>
+          <Pressable
+            style={[styles.postActionButton, styles.postActionPrimary]}
+            disabled={updatePostMutation.isPending || deletePostMutation.isPending}
+            onPress={() => handleToggleFinished(item)}
+          >
+            <Text style={styles.postActionPrimaryText}>
+              {item.finalizado ? "Marcar pendente" : "Marcar concluido"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.postActionButton, styles.postActionDanger]}
+            disabled={updatePostMutation.isPending || deletePostMutation.isPending}
+            onPress={() => handleDeletePost(item.id)}
+          >
+            <Text style={styles.postActionDangerText}>Apagar</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.containerCentered}>
+        <ActivityIndicator color={theme.colors.text} />
+        <Text style={styles.loadingText}>Carregando...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t("profile_title")}</Text>
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Teste de Upload (R2)</Text>
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={styles.contentContainer}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        ListHeaderComponent={
+          <View style={styles.headerBlock}>
+            <Text style={styles.title}>{t("profile_title")}</Text>
 
-        <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handlePickAndUpload}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={theme.colors.buttonText} />
-          ) : (
-            <Text style={styles.buttonText}>Selecionar foto e enviar</Text>
-          )}
-        </Pressable>
+            <View style={styles.profileCard}>
+              {profile?.banner ? <Image source={{ uri: profile.banner }} style={styles.banner} /> : null}
 
-        {status ? <Text style={styles.success}>{status}</Text> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+              <View style={styles.profileBody}>
+                {profile?.foto_perfil ? (
+                  <Image source={{ uri: profile.foto_perfil }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarPlaceholderText}>Sem foto</Text>
+                  </View>
+                )}
 
-        {selectedImageUri ? (
-          <View style={styles.previewBlock}>
-            <Text style={styles.previewTitle}>Prévia local</Text>
-            <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
+                <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Seu perfil"}</Text>
+
+                {profile?.biografia ? <Text style={styles.bioText}>{profile.biografia}</Text> : null}
+              </View>
+
+              <View style={styles.actionsRow}>
+                <Pressable style={styles.button} onPress={handleRefresh}>
+                  <Text style={styles.buttonText}>Atualizar</Text>
+                </Pressable>
+
+                <Pressable style={styles.button} onPress={() => router.push("/screens/social/UpdateProfile")}>
+                  <Text style={styles.buttonText}>Editar Perfil</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>Meus posts de treino</Text>
+            {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+            {!errorMessage && posts.length === 0 ? (
+              <Text style={styles.emptyText}>Voce ainda nao tem posts de treino.</Text>
+            ) : null}
           </View>
-        ) : null}
-
-        {uploadedImageUrl ? (
-          <View style={styles.previewBlock}>
-            <Text style={styles.previewTitle}>URL pública no R2</Text>
-            <Text selectable style={styles.urlText}>
-              {uploadedImageUrl}
-            </Text>
-          </View>
-        ) : null}
-
-        <Pressable
-          style={styles.button}
-          onPress={() => router.push("/screens/social/UpdateProfile")}
-        >
-          <Text style={styles.buttonText}>Editar Perfil</Text>
-        </Pressable>
-      </View>
+        }
+        renderItem={renderPostItem}
+      />
     </View>
   );
 }
@@ -165,77 +188,163 @@ function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: {
       flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    containerCentered: {
+      flex: 1,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.colors.background,
+      gap: 8,
+    },
+    loadingText: {
+      color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: "500",
+    },
+    contentContainer: {
       padding: 16,
+      gap: 12,
+      paddingBottom: 30,
+    },
+    headerBlock: {
+      gap: 10,
     },
     title: {
       fontSize: 24,
       fontWeight: "700",
       color: theme.colors.text,
-      marginBottom: 16,
     },
-    card: {
+    profileCard: {
       width: "100%",
-      maxWidth: 420,
       backgroundColor: theme.colors.surface,
       borderColor: theme.colors.border,
       borderWidth: 1,
       borderRadius: 12,
+      overflow: "hidden",
+    },
+    banner: {
+      width: "100%",
+      height: 120,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    profileBody: {
+      alignItems: "center",
       padding: 14,
-      gap: 10,
-      
+      gap: 8,
+    },
+    avatar: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    avatarPlaceholder: {
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    avatarPlaceholderText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    nameText: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+    bioText: {
+      color: theme.colors.mutedText,
+      fontSize: 14,
+      textAlign: "center",
+    },
+    actionsRow: {
+      flexDirection: "row",
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingBottom: 14,
+    },
+    button: {
+      backgroundColor: theme.colors.button,
+      borderRadius: 10,
+      minHeight: 42,
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+    },
+    buttonText: {
+      color: theme.colors.buttonText,
+      fontWeight: "700",
+      fontSize: 14,
     },
     sectionTitle: {
       color: theme.colors.text,
       fontSize: 16,
       fontWeight: "700",
+      marginTop: 6,
     },
-    button: {
-      backgroundColor: theme.colors.button,
+    postCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
       borderRadius: 10,
-      minHeight: 44,
+      padding: 12,
+      backgroundColor: theme.colors.surface,
+      gap: 4,
+    },
+    postTitle: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    postText: {
+      color: theme.colors.text,
+      fontSize: 13,
+    },
+    postActionsRow: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 8,
+    },
+    postActionButton: {
+      minHeight: 38,
+      borderRadius: 8,
+      paddingHorizontal: 10,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      flex: 1,
     },
-    buttonDisabled: {
-      opacity: 0.7,
+    postActionPrimary: {
+      backgroundColor: theme.colors.button,
     },
-    buttonText: {
+    postActionPrimaryText: {
       color: theme.colors.buttonText,
       fontWeight: "700",
-      fontSize: 15,
+      fontSize: 12,
+      textAlign: "center",
     },
-    success: {
-      color: theme.colors.success,
-      fontWeight: "500",
+    postActionDanger: {
+      backgroundColor: `${theme.colors.error}22`,
+      borderWidth: 1,
+      borderColor: theme.colors.error,
+    },
+    postActionDangerText: {
+      color: theme.colors.error,
+      fontWeight: "700",
+      fontSize: 12,
+    },
+    emptyText: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+      fontStyle: "italic",
     },
     error: {
       color: theme.colors.error,
       fontWeight: "500",
-    },
-    previewBlock: {
-      gap: 6,
-      marginTop: 8,
-    },
-    previewTitle: {
-      color: theme.colors.mutedText,
-      fontWeight: "600",
-    },
-    previewImage: {
-      width: "100%",
-      height: 220,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.inputBackground,
-    },
-    urlText: {
-      color: theme.colors.link,
-      fontSize: 12,
     },
   });
 }
