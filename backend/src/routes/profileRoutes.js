@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const authController = require('../controller/profileController');
+const profileController = require('../controller/profileController');
 const authMiddleware = require('../middleware/authMiddleware');
 
+// Legacy routes
+router.post('/profile', authMiddleware, profileController.profile);
+router.put('/updateProfile', authMiddleware, profileController.updateProfile);
 
-//router.post('/profile',  authController.profile);
-router.put('/updateProfile', authMiddleware, authController.updateProfile);
-//router.post('/refresh', authController.handleRefresh);
+// REST routes
+router.get('/me', authMiddleware, profileController.getMe);
+router.put('/me', authMiddleware, profileController.updateMe);
+router.get('/me/posts', authMiddleware, profileController.getMyPosts);
+router.put('/me/posts/:postId', authMiddleware, profileController.updateMyPost);
+router.delete('/me/posts/:postId', authMiddleware, profileController.deleteMyPost);
 
 module.exports = router;
