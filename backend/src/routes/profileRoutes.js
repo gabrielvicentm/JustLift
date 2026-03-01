@@ -10,8 +10,5 @@ router.put('/updateProfile', authMiddleware, profileController.updateProfile);
 // REST routes
 router.get('/me', authMiddleware, profileController.getMe);
 router.put('/me', authMiddleware, profileController.updateMe);
-router.get('/me/posts', authMiddleware, profileController.getMyPosts);
-router.put('/me/posts/:postId', authMiddleware, profileController.updateMyPost);
-router.delete('/me/posts/:postId', authMiddleware, profileController.deleteMyPost);
 
 module.exports = router;
