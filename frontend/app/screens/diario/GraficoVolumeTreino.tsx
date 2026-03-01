@@ -81,8 +81,10 @@ function getApiErrorMessage(err: unknown) {
   return `Erro ${status} ao carregar gráfico.`;
 }
 
-function formatDuration(totalMinutes: number) {
-  if (totalMinutes <= 0) return "0 min";
+function formatDuration(totalSeconds: number) {
+  if (totalSeconds <= 0) return "0 min";
+
+  const totalMinutes = Math.floor(totalSeconds / 60);
 
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -166,7 +168,7 @@ export default function GraficoVolumeTreinoScreen() {
 
   const totalSeries = data?.totais.total_series ?? 0;
   const totalTreinos = data?.totais.total_treinos ?? 0;
-  const duracaoTotalMinutos = data?.totais.duracao_total_minutos ?? 0;
+  const duracaoTotalSegundos = data?.totais.duracao_total_minutos ?? 0;
 
   const chartSize = 260;
   const strokeWidth = 38;
@@ -280,7 +282,7 @@ export default function GraficoVolumeTreinoScreen() {
 
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>Duração</Text>
-                <Text style={styles.metricValue}>{formatDuration(duracaoTotalMinutos)}</Text>
+                <Text style={styles.metricValue}>{formatDuration(duracaoTotalSegundos)}</Text>
               </View>
             </View>
           </>
