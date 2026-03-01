@@ -93,6 +93,7 @@ export async function uploadImageToR2(
   uri: string,
   filename: string,
   contentType = "image/jpeg",
+  size?: number,
 ): Promise<string | null> {
   const headers = await getAuthHeader();
 
@@ -103,7 +104,7 @@ export async function uploadImageToR2(
       {
         filename,
         contentType,
-        size: 0,
+        size: size ?? 0,
       },
       { headers },
     );
@@ -136,7 +137,7 @@ export async function uploadImageToR2(
       {
         key,
         contentType,
-        size: 0,
+        size: size ?? 0,
       },
       { headers },
     );
