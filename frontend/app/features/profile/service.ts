@@ -3,17 +3,14 @@ import { AxiosError } from "axios";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "@/app/config/api";
 import type {
-  MyPostsResponse,
   MyProfileResponse,
   PresignResponse,
-  UpdateMyPostPayload,
   UpdateMyProfilePayload,
 } from "./types";
 
 export const profileKeys = {
   all: ["profile"] as const,
   me: () => ["profile", "me"] as const,
-  myPosts: () => ["profile", "me", "posts"] as const,
 };
 
 export async function getAuthHeader() {
@@ -62,30 +59,9 @@ export async function fetchMyProfile() {
   return response.data;
 }
 
-export async function fetchMyPosts() {
-  const headers = await getAuthHeader();
-  const response = await api.get<MyPostsResponse>("/profile/me/posts", {
-    headers,
-    params: { limit: 20, offset: 0 },
-  });
-  return response.data.items ?? [];
-}
-
 export async function updateMyProfile(payload: UpdateMyProfilePayload) {
   const headers = await getAuthHeader();
   const response = await api.put("/profile/me", payload, { headers });
-  return response.data;
-}
-
-export async function updateMyPost(postId: number, payload: UpdateMyPostPayload) {
-  const headers = await getAuthHeader();
-  const response = await api.put(`/profile/me/posts/${postId}`, payload, { headers });
-  return response.data;
-}
-
-export async function deleteMyPost(postId: number) {
-  const headers = await getAuthHeader();
-  const response = await api.delete(`/profile/me/posts/${postId}`, { headers });
   return response.data;
 }
 

@@ -50,10 +50,11 @@ function formatDate(date: string) {
   return `${day}/${month}/${year}`;
 }
 
-function formatDuration(minutes: number | null) {
-  if (!minutes || minutes <= 0) return "0min";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+function formatDuration(totalSeconds: number | null) {
+  if (!totalSeconds || totalSeconds <= 0) return "0min";
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
   if (h === 0) return `${m}min`;
   return `${h}h ${m}min`;
 }
