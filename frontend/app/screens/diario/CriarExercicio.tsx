@@ -18,12 +18,7 @@ import { useRouter } from "expo-router";
 import { api } from "@/app/config/api";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
-
-type PresignResponse = {
-  key: string;
-  uploadUrl: string;
-  publicUrl: string | null;
-};
+import { uploadImageToR2 } from "@/app/features/profile/service";
 
 const EQUIPAMENTOS = ["barra", "halteres", "peso corporal", "cabo", "máquina", "elástico"];
 const MUSCULOS_ALVO = [
@@ -134,34 +129,7 @@ export default function CriarExercicioScreen() {
       return null;
     }
 
-    const presign = await api.post<PresignResponse>("/media/presign", {
-      filename: imageName,
-      contentType: imageMime,
-      size: imageSize,
-      folder: "exercicios_customizados",
-    });
-
-    const { uploadUrl, key, publicUrl } = presign.data;
-    const fileResponse = await fetch(imageUri);
-    const fileBlob = await fileResponse.blob();
-
-    const putResult = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": imageMime },
-      body: fileBlob,
-    });
-
-    if (!putResult.ok) {
-      throw new Error(`Falha no upload da imagem (HTTP ${putResult.status})`);
-    }
-
-    await api.post("/media/complete", {
-      key,
-      contentType: imageMime,
-      size: imageSize,
-    });
-
-    return publicUrl ?? key;
+    return uploadImageToR2(imageUri, imageName, imageMime, imageSize);
   };
 
   const handleCreateExercise = async () => {

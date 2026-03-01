@@ -16,6 +16,20 @@ export default function GraficosScreen() {
       <Text style={styles.title}>{t("diary_charts_title")}</Text>
       <Text style={styles.description}>{t("diary_charts_description")}</Text>
 
+      <Pressable
+        style={styles.primaryButton}
+        onPress={() => router.push("/screens/diario/GraficoExercicios")}
+      >
+        <Text style={styles.primaryButtonText}>Gráfico de exercícios</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.primaryButton}
+        onPress={() => router.push("/screens/diario/GraficoVolumeTreino")}
+      >
+        <Text style={styles.primaryButtonText}>Gráfico de volume de treino</Text>
+      </Pressable>
+
       <Pressable style={styles.backButton} onPress={() => router.back()}>
         <Text style={styles.backButtonText}>{t("common_back")}</Text>
       </Pressable>
@@ -43,15 +57,29 @@ function createStyles(theme: AppTheme) {
       textAlign: "center",
     },
     backButton: {
-      marginTop: 16,
+      marginTop: 8,
+      height: 46,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    primaryButton: {
+      marginTop: 8,
       height: 46,
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.colors.button,
     },
-    backButtonText: {
+    primaryButtonText: {
       color: theme.colors.buttonText,
+      fontWeight: "700",
+    },
+    backButtonText: {
+      color: theme.colors.text,
       fontWeight: "700",
     },
   });
