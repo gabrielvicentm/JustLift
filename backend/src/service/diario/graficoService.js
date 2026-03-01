@@ -113,3 +113,176 @@ exports.getVolumeDistribution = async ({ userId, period = '7d' }) => {
     distribuicao: distribution,
   };
 };
+
+exports.getExercisesDone = async ({ userId, lang = 'pt' }) => {
+  const safeLang = lang === 'en' ? 'en' : 'pt';
+
+  const query = `
+    WITH series_base AS (
+      SELECT
+        t.treino_id,
+        t.data,
+        edt.exercise_id,
+        edt.custom_exercise_id,
+        s.kg
+      FROM treinos t
+      JOIN exercicios_do_treino edt
+        ON edt.treino_id = t.treino_id
+      JOIN series_do_exercicio s
+        ON s.exercicio_treino_id = edt.exercicio_treino_id
+      WHERE t.user_id = $1
+        AND t.finalizado = TRUE
+        AND s.concluido = TRUE
+    ),
+    agrupado AS (
+      SELECT
+        'api'::text AS source,
+        sb.exercise_id,
+        NULL::int AS custom_exercise_id,
+        COUNT(DISTINCT sb.treino_id)::int AS total_treinos,
+        MAX(sb.kg)::numeric(10,2) AS recorde_kg,
+        MAX(sb.data) AS ultima_data
+      FROM series_base sb
+      WHERE sb.exercise_id IS NOT NULL
+      GROUP BY sb.exercise_id
+
+      UNION ALL
+
+      SELECT
+        'custom'::text AS source,
+        NULL::varchar(20) AS exercise_id,
+        sb.custom_exercise_id,
+        COUNT(DISTINCT sb.treino_id)::int AS total_treinos,
+        MAX(sb.kg)::numeric(10,2) AS recorde_kg,
+        MAX(sb.data) AS ultima_data
+      FROM series_base sb
+      WHERE sb.custom_exercise_id IS NOT NULL
+      GROUP BY sb.custom_exercise_id
+    )
+    SELECT
+      a.source,
+      a.exercise_id,
+      a.custom_exercise_id,
+      COALESCE(ec.nome, tr_lang.nome, tr_en.nome, a.exercise_id, 'Exercício') AS nome,
+      COALESCE(ec.img_url, e.gif_url) AS imagem_url,
+      a.total_treinos,
+      COALESCE(a.recorde_kg, 0)::float AS recorde_kg,
+      TO_CHAR(a.ultima_data, 'YYYY-MM-DD') AS ultima_data
+    FROM agrupado a
+    LEFT JOIN exercicios_customizados ec
+      ON ec.id_exercicio_customizado = a.custom_exercise_id
+    LEFT JOIN exercicios e
+      ON e.exercise_id = a.exercise_id
+    LEFT JOIN exercicio_traducoes tr_lang
+      ON tr_lang.exercise_id = a.exercise_id
+     AND tr_lang.lang = $2
+    LEFT JOIN exercicio_traducoes tr_en
+      ON tr_en.exercise_id = a.exercise_id
+     AND tr_en.lang = 'en'
+    ORDER BY nome ASC
+  `;
+
+  const result = await db.query(query, [userId, safeLang]);
+  return result.rows || [];
+};
+
+exports.getExerciseProgress = async ({
+  userId,
+  source,
+  exerciseId = null,
+  customExerciseId = null,
+  lang = 'pt',
+}) => {
+  const safeLang = lang === 'en' ? 'en' : 'pt';
+  const isApi = source === 'api';
+  const idValue = isApi ? exerciseId : customExerciseId;
+  const column = isApi ? 'edt.exercise_id' : 'edt.custom_exercise_id';
+
+  const pointsQuery = `
+    SELECT
+      t.treino_id,
+      TO_CHAR(t.data, 'YYYY-MM-DD') AS data,
+      MAX(s.kg)::float AS peso_maximo
+    FROM treinos t
+    JOIN exercicios_do_treino edt
+      ON edt.treino_id = t.treino_id
+    JOIN series_do_exercicio s
+      ON s.exercicio_treino_id = edt.exercicio_treino_id
+    WHERE t.user_id = $1
+      AND t.finalizado = TRUE
+      AND s.concluido = TRUE
+      AND ${column} = $2
+    GROUP BY t.treino_id, t.data
+    ORDER BY t.data ASC, t.treino_id ASC
+  `;
+
+  const pointsResult = await db.query(pointsQuery, [userId, idValue]);
+  const pontos = pointsResult.rows || [];
+
+  let exercicio = null;
+
+  if (isApi) {
+    const nameResult = await db.query(
+      `
+        SELECT COALESCE(tr_lang.nome, tr_en.nome, $1::text, 'Exercício') AS nome
+        FROM exercicios e
+        LEFT JOIN exercicio_traducoes tr_lang
+          ON tr_lang.exercise_id = e.exercise_id
+         AND tr_lang.lang = $2
+        LEFT JOIN exercicio_traducoes tr_en
+          ON tr_en.exercise_id = e.exercise_id
+         AND tr_en.lang = 'en'
+        WHERE e.exercise_id = $1
+        LIMIT 1
+      `,
+      [exerciseId, safeLang],
+    );
+
+    exercicio = {
+      source: 'api',
+      exercise_id: exerciseId,
+      custom_exercise_id: null,
+      nome: String(nameResult.rows?.[0]?.nome || exerciseId || 'Exercício'),
+    };
+  } else {
+    const nameResult = await db.query(
+      `
+        SELECT COALESCE(ec.nome, 'Exercício customizado') AS nome
+        FROM exercicios_customizados ec
+        WHERE ec.id_exercicio_customizado = $1
+        LIMIT 1
+      `,
+      [customExerciseId],
+    );
+
+    exercicio = {
+      source: 'custom',
+      exercise_id: null,
+      custom_exercise_id: customExerciseId,
+      nome: String(nameResult.rows?.[0]?.nome || `Exercício #${customExerciseId}`),
+    };
+  }
+
+  const first = pontos[0] ? Number(pontos[0].peso_maximo || 0) : 0;
+  const last = pontos.length > 0 ? Number(pontos[pontos.length - 1].peso_maximo || 0) : 0;
+  const delta = last - first;
+  const variacaoPercentual = first > 0 ? (delta / first) * 100 : 0;
+  const recordeKg = pontos.reduce((acc, p) => Math.max(acc, Number(p.peso_maximo || 0)), 0);
+
+  return {
+    exercicio,
+    pontos: pontos.map((p) => ({
+      treino_id: Number(p.treino_id),
+      data: p.data,
+      peso_maximo: Number(p.peso_maximo || 0),
+    })),
+    estatisticas: {
+      total_treinos: pontos.length,
+      recorde_kg: Number(recordeKg.toFixed(2)),
+      peso_inicial_kg: Number(first.toFixed(2)),
+      peso_final_kg: Number(last.toFixed(2)),
+      variacao_kg: Number(delta.toFixed(2)),
+      variacao_percentual: Number(variacaoPercentual.toFixed(1)),
+    },
+  };
+};
