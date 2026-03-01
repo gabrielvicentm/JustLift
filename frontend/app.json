@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "RECEITA FEDERAL",
+    "name": "JustLift",
     "slug": "TIGRINHO",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/RECEITAFEDERAL.png",
+    "icon": "./assets/images/JUSTLIFT.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,10 +13,10 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/RECEITAFEDERAL.png",
-        "backgroundImage": "./assets/images/RECEITAFEDERAL.png",
-        "monochromeImage": "./assets/images/RECEITAFEDERAL.png"
+        "backgroundColor": "#b1ffa3",
+        "foregroundImage": "./assets/images/JUSTLIFT.png",
+        "backgroundImage": "./assets/images/JUSTLIFT.png",
+        "monochromeImage": "./assets/images/JUSTLIFT.png"
       },
       "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
@@ -25,7 +25,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/RECEITAFEDERAL.png"
+      "favicon": "./assets/images/JUSTLIFT.png"
     },
     "plugins": [
       "expo-router",
@@ -35,7 +35,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/RECEITAFEDERAL.png",
+          "image": "./assets/images/JUSTLIFT.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

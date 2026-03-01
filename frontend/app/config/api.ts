@@ -10,11 +10,11 @@ type RateLimitPayload = {
 type RateLimitHandler = (payload: RateLimitPayload) => void;
 */
 
-const devMachineHost = process.env.EXPO_PUBLIC_DEV_MACHINE_IP ?? "192.168.15.86";
+const devMachineHost = process.env.EXPO_PUBLIC_DEV_MACHINE_IP ?? "192.168.0.11";
 const fallbackBaseURL = Platform.select({
-  // Android físico precisa do IP da máquina na rede local (não localhost).
-  android: `http://192.168.15.86:3000/api`,
-  ios: "http://localhost:3000/api",
+  // Dispositivo fisico (Android/iOS) precisa do IP da maquina na rede local.
+  android: `http://${devMachineHost}:3000/api`,
+  ios: `http://${devMachineHost}:3000/api`,
   default: "http://localhost:3000/api",
 });
 

@@ -1,8 +1,8 @@
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ThemeProvider } from "@/providers/ThemeProvider";
+import { ThemeProvider, useAppTheme } from "@/providers/ThemeProvider";
 import { I18nProvider } from "@/providers/I18nProvider";
-import { useAppTheme } from "@/providers/ThemeProvider";
+import { AppQueryProvider } from "@/app/providers/QueryProvider";
 
 function RootStack() {
   const { theme } = useAppTheme();
@@ -48,7 +48,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <I18nProvider>
-          <RootStack />
+          <AppQueryProvider>
+            <RootStack />
+          </AppQueryProvider>
         </I18nProvider>
       </ThemeProvider>
     </SafeAreaProvider>
