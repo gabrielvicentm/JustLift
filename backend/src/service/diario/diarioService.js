@@ -1,6 +1,13 @@
 const db = require('../../utils/db');
 
+// Cria um exercício customizado para o usuário autenticado.
+// Entrada esperada:
+// - userId: UUID do usuário dono do exercício.
+// - nome, equipamento, musculoAlvo, imgUrl: metadados do exercício custom.
+// Saída:
+// - objeto da linha recém-criada.
 exports.createCustomExercise = async ({ userId, nome, equipamento, musculoAlvo, imgUrl }) => {
+
   const query = `
     INSERT INTO exercicios_customizados (
       user_id,
@@ -20,11 +27,18 @@ exports.createCustomExercise = async ({ userId, nome, equipamento, musculoAlvo, 
       created_at
   `;
 
+  // Ordem dos valores segue a ordem dos placeholders $1..$5 da query.
   const values = [userId, nome, equipamento, musculoAlvo, imgUrl];
+  // Executa o INSERT e retorna a linha criada.
   const result = await db.query(query, values);
   return result.rows[0];
 };
 
+// Busca exercícios canônicos com filtros opcionais e paginação.
+// Fluxo:
+// 1) Obtém base paginada via função SQL buscar_exercicios.
+// 2) Enriquece resultado com listas de músculos/equipamentos traduzidos.
+// 3) Retorna no mesmo formato esperado pela API.
 exports.searchExercises = async ({
   query = null,
   lang = 'pt',
@@ -33,7 +47,55 @@ exports.searchExercises = async ({
   limit = 30,
   offset = 0,
 }) => {
+  // CTE "base":
+  // - centraliza o resultado da função SQL com ranking e filtros.
+  // CTE "musculos" e "equipamentos":
+  // - agregam labels por exercise_id apenas para a página atual (melhor custo).
   const sql = `
+    WITH base AS (
+      SELECT *
+      FROM buscar_exercicios($1, $2, $3, $4, $5, $6)
+    ),
+    musculos AS (
+      SELECT
+        src.exercise_id,
+        jsonb_agg(src.label ORDER BY src.label) AS musculos
+      FROM (
+        SELECT DISTINCT
+          b.exercise_id,
+          COALESCE(gmt_lang.label, gmt_en.label, egm.muscle_key) AS label
+        FROM base b
+        JOIN exercicio_grupos_musculares egm
+          ON egm.exercise_id = b.exercise_id
+        LEFT JOIN grupo_muscular_traducoes gmt_lang
+          ON gmt_lang.muscle_key = egm.muscle_key
+         AND gmt_lang.lang = $2
+        LEFT JOIN grupo_muscular_traducoes gmt_en
+          ON gmt_en.muscle_key = egm.muscle_key
+         AND gmt_en.lang = 'en'
+      ) src
+      GROUP BY src.exercise_id
+    ),
+    equipamentos AS (
+      SELECT
+        src.exercise_id,
+        jsonb_agg(src.label ORDER BY src.label) AS equipamentos
+      FROM (
+        SELECT DISTINCT
+          b.exercise_id,
+          COALESCE(et_lang.label, et_en.label, ee.equipment_key) AS label
+        FROM base b
+        JOIN exercicio_equipamentos ee
+          ON ee.exercise_id = b.exercise_id
+        LEFT JOIN equipamento_traducoes et_lang
+          ON et_lang.equipment_key = ee.equipment_key
+         AND et_lang.lang = $2
+        LEFT JOIN equipamento_traducoes et_en
+          ON et_en.equipment_key = ee.equipment_key
+         AND et_en.lang = 'en'
+      ) src
+      GROUP BY src.exercise_id
+    )
     SELECT
       b.exercise_id,
       b.nome_exibicao AS nome,
@@ -42,44 +104,24 @@ exports.searchExercises = async ({
       b.score,
       COALESCE(m.musculos, '[]'::jsonb) AS musculos,
       COALESCE(eq.equipamentos, '[]'::jsonb) AS equipamentos
-    FROM buscar_exercicios($1, $2, $3, $4, $5, $6) b
-    LEFT JOIN LATERAL (
-      SELECT jsonb_agg(x.label ORDER BY x.label) AS musculos
-      FROM (
-        SELECT DISTINCT COALESCE(gmt_lang.label, gmt_en.label, egm.muscle_key) AS label
-        FROM exercicio_grupos_musculares egm
-        LEFT JOIN grupo_muscular_traducoes gmt_lang
-          ON gmt_lang.muscle_key = egm.muscle_key
-         AND gmt_lang.lang = $2
-        LEFT JOIN grupo_muscular_traducoes gmt_en
-          ON gmt_en.muscle_key = egm.muscle_key
-         AND gmt_en.lang = 'en'
-        WHERE egm.exercise_id = b.exercise_id
-      ) x
-    ) m ON TRUE
-    LEFT JOIN LATERAL (
-      SELECT jsonb_agg(x.label ORDER BY x.label) AS equipamentos
-      FROM (
-        SELECT DISTINCT COALESCE(et_lang.label, et_en.label, ee.equipment_key) AS label
-        FROM exercicio_equipamentos ee
-        LEFT JOIN equipamento_traducoes et_lang
-          ON et_lang.equipment_key = ee.equipment_key
-         AND et_lang.lang = $2
-        LEFT JOIN equipamento_traducoes et_en
-          ON et_en.equipment_key = ee.equipment_key
-         AND et_en.lang = 'en'
-        WHERE ee.exercise_id = b.exercise_id
-      ) x
-    ) eq ON TRUE
+    FROM base b
+    LEFT JOIN musculos m
+      ON m.exercise_id = b.exercise_id
+    LEFT JOIN equipamentos eq
+      ON eq.exercise_id = b.exercise_id
     ORDER BY b.score DESC, b.nome_exibicao ASC
   `;
 
+  // Parâmetros na mesma ordem dos placeholders da query.
   const values = [query, lang, muscleKey, equipmentKey, limit, offset];
+  // Executa e devolve todas as linhas do resultado.
   const result = await db.query(sql, values);
   return result.rows;
 };
 
+// Lista os exercícios customizados de um usuário em ordem de criação (mais novo primeiro).
 exports.getCustomExercisesByUser = async ({ userId }) => {
+  // Filtro por dono do exercício para isolamento entre usuários.
   const query = `
     SELECT
       id_exercicio_customizado,
@@ -94,10 +136,16 @@ exports.getCustomExercisesByUser = async ({ userId }) => {
     ORDER BY created_at DESC
   `;
 
+  // Query simples sem transformação extra.
   const result = await db.query(query, [userId]);
   return result.rows;
 };
  
+// Persiste um treino completo (treino + exercícios + séries) de forma transacional.
+// Regras importantes:
+// - Tudo grava ou nada grava (BEGIN/COMMIT/ROLLBACK).
+// - Calcula métricas agregadas no backend (peso_total e total_series concluídas).
+// - Usa inserts em lote para reduzir round-trips com o banco.
 exports.saveWorkout = async ({
   userId,
   data = null,
@@ -105,15 +153,19 @@ exports.saveWorkout = async ({
   finalizado = true,
   exercicios = [],
 }) => {
+  // Conexão dedicada para transação explícita.
   const client = await db.connect();
 
   try {
+    // Início da transação atômica.
     await client.query('BEGIN');
 
+    // Soma quantas séries foram concluídas no treino.
     const totalSeries = exercicios.reduce((acc, ex) => (
       acc + ex.series.filter((serie) => serie.concluido).length
     ), 0);
 
+    // Soma volume total (kg * repetições) apenas de séries concluídas.
     const pesoTotal = exercicios.reduce((acc, ex) => (
       acc + ex.series.reduce((inner, serie) => {
         if (!serie.concluido) return inner;
@@ -121,6 +173,8 @@ exports.saveWorkout = async ({
       }, 0)
     ), 0);
 
+    // Cria o "cabeçalho" do treino.
+    // Se data vier nula, usa CURRENT_DATE.
     const treinoInsertQuery = `
       INSERT INTO treinos (
         user_id,
@@ -141,6 +195,7 @@ exports.saveWorkout = async ({
       RETURNING treino_id, user_id, data, duracao, peso_total, total_series, finalizado
     `;
 
+    // Persistência do treino principal.
     const treinoResult = await client.query(treinoInsertQuery, [
       userId,
       data,
@@ -150,23 +205,57 @@ exports.saveWorkout = async ({
       finalizado,
     ]);
 
+    // Linha criada em treinos (referência para filhos).
     const treino = treinoResult.rows[0];
 
-    for (let idx = 0; idx < exercicios.length; idx += 1) {
-      const ex = exercicios[idx];
+    // Coleta IDs de exercícios customizados sem duplicar.
+    const customIds = Array.from(new Set(
+      exercicios
+        .map((ex) => ex.custom_exercise_id)
+        .filter((id) => Number.isInteger(id)),
+    ));
 
-      if (ex.custom_exercise_id) {
-        const ownerCheck = await client.query(
-          `SELECT 1 FROM exercicios_customizados WHERE id_exercicio_customizado = $1 AND user_id = $2`,
-          [ex.custom_exercise_id, userId],
-        );
+    // Validação em lote de ownership de exercícios customizados:
+    // todos os IDs enviados precisam pertencer ao usuário atual.
+    if (customIds.length > 0) {
+      const ownerCheck = await client.query(
+        `
+          SELECT id_exercicio_customizado
+          FROM exercicios_customizados
+          WHERE user_id = $1
+            AND id_exercicio_customizado = ANY($2::int[])
+        `,
+        [userId, customIds],
+      );
 
-        if (ownerCheck.rowCount === 0) {
-          throw new Error(`Exercício customizado inválido para o usuário: ${ex.custom_exercise_id}`);
-        }
+      // Conjunto dos IDs válidos retornados pelo banco.
+      const ownedIds = new Set(ownerCheck.rows.map((row) => row.id_exercicio_customizado));
+      // Se houver qualquer ID não pertencente ao usuário, aborta tudo.
+      const invalidCustomId = customIds.find((id) => !ownedIds.has(id));
+      if (invalidCustomId) {
+        throw new Error(`Exercício customizado inválido para o usuário: ${invalidCustomId}`);
       }
+    }
 
-      const exercicioTreinoInsertQuery = `
+    // Monta INSERT em lote de exercicios_do_treino:
+    // cada exercício gera 5 placeholders (treino_id, exercise_id, custom_exercise_id, anotacoes, ordem).
+    const exercicioValues = [];
+    const exercicioPlaceholders = exercicios.map((ex, idx) => {
+      const base = idx * 5;
+      exercicioValues.push(
+        treino.treino_id,
+        ex.exercise_id,
+        ex.custom_exercise_id,
+        ex.anotacoes,
+        idx + 1,
+      );
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+    });
+
+    // Executa um único INSERT para todos os exercícios do treino.
+    // Retorna id gerado + ordem para mapear com as séries depois.
+    const exerciciosInsertResult = await client.query(
+      `
         INSERT INTO exercicios_do_treino (
           treino_id,
           exercise_id,
@@ -174,51 +263,72 @@ exports.saveWorkout = async ({
           anotacoes,
           ordem
         )
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING exercicio_treino_id
-      `;
+        VALUES ${exercicioPlaceholders.join(', ')}
+        RETURNING exercicio_treino_id, ordem
+      `,
+      exercicioValues,
+    );
 
-      const exercicioTreinoResult = await client.query(exercicioTreinoInsertQuery, [
-        treino.treino_id,
-        ex.exercise_id,
-        ex.custom_exercise_id,
-        ex.anotacoes,
-        idx + 1,
-      ]);
+    // Mapeia "ordem do payload" -> "exercicio_treino_id do banco".
+    const exercicioTreinoIdByOrdem = new Map(
+      exerciciosInsertResult.rows.map((row) => [row.ordem, row.exercicio_treino_id]),
+    );
 
-      const exercicioTreinoId = exercicioTreinoResult.rows[0].exercicio_treino_id;
+    // Normaliza todas as séries em uma única lista já com FK resolvida.
+    const seriesRows = [];
+    exercicios.forEach((ex, idx) => {
+      const exercicioTreinoId = exercicioTreinoIdByOrdem.get(idx + 1);
+      ex.series.forEach((serie, serieIdx) => {
+        seriesRows.push({
+          exercicioTreinoId,
+          numero: serie.numero || (serieIdx + 1),
+          kg: serie.kg,
+          repeticoes: serie.repeticoes,
+          concluido: serie.concluido,
+        });
+      });
+    });
 
-      for (let serieIdx = 0; serieIdx < ex.series.length; serieIdx += 1) {
-        const serie = ex.series[serieIdx];
-
-        await client.query(
-          `
-            INSERT INTO series_do_exercicio (
-              exercicio_treino_id,
-              numero,
-              kg,
-              repeticoes,
-              concluido
-            )
-            VALUES ($1, $2, $3, $4, $5)
-          `,
-          [
-            exercicioTreinoId,
-            serie.numero || (serieIdx + 1),
-            serie.kg,
-            serie.repeticoes,
-            serie.concluido,
-          ],
+    // Se houver séries, persiste tudo em lote na tabela series_do_exercicio.
+    if (seriesRows.length > 0) {
+      const seriesValues = [];
+      const seriesPlaceholders = seriesRows.map((serie, idx) => {
+        // Cada série também gera 5 placeholders.
+        const base = idx * 5;
+        seriesValues.push(
+          serie.exercicioTreinoId,
+          serie.numero,
+          serie.kg,
+          serie.repeticoes,
+          serie.concluido,
         );
-      }
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+      });
+
+      await client.query(
+        `
+          INSERT INTO series_do_exercicio (
+            exercicio_treino_id,
+            numero,
+            kg,
+            repeticoes,
+            concluido
+          )
+          VALUES ${seriesPlaceholders.join(', ')}
+        `,
+        seriesValues,
+      );
     }
 
+    // Finaliza transação com sucesso.
     await client.query('COMMIT');
     return treino;
   } catch (err) {
+    // Em qualquer erro, desfaz tudo para não deixar dados parciais.
     await client.query('ROLLBACK');
     throw err;
   } finally {
+    // Sempre libera a conexão de volta ao pool.
     client.release();
   }
 };
