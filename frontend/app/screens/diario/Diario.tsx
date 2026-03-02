@@ -93,7 +93,7 @@ export default function DiarioScreen() {
 
         <Pressable
           style={styles.button}
-          onPress={() => router.push("/screens/diario/CriarExercicio")}
+          onPress={() => router.push("/screens/diario/Ranking")}
         >
           <Text style={styles.buttonText}>{t("diary_ranking")}</Text>
         </Pressable>

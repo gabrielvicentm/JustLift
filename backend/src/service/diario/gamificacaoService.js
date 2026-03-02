@@ -82,6 +82,43 @@ const getTotalPoints = async ({ userId, client }) => {
   return Number(result.rows[0]?.pontos_totais || 0);
 };
 
+const getGlobalPosition = async ({ userId, client }) => {
+  const result = await client.query(
+    `
+      WITH ranking_base AS (
+        SELECT
+          u.id,
+          COALESCE(gs.pontos_totais, 0) AS total_points,
+          u.created_at
+        FROM users u
+        LEFT JOIN gamificacao_saldos gs
+          ON gs.user_id = u.id
+      ),
+      target AS (
+        SELECT id, total_points, created_at
+        FROM ranking_base
+        WHERE id = $1
+      )
+      SELECT
+        1 + COUNT(*)::INT AS posicao
+      FROM ranking_base rb
+      CROSS JOIN target t
+      WHERE
+        rb.total_points > t.total_points
+        OR (
+          rb.total_points = t.total_points
+          AND (
+            rb.created_at < t.created_at
+            OR (rb.created_at = t.created_at AND rb.id < t.id)
+          )
+        )
+    `,
+    [userId],
+  );
+
+  return Number(result.rows[0]?.posicao || 0);
+};
+
 exports.grantPoints = async ({
   userId,
   points,
@@ -215,8 +252,10 @@ exports.getMyGamificacao = async ({ userId }) => {
   const client = await db.connect();
   try {
     const totalPoints = await getTotalPoints({ userId, client });
+    const globalPosition = await getGlobalPosition({ userId, client });
     return {
       totalPoints,
+      global_position: globalPosition,
       patente: enrichPatenteProgress(totalPoints),
     };
   } finally {
@@ -264,11 +303,14 @@ exports.getRanking = async ({ limit = 20 }) => {
       SELECT
         u.id AS user_id,
         u.username,
+        up.foto_perfil,
         COALESCE(gs.pontos_totais, 0) AS total_points
       FROM users u
       LEFT JOIN gamificacao_saldos gs
         ON gs.user_id = u.id
-      ORDER BY COALESCE(gs.pontos_totais, 0) DESC, u.created_at ASC
+      LEFT JOIN users_profile up
+        ON up.user_id = u.id
+      ORDER BY COALESCE(gs.pontos_totais, 0) DESC, u.created_at ASC, u.id ASC
       LIMIT $1
     `,
     [safeLimit],
@@ -280,6 +322,7 @@ exports.getRanking = async ({ limit = 20 }) => {
       posicao: index + 1,
       user_id: row.user_id,
       username: row.username,
+      foto_perfil: row.foto_perfil ?? null,
       total_points: totalPoints,
       patente: enrichPatenteProgress(totalPoints),
     };
