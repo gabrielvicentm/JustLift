@@ -233,6 +233,31 @@ CREATE TABLE exercicios_customizados (
     ON DELETE CASCADE
 );
 
+-- SALDO DE GAMIFICAÇÃO POR USUÁRIO
+CREATE TABLE gamificacao_saldos (
+  user_id UUID PRIMARY KEY,
+  pontos_totais BIGINT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_gamificacao_saldo_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_gamificacao_pontos_nao_negativos
+    CHECK (pontos_totais >= 0)
+);
+
+-- HISTÓRICO DE EVENTOS QUE GERAM PONTOS
+CREATE TABLE gamificacao_eventos (
+  evento_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL,
+  source_type VARCHAR(50) NOT NULL,
+  source_id VARCHAR(100),
+  points INT NOT NULL,
+  metadata JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_gamificacao_evento_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_gamificacao_evento_points
+    CHECK (points >= 0)
+);
 
 
 -- Histórico de treinos por usuário
@@ -250,6 +275,19 @@ ON series_do_exercicio(exercicio_treino_id);
 -- Exercícios customizados por usuário (consulta + ordenação)
 CREATE INDEX idx_exercicios_custom_user_created_at
 ON exercicios_customizados(user_id, created_at DESC);
+
+-- Índice para ranking por pontos
+CREATE INDEX idx_gamificacao_saldos_pontos
+ON gamificacao_saldos(pontos_totais DESC);
+
+-- Índice para histórico por usuário
+CREATE INDEX idx_gamificacao_eventos_user_created
+ON gamificacao_eventos(user_id, created_at DESC);
+
+-- Idempotência por evento externo (quando source_id existir)
+CREATE UNIQUE INDEX uq_gamificacao_evento_source
+ON gamificacao_eventos(user_id, source_type, source_id)
+WHERE source_id IS NOT NULL;
 
 -- Assinaturas por usuário/status/validade
 CREATE INDEX idx_subscription_user_status

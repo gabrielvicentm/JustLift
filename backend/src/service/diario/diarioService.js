@@ -1,4 +1,5 @@
 const db = require('../../utils/db');
+const gamificacaoService = require('./gamificacaoService');
 
 // Cria um exercício customizado para o usuário autenticado.
 // Entrada esperada:
@@ -319,6 +320,14 @@ exports.saveWorkout = async ({
         seriesValues,
       );
     }
+
+    await gamificacaoService.grantWorkoutPoints({
+      userId,
+      workoutId: treino.treino_id,
+      volumeTotal: pesoTotal,
+      finalizado,
+      client,
+    });
 
     // Finaliza transação com sucesso.
     await client.query('COMMIT');
