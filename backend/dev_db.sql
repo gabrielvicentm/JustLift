@@ -45,6 +45,11 @@ CREATE TABLE users_profile (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Índice trigram para acelerar busca por username com ILIKE
+CREATE INDEX idx_users_username_trgm
+ON users
+USING gin (username gin_trgm_ops);
+
 -- Assinaturas por usuário (fonte da verdade do premium)
 CREATE TABLE user_subscriptions (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
