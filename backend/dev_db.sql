@@ -233,6 +233,31 @@ CREATE TABLE exercicios_customizados (
     ON DELETE CASCADE
 );
 
+-- SALDO DE GAMIFICAÇÃO POR USUÁRIO
+CREATE TABLE gamificacao_saldos (
+  user_id UUID PRIMARY KEY,
+  pontos_totais BIGINT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_gamificacao_saldo_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_gamificacao_pontos_nao_negativos
+    CHECK (pontos_totais >= 0)
+);
+
+-- HISTÓRICO DE EVENTOS QUE GERAM PONTOS
+CREATE TABLE gamificacao_eventos (
+  evento_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL,
+  source_type VARCHAR(50) NOT NULL,
+  source_id VARCHAR(100),
+  points INT NOT NULL,
+  metadata JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_gamificacao_evento_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_gamificacao_evento_points
+    CHECK (points >= 0)
+);
 
 
 -- Histórico de treinos por usuário
@@ -247,9 +272,22 @@ ON exercicios_do_treino(treino_id);
 CREATE INDEX idx_series_exercicio
 ON series_do_exercicio(exercicio_treino_id);
 
--- Exercícios customizados por usuário
-CREATE INDEX idx_exercicios_custom_user
-ON exercicios_customizados(user_id);
+-- Exercícios customizados por usuário (consulta + ordenação)
+CREATE INDEX idx_exercicios_custom_user_created_at
+ON exercicios_customizados(user_id, created_at DESC);
+
+-- Índice para ranking por pontos
+CREATE INDEX idx_gamificacao_saldos_pontos
+ON gamificacao_saldos(pontos_totais DESC);
+
+-- Índice para histórico por usuário
+CREATE INDEX idx_gamificacao_eventos_user_created
+ON gamificacao_eventos(user_id, created_at DESC);
+
+-- Idempotência por evento externo (quando source_id existir)
+CREATE UNIQUE INDEX uq_gamificacao_evento_source
+ON gamificacao_eventos(user_id, source_type, source_id)
+WHERE source_id IS NOT NULL;
 
 -- Assinaturas por usuário/status/validade
 CREATE INDEX idx_subscription_user_status
@@ -301,14 +339,13 @@ AS $$
       immutable_unaccent(lower(NULLIF(trim(p_query), ''))) AS q_norm,
       CASE WHEN p_lang IN ('pt', 'en') THEN p_lang ELSE 'pt' END AS lang
   ),
-  candidatos AS (
+  candidatos_sem_query AS (
     SELECT
       e.exercise_id,
       e.gif_url,
       t_lang.nome AS nome_lang,
       t_en.nome AS nome_en,
-      similarity(immutable_unaccent(lower(t_lang.nome)), p.q_norm) AS sim_lang,
-      similarity(immutable_unaccent(lower(t_en.nome)), p.q_norm) AS sim_en
+      0::NUMERIC AS score
     FROM exercicios e
     JOIN exercicio_traducoes t_en
       ON t_en.exercise_id = e.exercise_id
@@ -331,24 +368,65 @@ AS $$
         WHERE ee.exercise_id = e.exercise_id
           AND ee.equipment_key = p_equipment_key
       ))
+      AND p.q_raw IS NULL
+  ),
+  candidatos_com_query AS (
+    SELECT
+      e.exercise_id,
+      e.gif_url,
+      t_lang.nome AS nome_lang,
+      t_en.nome AS nome_en,
+      COALESCE(
+        GREATEST(
+          similarity(immutable_unaccent(lower(COALESCE(t_lang.nome, t_en.nome))), p.q_norm),
+          similarity(immutable_unaccent(lower(t_en.nome)), p.q_norm)
+        ),
+        0
+      )::NUMERIC AS score
+    FROM exercicios e
+    JOIN exercicio_traducoes t_en
+      ON t_en.exercise_id = e.exercise_id
+     AND t_en.lang = 'en'
+    CROSS JOIN params p
+    LEFT JOIN exercicio_traducoes t_lang
+      ON t_lang.exercise_id = e.exercise_id
+     AND t_lang.lang = p.lang
+    WHERE
+      (p_muscle_key IS NULL OR EXISTS (
+        SELECT 1
+        FROM exercicio_grupos_musculares egm
+        WHERE egm.exercise_id = e.exercise_id
+          AND egm.muscle_key = p_muscle_key
+      ))
+      AND
+      (p_equipment_key IS NULL OR EXISTS (
+        SELECT 1
+        FROM exercicio_equipamentos ee
+        WHERE ee.exercise_id = e.exercise_id
+          AND ee.equipment_key = p_equipment_key
+      ))
+      AND p.q_raw IS NOT NULL
       AND (
-        p.q_raw IS NULL
-        OR immutable_unaccent(lower(COALESCE(t_lang.nome, t_en.nome))) LIKE p.q_norm || '%'
+        immutable_unaccent(lower(COALESCE(t_lang.nome, t_en.nome))) LIKE p.q_norm || '%'
         OR immutable_unaccent(lower(t_en.nome)) LIKE p.q_norm || '%'
         OR immutable_unaccent(lower(COALESCE(t_lang.nome, t_en.nome))) % p.q_norm
         OR immutable_unaccent(lower(t_en.nome)) % p.q_norm
       )
+  ),
+  candidatos AS (
+    SELECT * FROM candidatos_sem_query
+    UNION ALL
+    SELECT * FROM candidatos_com_query
   )
   SELECT
     c.exercise_id,
     COALESCE(c.nome_lang, c.nome_en)::VARCHAR(200) AS nome_exibicao,
     c.nome_en::VARCHAR(200) AS nome_en,
     c.gif_url,
-    COALESCE(GREATEST(c.sim_lang, c.sim_en), 0)::NUMERIC AS score
+    c.score
   FROM candidatos c
   ORDER BY
-    CASE WHEN (SELECT q_raw FROM params) IS NULL THEN 1 ELSE 0 END,
-    COALESCE(GREATEST(c.sim_lang, c.sim_en), 0) DESC,
+    c.score DESC,
     COALESCE(c.nome_lang, c.nome_en) ASC
   LIMIT GREATEST(p_limit, 1)
   OFFSET GREATEST(p_offset, 0);
