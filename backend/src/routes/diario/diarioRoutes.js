@@ -18,5 +18,4 @@ router.post('/custom', authMiddleware, diarioController.criarExercicioCustomizad
 // Busca exercícios customizados do usuário autenticado
 router.get('/custom', authMiddleware, diarioController.buscarExerciciosCustomizados);
 
-
 module.exports = router;
