@@ -15,6 +15,13 @@ export type UpdateMyProfilePayload = {
   banner: string | null;
 };
 
+export type SearchUserResponseItem = {
+  user_id: string;
+  username: string;
+  nome_exibicao: string | null;
+  foto_perfil: string | null;
+};
+
 type PresignResponse = {
   key: string;
   uploadUrl: string;

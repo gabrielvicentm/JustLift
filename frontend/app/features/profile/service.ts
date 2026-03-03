@@ -5,6 +5,7 @@ import { api } from "@/app/config/api";
 import type {
   MyProfileResponse,
   PresignResponse,
+  SearchUserResponseItem,
   UpdateMyProfilePayload,
 } from "./types";
 
@@ -63,6 +64,15 @@ export async function updateMyProfile(payload: UpdateMyProfilePayload) {
   const headers = await getAuthHeader();
   const response = await api.put("/profile/me", payload, { headers });
   return response.data;
+}
+
+export async function searchUsersByUsername(query: string, limit = 20) {
+  const headers = await getAuthHeader();
+  const response = await api.get<SearchUserResponseItem[]>("/search/users", {
+    headers,
+    params: { q: query, limit },
+  });
+  return response.data ?? [];
 }
 
 export async function uploadImageToR2(
