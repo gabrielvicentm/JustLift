@@ -45,17 +45,3 @@ exports.updateProfile = async (req, res) => {
 };
 
 exports.updateMe = exports.updateProfile;
-
-exports.searchUsers = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const q = String(req.query.q || '').trim(); // pega "q" da query string; garante que vire string; remove espaços no começo/fim.
-    const limit = req.query.limit;
-
-    const users = await profileService.searchUsersByUsername(userId, q, limit);
-    return res.status(200).json(users);
-  } catch (err) {
-    console.error('Erro ao pesquisar usuarios:', err);
-    return res.status(500).json({ message: 'Erro no servidor ao pesquisar usuarios.' });
-  }
-};

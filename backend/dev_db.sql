@@ -45,10 +45,11 @@ CREATE TABLE users_profile (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índice trigram para acelerar busca por username com ILIKE
+--Isso é um “atalho” para o banco achar usernames mais rápido;
+--em buscas como ILIKE '%nome%', sem varrer todos os usuários.
 CREATE INDEX idx_users_username_trgm
 ON users
-USING gin (username gin_trgm_ops);
+USING gin (username gin_trgm_ops); --GIN e usado para busca por texto “parecido”
 
 -- Assinaturas por usuário (fonte da verdade do premium)
 CREATE TABLE user_subscriptions (

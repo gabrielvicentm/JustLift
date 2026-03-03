@@ -9,6 +9,7 @@ const graficoRoutes = require('./src/routes/diario/graficoRoutes');
 const gamificacaoRoutes = require('./src/routes/diario/gamificacaoRoutes');
 const premiumRoutes = require('./src/routes/premiumRoutes');
 const profileRoutes = require('./src/routes/profileRoutes');
+const searchRoutes = require('./src/routes/searchRoutes');
 
 //const rateLimiter = require('./src/middleware/rateLimiter');
 
@@ -27,6 +28,7 @@ app.use('/api/detalhe-treino', detalheTreinoRoutes);
 app.use('/api/diario/graficos', graficoRoutes);
 app.use('/api/premium', premiumRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/search', searchRoutes);
 
 
 module.exports = app;

@@ -68,7 +68,7 @@ export async function updateMyProfile(payload: UpdateMyProfilePayload) {
 
 export async function searchUsersByUsername(query: string, limit = 20) {
   const headers = await getAuthHeader();
-  const response = await api.get<SearchUserResponseItem[]>("/profile/search", {
+  const response = await api.get<SearchUserResponseItem[]>("/search/users", {
     headers,
     params: { q: query, limit },
   });

@@ -10,6 +10,5 @@ router.put('/updateProfile', authMiddleware, profileController.updateProfile);
 // REST routes
 router.get('/me', authMiddleware, profileController.getMe);
 router.put('/me', authMiddleware, profileController.updateMe);
-router.get('/search', authMiddleware, profileController.searchUsers);
 
 module.exports = router;
