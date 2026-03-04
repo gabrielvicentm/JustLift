@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { api } from "@/app/config/api";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { useI18n } from "@/providers/I18nProvider";
 import type { AppTheme } from "@/theme/theme";
@@ -12,8 +14,27 @@ export default function ConfiguracoesScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const isDarkMode = mode === "dark";
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const goHome = () => router.push("/screens/Home");
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    try {
+      const refreshToken = await AsyncStorage.getItem("refreshToken");
+      if (refreshToken) {
+        await api.post("/user/logout", { refreshToken });
+      }
+    } catch (err) {
+      console.log("Erro ao fazer logout no servidor:", err);
+    } finally {
+      await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
+      router.replace("/screens/auth/Login");
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -75,8 +96,8 @@ export default function ConfiguracoesScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.logoutButton} onPress={() => undefined}>
-        <Text style={styles.logoutButtonText}>Logout</Text>
+      <Pressable style={styles.logoutButton} onPress={handleLogout} disabled={isLoggingOut}>
+        <Text style={styles.logoutButtonText}>{isLoggingOut ? "Saindo..." : "Logout"}</Text>
       </Pressable>
 
       <Modal visible={showLanguageModal} animationType="fade" transparent onRequestClose={() => setShowLanguageModal(false)}>
