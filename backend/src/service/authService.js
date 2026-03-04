@@ -239,3 +239,19 @@ exports.refreshToken = async (refreshToken) => {
     refreshToken: newRefreshToken,
   };
 };
+
+exports.logout = async (refreshToken) => {
+  const decoded = jwt.verify(refreshToken, SECRET_KEY);
+
+  const user = await db.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
+
+  if (user.rows.length === 0) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  if (user.rows[0].refresh_token !== refreshToken) {
+    throw new Error('INVALID_REFRESH_TOKEN');
+  }
+
+  await db.query('UPDATE users SET refresh_token = NULL WHERE id = $1', [decoded.userId]);
+};

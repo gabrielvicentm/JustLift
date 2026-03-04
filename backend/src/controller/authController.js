@@ -150,3 +150,27 @@ exports.handleRefresh = async (req, res) => {
     return res.status(500).json({ message: 'Erro no servidor' });
   }
 };
+
+exports.logout = async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: 'Refresh token nao enviado' });
+  }
+
+  try {
+    await authService.logout(refreshToken);
+    return res.status(200).json({ message: 'Logout efetuado com sucesso' });
+  } catch (err) {
+    if (err.message === 'USER_NOT_FOUND') {
+      return res.status(400).json({ message: 'Usuario nao encontrado' });
+    }
+
+    if (err.message === 'INVALID_REFRESH_TOKEN' || err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return res.status(403).json({ message: 'Refresh token invalido ou expirado' });
+    }
+
+    console.error('Erro no logout:', err);
+    return res.status(500).json({ message: 'Erro no servidor' });
+  }
+};
