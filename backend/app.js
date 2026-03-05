@@ -10,6 +10,7 @@ const gamificacaoRoutes = require('./src/routes/diario/gamificacaoRoutes');
 const premiumRoutes = require('./src/routes/premiumRoutes');
 const profileRoutes = require('./src/routes/profileRoutes');
 const searchRoutes = require('./src/routes/searchRoutes');
+const followRoutes = require('./src/routes/followRoutes');
 
 //const rateLimiter = require('./src/middleware/rateLimiter');
 
@@ -29,6 +30,7 @@ app.use('/api/diario/graficos', graficoRoutes);
 app.use('/api/premium', premiumRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/follows', followRoutes);
 
 
 module.exports = app;

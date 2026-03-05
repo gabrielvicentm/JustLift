@@ -5,6 +5,8 @@ export type MyProfileResponse = {
   biografia: string | null;
   foto_perfil: string | null;
   banner: string | null;
+  followers_count: number;
+  following_count: number;
   created_at: string;
 };
 
@@ -20,6 +22,14 @@ export type SearchUserResponseItem = {
   username: string;
   nome_exibicao: string | null;
   foto_perfil: string | null;
+};
+
+export type FollowListItem = {
+  user_id: string;
+  username: string;
+  nome_exibicao: string | null;
+  foto_perfil: string | null;
+  followed_at: string;
 };
 
 type PresignResponse = {

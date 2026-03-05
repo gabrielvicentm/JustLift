@@ -64,6 +64,18 @@ export default function PerfilScreen() {
               <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Seu perfil"}</Text>
 
               {profile?.biografia ? <Text style={styles.bioText}>{profile.biografia}</Text> : null}
+
+              <Pressable
+                style={styles.socialSummary}
+                onPress={() => router.push("/screens/social/FollowersFollowing" as never)}
+              >
+                <Text style={styles.socialSummaryText}>
+                  <Text style={styles.socialSummaryNumber}>{profile?.followers_count ?? 0}</Text> seguidores
+                </Text>
+                <Text style={styles.socialSummaryText}>
+                  <Text style={styles.socialSummaryNumber}>{profile?.following_count ?? 0}</Text> seguindo
+                </Text>
+              </Pressable>
             </View>
 
             <View style={styles.actionsRow}>
@@ -160,6 +172,19 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.mutedText,
       fontSize: 14,
       textAlign: "center",
+    },
+    socialSummary: {
+      marginTop: 8,
+      flexDirection: "row",
+      gap: 16,
+    },
+    socialSummaryText: {
+      color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    socialSummaryNumber: {
+      fontWeight: "800",
     },
     actionsRow: {
       flexDirection: "row",

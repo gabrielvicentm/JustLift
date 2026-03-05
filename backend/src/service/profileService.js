@@ -9,6 +9,16 @@ exports.getProfile = async (userId) => {
        up.biografia,
        up.foto_perfil,
        up.banner,
+       (
+         SELECT COUNT(*)
+         FROM user_follows uf
+         WHERE uf.following_id = u.id
+       )::INT AS followers_count,
+       (
+         SELECT COUNT(*)
+         FROM user_follows uf
+         WHERE uf.follower_id = u.id
+       )::INT AS following_count,
        u.created_at
      FROM users u
      LEFT JOIN users_profile up ON up.user_id = u.id

@@ -45,11 +45,29 @@ CREATE TABLE users_profile (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE user_follows (
+  follower_id UUID NOT NULL,
+  following_id UUID NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT pk_user_follows PRIMARY KEY (follower_id, following_id),
+  CONSTRAINT fk_user_follows_follower
+    FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_follows_following
+    FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_user_follows_not_self CHECK (follower_id <> following_id)
+);
+
 --Isso é um “atalho” para o banco achar usernames mais rápido;
 --em buscas como ILIKE '%nome%', sem varrer todos os usuários.
 CREATE INDEX idx_users_username_trgm
 ON users
 USING gin (username gin_trgm_ops); --GIN e usado para busca por texto “parecido”
+
+CREATE INDEX idx_user_follows_follower
+ON user_follows(follower_id, created_at DESC);
+
+CREATE INDEX idx_user_follows_following
+ON user_follows(following_id, created_at DESC);
 
 -- Assinaturas por usuário (fonte da verdade do premium)
 CREATE TABLE user_subscriptions (
