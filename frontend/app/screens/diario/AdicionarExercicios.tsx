@@ -56,13 +56,62 @@ type WorkoutExercisePayload = {
   previous_reps: number | null;
 };
 
+type WorkoutSetDraft = {
+  id: string;
+  numero: number;
+  anteriorKg: number | null;
+  anteriorReps: number | null;
+  kg: string;
+  reps: string;
+  concluido: boolean;
+};
+
+type WorkoutExerciseDraft = WorkoutExercisePayload & {
+  uid: string;
+  anotacao: string;
+  series: WorkoutSetDraft[];
+};
+
 type WorkoutDraft = {
   selected_api_items?: Exercicio[];
   selected_custom_items?: ExercicioCustomizado[];
-  series_data?: unknown;
+  series_data?: WorkoutExerciseDraft[] | WorkoutExercisePayload[] | unknown;
   elapsed_seconds?: number;
   paused?: boolean;
   updated_at?: string;
+};
+
+type RepeatWorkoutListItem = {
+  treino_id: number;
+  data: string;
+  duracao: number;
+  peso_total: number;
+  total_series: number;
+  total_exercicios: number;
+};
+
+type RepeatWorkoutListResponse = {
+  treinos: RepeatWorkoutListItem[];
+  meta: {
+    count: number;
+    limit: number;
+  };
+};
+
+type RepeatWorkoutTemplateExercise = {
+  source: "api" | "custom";
+  exercise_id: string | null;
+  custom_exercise_id: number | null;
+  nome: string;
+  nome_en: string | null;
+  gif_url: string | null;
+  total_series: number;
+};
+
+type RepeatWorkoutTemplateResponse = {
+  treino_id: number;
+  data: string;
+  exercicios: RepeatWorkoutTemplateExercise[];
 };
 
 const WORKOUT_DRAFT_KEY = "current_workout_draft_v1";
@@ -108,7 +157,12 @@ export default function AdicionarTreinoScreen() {
   const [showMuscleModal, setShowMuscleModal] = useState(false);
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
   const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+  const [showRepeatWorkoutModal, setShowRepeatWorkoutModal] = useState(false);
   const [customExercises, setCustomExercises] = useState<ExercicioCustomizado[]>([]);
+  const [repeatWorkouts, setRepeatWorkouts] = useState<RepeatWorkoutListItem[]>([]);
+  const [loadingRepeatWorkouts, setLoadingRepeatWorkouts] = useState(false);
+  const [repeatWorkoutsError, setRepeatWorkoutsError] = useState<string | null>(null);
+  const [loadingRepeatTemplateId, setLoadingRepeatTemplateId] = useState<number | null>(null);
   const [loadingCustom, setLoadingCustom] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
@@ -363,6 +417,141 @@ export default function AdicionarTreinoScreen() {
     }
   }, [isEn]);
 
+  const loadRepeatWorkouts = useCallback(async () => {
+    setLoadingRepeatWorkouts(true);
+    setRepeatWorkoutsError(null);
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (!accessToken) {
+        setRepeatWorkouts([]);
+        setRepeatWorkoutsError(isEn ? "Sign in to view previous workouts." : "Faça login para ver os treinos anteriores.");
+        return;
+      }
+
+      const response = await api.get<RepeatWorkoutListResponse>("/diario/repetir-treino/lista", {
+        params: { limit: 30 },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      setRepeatWorkouts(response.data?.treinos ?? []);
+    } catch (err) {
+      console.error("Erro ao buscar treinos para repetir:", err);
+      setRepeatWorkouts([]);
+      setRepeatWorkoutsError(isEn ? "Error loading previous workouts." : "Erro ao carregar treinos anteriores.");
+    } finally {
+      setLoadingRepeatWorkouts(false);
+    }
+  }, [isEn]);
+
+  const buildSeriesTemplate = (totalSeries: number, uid: string): WorkoutSetDraft[] => {
+    const amount = Math.max(Math.floor(Number(totalSeries) || 1), 1);
+    return Array.from({ length: amount }).map((_, index) => ({
+      id: `${uid}-${index + 1}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      numero: index + 1,
+      anteriorKg: null,
+      anteriorReps: null,
+      kg: "",
+      reps: "",
+      concluido: false,
+    }));
+  };
+
+  const handleSelectRepeatWorkout = useCallback(async (treinoId: number) => {
+    setLoadingRepeatTemplateId(treinoId);
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (!accessToken) {
+        setRepeatWorkoutsError(isEn ? "Sign in to repeat a workout." : "Faça login para repetir treino.");
+        return;
+      }
+
+      const response = await api.get<RepeatWorkoutTemplateResponse>(
+        `/diario/repetir-treino/template/${treinoId}`,
+        {
+          params: { lang: language },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      const templateExercises = response.data?.exercicios ?? [];
+      if (templateExercises.length === 0) {
+        setRepeatWorkoutsError(isEn ? "Selected workout has no exercises." : "O treino selecionado não possui exercícios.");
+        return;
+      }
+
+      const apiItems: Exercicio[] = [];
+      const customItems: ExercicioCustomizado[] = [];
+
+      const seriesData: WorkoutExerciseDraft[] = templateExercises.map((item) => {
+        const uid = item.source === "api" ? `api:${item.exercise_id}` : `custom:${item.custom_exercise_id}`;
+        if (item.source === "api" && item.exercise_id) {
+          apiItems.push({
+            exercise_id: item.exercise_id,
+            nome: item.nome,
+            nome_en: item.nome_en || item.nome,
+            gif_url: item.gif_url,
+            score: 0,
+            musculos: [],
+            equipamentos: [],
+          });
+        } else if (item.source === "custom" && item.custom_exercise_id != null) {
+          customItems.push({
+            id_exercicio_customizado: item.custom_exercise_id,
+            nome: item.nome,
+            equipamento: null,
+            musculo_alvo: null,
+            img_url: item.gif_url,
+          });
+        }
+
+        return {
+          source: item.source,
+          exercise_id: item.exercise_id,
+          custom_exercise_id: item.custom_exercise_id,
+          nome: item.nome,
+          nome_en: item.nome_en,
+          gif_url: item.gif_url,
+          previous_kg: null,
+          previous_reps: null,
+          uid,
+          anotacao: "",
+          series: buildSeriesTemplate(item.total_series, uid),
+        };
+      });
+
+      setSelectedIds(new Set(apiItems.map((item) => item.exercise_id)));
+      setSelectedApiItems(Object.fromEntries(apiItems.map((item) => [item.exercise_id, item])));
+      setSelectedCustomIds(new Set(customItems.map((item) => item.id_exercicio_customizado)));
+      setSelectedCustomItems(Object.fromEntries(customItems.map((item) => [item.id_exercicio_customizado, item])));
+
+      const rawDraft = await AsyncStorage.getItem(WORKOUT_DRAFT_KEY);
+      const previousDraft: WorkoutDraft = rawDraft ? JSON.parse(rawDraft) : {};
+
+      const nextDraft: WorkoutDraft = {
+        ...previousDraft,
+        selected_api_items: apiItems,
+        selected_custom_items: customItems,
+        series_data: seriesData,
+        elapsed_seconds: 0,
+        paused: false,
+        updated_at: new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem(WORKOUT_DRAFT_KEY, JSON.stringify(nextDraft));
+      setShowRepeatWorkoutModal(false);
+      router.push("/screens/diario/AdicionarSeries");
+    } catch (err) {
+      console.error("Erro ao carregar template do treino:", err);
+      setRepeatWorkoutsError(isEn ? "Could not load selected workout." : "Não foi possível carregar o treino selecionado.");
+    } finally {
+      setLoadingRepeatTemplateId(null);
+    }
+  }, [isEn, language, router]);
+
   const selectedMuscleLabel =
     MUSCLE_FILTER_OPTIONS.find((option) => option.key === muscleFilter)?.label ?? (isEn ? "Muscles" : "Músculos");
   const selectedEquipmentLabel =
@@ -454,10 +643,13 @@ export default function AdicionarTreinoScreen() {
           >
             <Text style={styles.tabButtonText}>Personalizados</Text>
           </Pressable>
-          <Pressable style={styles.tabButton}>
-            <Text style={styles.tabButtonText}>{isEn ? "Custom" : "Personalizados"}</Text>
-          </Pressable>
-          <Pressable style={styles.tabButton}>
+          <Pressable
+            style={styles.tabButton}
+            onPress={() => {
+              setShowRepeatWorkoutModal(true);
+              loadRepeatWorkouts().catch(() => undefined);
+            }}
+          >
             <Text style={styles.tabButtonText}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
           </Pressable>
         </View>
@@ -551,7 +743,6 @@ export default function AdicionarTreinoScreen() {
                     <View style={styles.customInfo}>
                       <Text style={styles.customName}>{item.nome}</Text>
                       <Text style={styles.customMeta}>
-                        {item.musculo_alvo || "Sem músculo alvo"}
                         {item.musculo_alvo || (isEn ? "No target muscle" : "Sem músculo alvo")}
                       </Text>
                       <Text style={styles.customMeta}>
@@ -561,6 +752,75 @@ export default function AdicionarTreinoScreen() {
                     {selected ? <Text style={styles.customSelectedMark}>✓</Text> : null}
                   </Pressable>
                 )}}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showRepeatWorkoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRepeatWorkoutModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
+              <Pressable onPress={() => setShowRepeatWorkoutModal(false)}>
+                <Text style={styles.modalClose}>{isEn ? "Close" : "Fechar"}</Text>
+              </Pressable>
+            </View>
+
+            {loadingRepeatWorkouts ? (
+              <View style={styles.modalState}>
+                <ActivityIndicator color={theme.colors.button} />
+              </View>
+            ) : repeatWorkoutsError ? (
+              <View style={styles.modalState}>
+                <Text style={styles.errorText}>{repeatWorkoutsError}</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={repeatWorkouts}
+                keyExtractor={(item) => String(item.treino_id)}
+                contentContainerStyle={styles.modalList}
+                ListEmptyComponent={
+                  <View style={styles.modalState}>
+                    <Text style={styles.emptyText}>
+                      {isEn ? "No previous workouts found." : "Nenhum treino anterior encontrado."}
+                    </Text>
+                  </View>
+                }
+                renderItem={({ item }) => {
+                  const isLoadingThis = loadingRepeatTemplateId === item.treino_id;
+                  return (
+                    <Pressable
+                      style={styles.repeatWorkoutRow}
+                      onPress={() => handleSelectRepeatWorkout(item.treino_id).catch(() => undefined)}
+                      disabled={loadingRepeatTemplateId != null}
+                    >
+                      <View style={styles.repeatWorkoutMainInfo}>
+                        <Text style={styles.repeatWorkoutDate}>
+                          {new Date(item.data).toLocaleDateString("pt-BR")}
+                        </Text>
+                        <Text style={styles.repeatWorkoutMeta}>
+                          {`${item.total_exercicios} ${isEn ? "exercises" : "exercícios"} • ${item.total_series} ${isEn ? "sets" : "séries"}`}
+                        </Text>
+                        <Text style={styles.repeatWorkoutMeta}>
+                          {`${isEn ? "Duration" : "Duração"}: ${Math.floor((item.duracao || 0) / 60)}m ${Number(item.duracao || 0) % 60}s`}
+                        </Text>
+                      </View>
+
+                      {isLoadingThis ? (
+                        <ActivityIndicator color={theme.colors.button} />
+                      ) : (
+                        <Text style={styles.repeatWorkoutSelectText}>{isEn ? "Use" : "Usar"}</Text>
+                      )}
+                    </Pressable>
+                  );
+                }}
               />
             )}
           </View>
@@ -958,6 +1218,35 @@ function createStyles(theme: AppTheme) {
       fontWeight: "700",
       alignSelf: "center",
       marginRight: 4,
+    },
+    repeatWorkoutRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 10,
+      backgroundColor: theme.colors.background,
+      padding: 10,
+    },
+    repeatWorkoutMainInfo: {
+      flex: 1,
+      gap: 3,
+    },
+    repeatWorkoutDate: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+    repeatWorkoutMeta: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    repeatWorkoutSelectText: {
+      color: theme.colors.button,
+      fontSize: 14,
+      fontWeight: "800",
     },
     filterList: {
       padding: 10,
