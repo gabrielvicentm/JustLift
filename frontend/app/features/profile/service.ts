@@ -3,7 +3,9 @@ import { AxiosError } from "axios";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "@/app/config/api";
 import type {
+  FollowListItem,
   MyProfileResponse,
+  PublicProfileResponse,
   PresignResponse,
   SearchUserResponseItem,
   UpdateMyProfilePayload,
@@ -66,6 +68,14 @@ export async function updateMyProfile(payload: UpdateMyProfilePayload) {
   return response.data;
 }
 
+export async function fetchProfileByUsername(username: string) {
+  const headers = await getAuthHeader();
+  const response = await api.get<PublicProfileResponse>(`/profile/u/${encodeURIComponent(username)}`, {
+    headers,
+  });
+  return response.data;
+}
+
 export async function searchUsersByUsername(query: string, limit = 20) {
   const headers = await getAuthHeader();
   const response = await api.get<SearchUserResponseItem[]>("/search/users", {
@@ -73,6 +83,39 @@ export async function searchUsersByUsername(query: string, limit = 20) {
     params: { q: query, limit },
   });
   return response.data ?? [];
+}
+
+export async function fetchFollowers(query = "", limit = 50, offset = 0) {
+  const headers = await getAuthHeader();
+  const response = await api.get<FollowListItem[]>("/follows/followers", {
+    headers,
+    params: { q: query, limit, offset },
+  });
+  return response.data ?? [];
+}
+
+export async function fetchFollowing(query = "", limit = 50, offset = 0) {
+  const headers = await getAuthHeader();
+  const response = await api.get<FollowListItem[]>("/follows/following", {
+    headers,
+    params: { q: query, limit, offset },
+  });
+  return response.data ?? [];
+}
+
+export async function removeFollowing(targetUserId: string) {
+  const headers = await getAuthHeader();
+  await api.delete(`/follows/following/${targetUserId}`, { headers });
+}
+
+export async function removeFollower(followerUserId: string) {
+  const headers = await getAuthHeader();
+  await api.delete(`/follows/followers/${followerUserId}`, { headers });
+}
+
+export async function followUser(targetUserId: string) {
+  const headers = await getAuthHeader();
+  await api.post(`/follows/following/${targetUserId}`, {}, { headers });
 }
 
 export async function uploadImageToR2(
