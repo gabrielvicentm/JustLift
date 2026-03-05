@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -119,17 +120,36 @@ export default function SearchUsersScreen() {
         data={results}
         keyExtractor={(item) => item.user_id}
         contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           !loading && hasSearched && query.trim().length >= 1 ? (
             <Text style={styles.emptyText}>Nenhum usuario encontrado.</Text>
           ) : null
         }
-        renderItem={({ item }) => (
-          <View style={styles.resultCard}>
-            <Text style={styles.resultUsername}>@{item.username}</Text>
-            {item.nome_exibicao ? <Text style={styles.resultDisplayName}>{item.nome_exibicao}</Text> : null}
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const avatarUri = String(item.foto_perfil || "").trim();
+
+          return (
+            <Pressable
+              style={styles.resultCard}
+              onPress={() => router.push(`/screens/social/${item.username}` as never)}
+            >
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarFallbackText}>
+                    {(item.nome_exibicao || item.username).slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+
+              <Text style={styles.resultDisplayName}>
+                {item.nome_exibicao || item.username}
+              </Text>
+            </Pressable>
+          );
+        }}
       />
     </View>
   );
@@ -219,16 +239,31 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.surface,
       borderRadius: 12,
       padding: 12,
-      gap: 4,
+      gap: 10,
+      flexDirection: "row",
+      alignItems: "center",
     },
-    resultUsername: {
-      color: theme.colors.text,
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    avatarFallback: {
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    avatarFallbackText: {
+      color: theme.colors.mutedText,
       fontWeight: "700",
       fontSize: 16,
     },
     resultDisplayName: {
-      color: theme.colors.mutedText,
-      fontSize: 13,
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: "700",
     },
   });
 }
