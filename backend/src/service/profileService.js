@@ -53,3 +53,48 @@ exports.updateProfile = async (userId, nome_exibicao, biografia, foto_perfil, ba
 
   return result.rows[0];
 };
+
+exports.getProfileByUsern = async (requestUserId, username) => {
+  const safeUsername = String(username || '').trim();
+
+  const result = await db.query(
+    `SELECT
+       u.id AS user_id,
+       u.username,
+       up.nome_exibicao,
+       up.biografia,
+       up.foto_perfil,
+       up.banner,
+       (
+         SELECT COUNT(*)
+         FROM user_follows uf
+         WHERE uf.following_id = u.id
+       )::INT AS followers_count,
+       (
+         SELECT COUNT(*)
+         FROM user_follows uf
+         WHERE uf.follower_id = u.id
+       )::INT AS following_count,
+       (
+         EXISTS (
+           SELECT 1
+           FROM user_follows uf
+           WHERE uf.follower_id = $1
+             AND uf.following_id = u.id
+         )
+       ) AS is_following,
+       (u.id = $1) AS is_me,
+       u.created_at
+     FROM users u
+     LEFT JOIN users_profile up ON up.user_id = u.id
+     WHERE lower(u.username) = lower($2)
+     LIMIT 1`,
+    [requestUserId, safeUsername]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  return result.rows[0];
+};

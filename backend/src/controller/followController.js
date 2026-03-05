@@ -85,3 +85,31 @@ exports.removeFollower = async (req, res) => {
     return res.status(500).json({ message: 'Erro no servidor ao remover seguidor.' });
   }
 };
+
+exports.follow = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const { targetUserId } = req.params;
+    const created = await followService.follow({ userId, targetUserId });
+
+    if (!created) {
+      return res.status(200).json({ message: 'Usuario ja estava sendo seguido.' });
+    }
+
+    return res.status(201).json({ message: 'Agora voce esta seguindo este usuario.' });
+  } catch (err) {
+    if (err.message === 'CANNOT_FOLLOW_SELF') {
+      return res.status(400).json({ message: 'Nao e permitido seguir a si mesmo.' });
+    }
+    if (err.message === 'USER_NOT_FOUND') {
+      return res.status(404).json({ message: 'Usuario alvo nao encontrado.' });
+    }
+
+    console.error('Erro ao seguir usuario:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao seguir usuario.' });
+  }
+};

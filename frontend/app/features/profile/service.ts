@@ -5,6 +5,7 @@ import { api } from "@/app/config/api";
 import type {
   FollowListItem,
   MyProfileResponse,
+  PublicProfileResponse,
   PresignResponse,
   SearchUserResponseItem,
   UpdateMyProfilePayload,
@@ -67,6 +68,14 @@ export async function updateMyProfile(payload: UpdateMyProfilePayload) {
   return response.data;
 }
 
+export async function fetchProfileByUsername(username: string) {
+  const headers = await getAuthHeader();
+  const response = await api.get<PublicProfileResponse>(`/profile/u/${encodeURIComponent(username)}`, {
+    headers,
+  });
+  return response.data;
+}
+
 export async function searchUsersByUsername(query: string, limit = 20) {
   const headers = await getAuthHeader();
   const response = await api.get<SearchUserResponseItem[]>("/search/users", {
@@ -102,6 +111,11 @@ export async function removeFollowing(targetUserId: string) {
 export async function removeFollower(followerUserId: string) {
   const headers = await getAuthHeader();
   await api.delete(`/follows/followers/${followerUserId}`, { headers });
+}
+
+export async function followUser(targetUserId: string) {
+  const headers = await getAuthHeader();
+  await api.post(`/follows/following/${targetUserId}`, {}, { headers });
 }
 
 export async function uploadImageToR2(

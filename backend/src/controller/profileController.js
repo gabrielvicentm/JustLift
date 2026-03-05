@@ -45,3 +45,24 @@ exports.updateProfile = async (req, res) => {
 };
 
 exports.updateMe = exports.updateProfile;
+
+exports.getByUsername = async (req, res) => {
+ const userId = req.user?.userId || req.user?.id || null;
+ const { username } = req.params;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Token invalido' });
+  }
+
+  try {
+    const profile = await profileService.getProfileByUsern(userId, username);
+    return res.status(200).json(profile);
+  } catch (err) {
+    if (err.message === 'USER_NOT_FOUND') {
+      return res.status(404).json({ message: 'Usuario nao encontrado' });
+    }
+
+    console.error('Erro ao buscar perfil por username:', err);
+    return res.status(500).json({ message: 'Erro no servidor' });
+  }
+};

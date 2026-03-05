@@ -102,3 +102,31 @@ exports.removeFollower = async ({ userId, followerUserId }) => {
 
   return result.rowCount > 0;
 };
+
+exports.follow = async ({ userId, targetUserId }) => {
+  if (userId === targetUserId) {
+    throw new Error('CANNOT_FOLLOW_SELF');
+  }
+
+  const targetUser = await db.query(
+    `SELECT id
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [targetUserId]
+  );
+
+  if (targetUser.rows.length === 0) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  const result = await db.query(
+    `INSERT INTO user_follows (follower_id, following_id)
+     VALUES ($1, $2)
+     ON CONFLICT (follower_id, following_id)
+     DO NOTHING`,
+    [userId, targetUserId]
+  );
+
+  return result.rowCount > 0;
+};

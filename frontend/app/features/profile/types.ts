@@ -10,6 +10,11 @@ export type MyProfileResponse = {
   created_at: string;
 };
 
+export type PublicProfileResponse = MyProfileResponse & {
+  is_following: boolean;
+  is_me: boolean;
+};
+
 export type UpdateMyProfilePayload = {
   nome_exibicao: string;
   biografia: string;
