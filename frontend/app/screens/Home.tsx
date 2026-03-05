@@ -16,14 +16,25 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>{t("home_title")}</Text>
-        <Pressable
-          style={styles.searchButton}
-          onPress={() => router.push("/screens/social/SearchUsers")}
-          accessibilityRole="button"
-          accessibilityLabel="Pesquisar usuarios"
-        >
-          <Ionicons name="search" size={22} color={theme.colors.text} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => router.push("/screens/social/CriarPost")}
+            accessibilityRole="button"
+            accessibilityLabel="Criar post"
+          >
+            <Ionicons name="add-circle-outline" size={22} color={theme.colors.text} />
+          </Pressable>
+
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => router.push("/screens/social/SearchUsers")}
+            accessibilityRole="button"
+            accessibilityLabel="Pesquisar usuarios"
+          >
+            <Ionicons name="search" size={22} color={theme.colors.text} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -51,7 +62,12 @@ function createStyles(theme: AppTheme) {
       fontWeight: "700",
       color: theme.colors.text,
     },
-    searchButton: {
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    iconButton: {
       width: 42,
       height: 42,
       borderRadius: 12,
