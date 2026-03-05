@@ -15,6 +15,21 @@ exports.getMinhaGamificacao = async (req, res) => {
   }
 };
 
+exports.getMinhasPatentesTemporada = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id || null;
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuário não autenticado' });
+    }
+
+    const data = await gamificacaoService.getMyGamificacaoPatentes({ userId });
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error('Erro ao buscar dados de patentes/temporada:', err);
+    return res.status(500).json({ message: 'Erro ao buscar dados de patentes/temporada' });
+  }
+};
+
 exports.getMeuHistoricoGamificacao = async (req, res) => {
   try {
     const userId = req.user?.userId || req.user?.id || null;
@@ -53,5 +68,30 @@ exports.getRankingGamificacao = async (req, res) => {
   } catch (err) {
     console.error('Erro ao buscar ranking de gamificação:', err);
     return res.status(500).json({ message: 'Erro ao buscar ranking de gamificação' });
+  }
+};
+
+exports.getHistoricoTemporadas = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id || null;
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuário não autenticado' });
+    }
+
+    const limitInput = Number(req.query.limit);
+    const offsetInput = Number(req.query.offset);
+    const limit = Number.isFinite(limitInput) ? limitInput : 10;
+    const offset = Number.isFinite(offsetInput) ? offsetInput : 0;
+
+    const data = await gamificacaoService.getMySeasonHistory({
+      userId,
+      limit,
+      offset,
+    });
+
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error('Erro ao buscar histórico de temporadas:', err);
+    return res.status(500).json({ message: 'Erro ao buscar histórico de temporadas' });
   }
 };
