@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import DraggableFlatList, { type RenderItemParams } from "react-native-draggable-flatlist";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 import { api } from "@/app/config/api";
@@ -33,15 +34,42 @@ type WorkoutSet = {
   id: string;
   numero: number;
   anteriorKg: number | null;
+  anteriorReps: number | null;
   kg: string;
   reps: string;
   concluido: boolean;
 };
 
+type PreviousSeriesInfo = {
+  kg: number | null;
+  repeticoes: number | null;
+};
+
 type WorkoutExercise = WorkoutExercisePayload & {
   uid: string;
   anotacao: string;
+  previousSeriesByNumero: Record<number, PreviousSeriesInfo>;
   series: WorkoutSet[];
+};
+
+type LastSeriesItem = {
+  source: "api" | "custom";
+  exercise_id: string | null;
+  custom_exercise_id: number | null;
+  series: {
+    numero: number;
+    kg: number | null;
+    repeticoes: number | null;
+  }[];
+};
+
+type LastSeriesResponse = {
+  items: LastSeriesItem[];
+  meta: {
+    count: number;
+    requested_api: number;
+    requested_custom: number;
+  };
 };
 
 type Exercicio = {
@@ -90,7 +118,9 @@ export default function AdicionarSeriesScreen() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [exercicios, setExercicios] = useState<WorkoutExercise[]>([]);
   const [showExerciseMenu, setShowExerciseMenu] = useState(false);
+  const [showReorderModal, setShowReorderModal] = useState(false);
   const [activeExerciseUid, setActiveExerciseUid] = useState<string | null>(null);
+  const [reorderItems, setReorderItems] = useState<WorkoutExercise[]>([]);
   const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -100,17 +130,66 @@ export default function AdicionarSeriesScreen() {
     ...item,
     uid: item.source === "api" ? `api:${item.exercise_id}` : `custom:${item.custom_exercise_id}`,
     anotacao: "",
+    previousSeriesByNumero: item.previous_kg == null
+      ? {}
+      : {
+          1: {
+            kg: item.previous_kg,
+            repeticoes: item.previous_reps,
+          },
+        },
     series: [
       {
         id: `${index}-1`,
         numero: 1,
         anteriorKg: item.previous_kg,
+        anteriorReps: item.previous_reps,
         kg: "",
         reps: "",
         concluido: false,
       },
     ],
   });
+
+  const withNormalizedSeries = (exercise: WorkoutExercise): WorkoutExercise => {
+    const previousByNumero = exercise.previousSeriesByNumero ?? {};
+    const normalizedSeries = (exercise.series || []).map((serie, index) => {
+      const numero = index + 1;
+      const previous = previousByNumero[numero];
+
+      return {
+        ...serie,
+        numero,
+        anteriorKg: previous?.kg ?? null,
+        anteriorReps: previous?.repeticoes ?? null,
+      };
+    });
+
+    if (normalizedSeries.length > 0) {
+      return {
+        ...exercise,
+        previousSeriesByNumero: previousByNumero,
+        series: normalizedSeries,
+      };
+    }
+
+    const previous = previousByNumero[1];
+    return {
+      ...exercise,
+      previousSeriesByNumero: previousByNumero,
+      series: [
+        {
+          id: `${exercise.uid}-1-${Date.now()}`,
+          numero: 1,
+          anteriorKg: previous?.kg ?? null,
+          anteriorReps: previous?.repeticoes ?? null,
+          kg: "",
+          reps: "",
+          concluido: false,
+        },
+      ],
+    };
+  };
 
   useEffect(() => {
     let active = true;
@@ -159,6 +238,69 @@ export default function AdicionarSeriesScreen() {
         });
         if (missingPayload.length > 0) {
           mapped = [...mapped, ...missingPayload.map(payloadToExercise)];
+        }
+
+        const accessToken = await AsyncStorage.getItem("accessToken");
+        if (!active) return;
+
+        const apiIds = mapped
+          .filter((item) => item.source === "api" && item.exercise_id)
+          .map((item) => item.exercise_id as string);
+        const customIds = mapped
+          .filter((item) => item.source === "custom" && item.custom_exercise_id != null)
+          .map((item) => item.custom_exercise_id as number);
+
+        if (accessToken && (apiIds.length > 0 || customIds.length > 0)) {
+          try {
+            const response = await api.get<LastSeriesResponse>("/diario/ultimas-series", {
+              params: {
+                api_ids: apiIds.join(","),
+                custom_ids: customIds.join(","),
+              },
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+
+            const previousByUid = new Map<
+              string,
+              Record<number, PreviousSeriesInfo>
+            >();
+
+            (response.data?.items ?? []).forEach((item) => {
+              const uid =
+                item.source === "api"
+                  ? `api:${item.exercise_id}`
+                  : `custom:${item.custom_exercise_id}`;
+
+              const perSerie = (item.series || []).reduce<Record<number, PreviousSeriesInfo>>(
+                (acc, serie) => {
+                  const numero = Number(serie.numero);
+                  if (!Number.isFinite(numero) || numero <= 0) return acc;
+                  acc[numero] = {
+                    kg: serie.kg != null ? Number(serie.kg) : null,
+                    repeticoes: serie.repeticoes != null ? Number(serie.repeticoes) : null,
+                  };
+                  return acc;
+                },
+                {},
+              );
+
+              previousByUid.set(uid, perSerie);
+            });
+
+            mapped = mapped.map((exercise) =>
+              withNormalizedSeries({
+                ...exercise,
+                previousSeriesByNumero: previousByUid.get(exercise.uid) ?? exercise.previousSeriesByNumero ?? {},
+              }),
+            );
+          } catch (err) {
+            console.error("Erro ao buscar últimas séries:", err);
+            mapped = mapped.map((exercise) => withNormalizedSeries(exercise));
+          }
+        } else {
+          mapped = mapped.map((exercise) => withNormalizedSeries(exercise));
         }
 
         setExercicios(mapped);
@@ -211,7 +353,7 @@ export default function AdicionarSeriesScreen() {
     return () => {
       active = false;
     };
-  }, [elapsedSeconds, exercicios, loading, paused]);
+  }, [elapsedSeconds, exercicios, loading, paused, saving]);
 
   const updateSerie = (
     exerciseUid: string,
@@ -234,6 +376,7 @@ export default function AdicionarSeriesScreen() {
       prev.map((exercise) => {
         if (exercise.uid !== exerciseUid) return exercise;
         const nextNumber = exercise.series.length + 1;
+        const previous = exercise.previousSeriesByNumero[nextNumber];
         return {
           ...exercise,
           series: [
@@ -241,13 +384,29 @@ export default function AdicionarSeriesScreen() {
             {
               id: `${exerciseUid}-${nextNumber}-${Date.now()}`,
               numero: nextNumber,
-              anteriorKg: null,
+              anteriorKg: previous?.kg ?? null,
+              anteriorReps: previous?.repeticoes ?? null,
               kg: "",
               reps: "",
               concluido: false,
             },
           ],
         };
+      }),
+    );
+  };
+
+  const removeSerie = (exerciseUid: string, serieId: string) => {
+    setExercicios((prev) =>
+      prev.map((exercise) => {
+        if (exercise.uid !== exerciseUid) return exercise;
+        if (exercise.series.length <= 1) return exercise;
+
+        const nextSeries = exercise.series.filter((serie) => serie.id !== serieId);
+        return withNormalizedSeries({
+          ...exercise,
+          series: nextSeries,
+        });
       }),
     );
   };
@@ -268,20 +427,20 @@ export default function AdicionarSeriesScreen() {
     setActiveExerciseUid(null);
   };
 
-  const moveExercise = (direction: "up" | "down") => {
-    if (!activeExerciseUid) return;
-    setExercicios((prev) => {
-      const index = prev.findIndex((item) => item.uid === activeExerciseUid);
-      if (index === -1) return prev;
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
-
-      const next = [...prev];
-      const [moved] = next.splice(index, 1);
-      next.splice(targetIndex, 0, moved);
-      return next;
-    });
+  const openReorderModal = () => {
+    setReorderItems(exercicios);
+    setShowReorderModal(true);
     closeExerciseMenu();
+  };
+
+  const closeReorderModal = () => {
+    setShowReorderModal(false);
+    setReorderItems([]);
+  };
+
+  const applyReorder = () => {
+    setExercicios(reorderItems);
+    closeReorderModal();
   };
 
   const removeExercise = () => {
@@ -454,7 +613,9 @@ export default function AdicionarSeriesScreen() {
               <View style={styles.serieCellLarge}>
                 <Text style={styles.serieLabel}>{language === "en" ? "PREV" : "ANTERIOR"}</Text>
                 <Text style={styles.serieValue}>
-                  {serie.anteriorKg == null ? "-" : String(serie.anteriorKg)}
+                  {serie.anteriorKg == null
+                    ? "-"
+                    : `${serie.anteriorKg}${serie.anteriorReps != null ? ` x ${serie.anteriorReps}` : ""}`}
                 </Text>
               </View>
 
@@ -504,6 +665,20 @@ export default function AdicionarSeriesScreen() {
                   }
                 >
                   <Text style={styles.checkText}>{serie.concluido ? "✓" : ""}</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.serieRemoveWrap}>
+                <Text style={styles.serieLabel}>{language === "en" ? "DEL" : "DEL"}</Text>
+                <Pressable
+                  style={[
+                    styles.removeSerieButton,
+                    exercise.series.length <= 1 && styles.removeSerieButtonDisabled,
+                  ]}
+                  onPress={() => removeSerie(exercise.uid, serie.id)}
+                  disabled={exercise.series.length <= 1}
+                >
+                  <Text style={styles.removeSerieButtonText}>-</Text>
                 </Pressable>
               </View>
             </View>
@@ -558,12 +733,8 @@ export default function AdicionarSeriesScreen() {
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>{language === "en" ? "Exercise options" : "Opções do exercício"}</Text>
 
-          <Pressable style={styles.modalAction} onPress={() => moveExercise("up")}>
-            <Text style={styles.modalActionText}>{language === "en" ? "Move up" : "Mover para cima"}</Text>
-          </Pressable>
-
-          <Pressable style={styles.modalAction} onPress={() => moveExercise("down")}>
-            <Text style={styles.modalActionText}>{language === "en" ? "Move down" : "Mover para baixo"}</Text>
+          <Pressable style={styles.modalAction} onPress={openReorderModal}>
+            <Text style={styles.modalActionText}>{language === "en" ? "Change order" : "Alterar ordem"}</Text>
           </Pressable>
 
           <Pressable style={[styles.modalAction, styles.modalDangerAction]} onPress={removeExercise}>
@@ -573,6 +744,48 @@ export default function AdicionarSeriesScreen() {
           <Pressable style={styles.modalCancel} onPress={closeExerciseMenu}>
             <Text style={styles.modalCancelText}>{language === "en" ? "Close" : "Fechar"}</Text>
           </Pressable>
+        </View>
+      </View>
+    </Modal>
+    <Modal visible={showReorderModal} transparent animationType="fade" onRequestClose={closeReorderModal}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.reorderModalCard}>
+          <Text style={styles.modalTitle}>
+            {language === "en" ? "Reorder exercises" : "Alterar ordem dos exercícios"}
+          </Text>
+          <Text style={styles.reorderHint}>
+            {language === "en"
+              ? "Hold and drag an item to move it."
+              : "Segure e arraste um exercício para mover."}
+          </Text>
+
+          <DraggableFlatList
+            data={reorderItems}
+            keyExtractor={(item) => item.uid}
+            onDragEnd={({ data }) => setReorderItems(data)}
+            style={styles.reorderList}
+            contentContainerStyle={styles.reorderListContent}
+            renderItem={({ item, drag, isActive }: RenderItemParams<WorkoutExercise>) => (
+              <Pressable
+                style={[styles.reorderRow, isActive && styles.reorderRowActive]}
+                onLongPress={drag}
+              >
+                <Text numberOfLines={1} style={styles.reorderRowText}>
+                  {language === "en" && item.nome_en ? item.nome_en : item.nome}
+                </Text>
+                <Text style={styles.reorderRowGrip}>☰</Text>
+              </Pressable>
+            )}
+          />
+
+          <View style={styles.reorderActions}>
+            <Pressable style={styles.cancelNoButton} onPress={closeReorderModal}>
+              <Text style={styles.cancelNoText}>{language === "en" ? "Cancel" : "Cancelar"}</Text>
+            </Pressable>
+            <Pressable style={styles.saveButton} onPress={applyReorder}>
+              <Text style={styles.saveButtonText}>{language === "en" ? "Apply" : "Aplicar"}</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
@@ -774,7 +987,7 @@ function createStyles(theme: AppTheme) {
       gap: 4,
     },
     serieCellLarge: {
-      flex: 1.2,
+      flex: 1.8,
       gap: 4,
     },
     serieLabel: {
@@ -784,15 +997,16 @@ function createStyles(theme: AppTheme) {
       textAlign: "center",
     },
     serieValue: {
-      height: 38,
+      minHeight: 38,
       borderRadius: 10,
       backgroundColor: theme.colors.inputBackground,
       color: theme.colors.text,
       textAlign: "center",
       textAlignVertical: "center",
-      lineHeight: 38,
       fontWeight: "700",
-      overflow: "hidden",
+      fontSize: 12,
+      paddingHorizontal: 4,
+      paddingVertical: 8,
     },
     serieInput: {
       height: 38,
@@ -806,7 +1020,12 @@ function createStyles(theme: AppTheme) {
       paddingHorizontal: 6,
     },
     serieCheckWrap: {
-      width: 50,
+      width: 42,
+      alignItems: "center",
+      gap: 4,
+    },
+    serieRemoveWrap: {
+      width: 42,
       alignItems: "center",
       gap: 4,
     },
@@ -829,6 +1048,26 @@ function createStyles(theme: AppTheme) {
       fontSize: 20,
       fontWeight: "800",
       lineHeight: 20,
+    },
+    removeSerieButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.error,
+      backgroundColor: "rgba(239, 68, 68, 0.12)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    removeSerieButtonDisabled: {
+      opacity: 0.45,
+      borderColor: theme.colors.border,
+    },
+    removeSerieButtonText: {
+      color: theme.colors.error,
+      fontSize: 24,
+      fontWeight: "800",
+      lineHeight: 24,
     },
     addSerieButton: {
       height: 46,
@@ -938,11 +1177,65 @@ function createStyles(theme: AppTheme) {
       padding: 12,
       gap: 8,
     },
+    reorderModalCard: {
+      width: "100%",
+      maxWidth: 380,
+      maxHeight: "80%",
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 12,
+      gap: 8,
+    },
     modalTitle: {
       color: theme.colors.text,
       fontSize: 17,
       fontWeight: "700",
       marginBottom: 2,
+    },
+    reorderHint: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+      marginBottom: 2,
+    },
+    reorderList: {
+      maxHeight: 360,
+    },
+    reorderListContent: {
+      gap: 8,
+      paddingVertical: 2,
+    },
+    reorderRow: {
+      minHeight: 50,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 10,
+      backgroundColor: theme.colors.inputBackground,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      gap: 10,
+    },
+    reorderRowActive: {
+      borderColor: "#3b82f6",
+      backgroundColor: theme.colors.surface,
+    },
+    reorderRowText: {
+      flex: 1,
+      color: theme.colors.text,
+      fontWeight: "700",
+      fontSize: 14,
+    },
+    reorderRowGrip: {
+      color: theme.colors.mutedText,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    reorderActions: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 4,
     },
     modalAction: {
       minHeight: 44,
