@@ -97,6 +97,13 @@ export default function DiarioScreen() {
         >
           <Text style={styles.buttonText}>{t("diary_ranking")}</Text>
         </Pressable>
+
+        <Pressable
+          style={styles.button}
+          onPress={() => router.push("/screens/diario/Patentes")}
+        >
+          <Text style={styles.buttonText}>{t("diary_patents")}</Text>
+        </Pressable>
       </View>
     </View>
   );

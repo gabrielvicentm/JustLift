@@ -283,6 +283,43 @@ CREATE TABLE gamificacao_eventos (
     CHECK (points >= 0)
 );
 
+-- TEMPORADAS DE GAMIFICAÇÃO (6 MESES CADA)
+CREATE TABLE gamificacao_temporadas (
+  temporada_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  season_number INT NOT NULL UNIQUE,
+  starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  finalized_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_gamificacao_temporada_status
+    CHECK (status IN ('active', 'finished')),
+  CONSTRAINT chk_gamificacao_temporada_periodo
+    CHECK (ends_at > starts_at)
+);
+
+-- RESULTADO FINAL DE CADA USUÁRIO POR TEMPORADA
+CREATE TABLE gamificacao_resultados_temporada (
+  resultado_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  temporada_id BIGINT NOT NULL,
+  user_id UUID NOT NULL,
+  username_snapshot TEXT NOT NULL,
+  foto_perfil_snapshot TEXT,
+  pontos_totais BIGINT NOT NULL DEFAULT 0,
+  posicao INT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_resultado_temporada
+    FOREIGN KEY (temporada_id) REFERENCES gamificacao_temporadas(temporada_id) ON DELETE CASCADE,
+  CONSTRAINT fk_resultado_temporada_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_resultado_temporada_pontos
+    CHECK (pontos_totais >= 0),
+  CONSTRAINT chk_resultado_temporada_posicao
+    CHECK (posicao > 0),
+  CONSTRAINT uq_resultado_temporada_user
+    UNIQUE (temporada_id, user_id)
+);
+
 
 -- Histórico de treinos por usuário
 CREATE INDEX idx_treinos_user_data
@@ -312,6 +349,12 @@ ON gamificacao_eventos(user_id, created_at DESC);
 CREATE UNIQUE INDEX uq_gamificacao_evento_source
 ON gamificacao_eventos(user_id, source_type, source_id)
 WHERE source_id IS NOT NULL;
+
+CREATE INDEX idx_gamificacao_temporadas_status_ends
+ON gamificacao_temporadas(status, ends_at ASC);
+
+CREATE INDEX idx_gamificacao_resultados_temporada_posicao
+ON gamificacao_resultados_temporada(temporada_id, posicao ASC);
 
 -- Assinaturas por usuário/status/validade
 CREATE INDEX idx_subscription_user_status

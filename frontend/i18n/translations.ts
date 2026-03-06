@@ -35,6 +35,7 @@ export const translations = {
     diary_my_workouts: "Meus Treinos",
     diary_charts: "Graficos",
     diary_ranking: "Ranking",
+    diary_patents: "Patentes",
     diary_add_workout_title: "Adicionar Treino",
     diary_add_workout_description: "Aqui voce podera cadastrar um novo treino.",
     diary_my_workouts_title: "Meus Treinos",
@@ -43,6 +44,8 @@ export const translations = {
     diary_charts_description: "Aqui voce podera acompanhar sua evolucao.",
     diary_ranking_title: "Ranking",
     diary_ranking_description: "Aqui voce podera ver a classificacao dos usuarios.",
+    diary_patents_title: "Patentes",
+    diary_patents_description: "Acompanhe sua patente, pontos e temporadas.",
     profile_title: "Tela Perfil",
     common_back: "Voltar",
 
@@ -97,6 +100,7 @@ export const translations = {
     diary_my_workouts: "My Workouts",
     diary_charts: "Charts",
     diary_ranking: "Ranking",
+    diary_patents: "Ranks",
     diary_add_workout_title: "Add Workout",
     diary_add_workout_description: "Here you can create a new workout entry.",
     diary_my_workouts_title: "My Workouts",
@@ -105,6 +109,8 @@ export const translations = {
     diary_charts_description: "Here you can track your progress.",
     diary_ranking_title: "Ranking",
     diary_ranking_description: "Here you can check the users leaderboard.",
+    diary_patents_title: "Ranks",
+    diary_patents_description: "Track your rank, points, and seasons.",
     profile_title: "Profile Screen",
     common_back: "Back",
 

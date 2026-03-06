@@ -121,6 +121,112 @@ exports.buscarExerciciosCustomizados = async (req, res) => {
   }
 };
 
+// Busca as séries do último treino finalizado para cada exercício informado.
+// Endpoint esperado: GET /diario/ultimas-series?api_ids=a,b&custom_ids=1,2
+exports.buscarUltimasSeries = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id || null;
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuário não autenticado' });
+    }
+
+    const apiIdsRaw = typeof req.query.api_ids === 'string' ? req.query.api_ids : '';
+    const customIdsRaw = typeof req.query.custom_ids === 'string' ? req.query.custom_ids : '';
+
+    const apiExerciseIds = apiIdsRaw
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+
+    const customExerciseIds = customIdsRaw
+      .split(',')
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    const items = await diarioService.getLastSeriesByExercises({
+      userId,
+      apiExerciseIds,
+      customExerciseIds,
+    });
+
+    return res.status(200).json({
+      items,
+      meta: {
+        count: items.length,
+        requested_api: apiExerciseIds.length,
+        requested_custom: customExerciseIds.length,
+      },
+    });
+  } catch (err) {
+    console.error('Erro ao buscar últimas séries:', err);
+    return res.status(500).json({ message: 'Erro ao buscar últimas séries' });
+  }
+};
+
+// Lista treinos finalizados para seleção no fluxo de repetir treino.
+// Endpoint esperado: GET /diario/repetir-treino/lista?limit=20
+exports.listarTreinosParaRepetir = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id || null;
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuário não autenticado' });
+    }
+
+    const limitInput = Number(req.query.limit);
+    const limit = Number.isFinite(limitInput) ? limitInput : 20;
+
+    const treinos = await diarioService.getRecentWorkoutsForRepeat({
+      userId,
+      limit,
+    });
+
+    return res.status(200).json({
+      treinos,
+      meta: {
+        count: treinos.length,
+        limit: Math.min(Math.max(Math.floor(limit), 1), 50),
+      },
+    });
+  } catch (err) {
+    console.error('Erro ao listar treinos para repetir:', err);
+    return res.status(500).json({ message: 'Erro ao listar treinos para repetir' });
+  }
+};
+
+// Retorna template (exercícios + quantidade de séries) de um treino finalizado.
+// Endpoint esperado: GET /diario/repetir-treino/template/:treinoId?lang=pt|en
+exports.buscarTemplateTreinoParaRepetir = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id || null;
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuário não autenticado' });
+    }
+
+    const treinoId = Number(req.params?.treinoId);
+    if (!Number.isInteger(treinoId) || treinoId <= 0) {
+      return res.status(400).json({ message: 'Treino inválido' });
+    }
+
+    const langInput = typeof req.query.lang === 'string' ? req.query.lang.trim().toLowerCase() : 'pt';
+    const lang = langInput === 'en' ? 'en' : 'pt';
+
+    const template = await diarioService.getWorkoutTemplateById({
+      userId,
+      treinoId,
+      lang,
+    });
+
+    if (!template) {
+      return res.status(404).json({ message: 'Treino não encontrado' });
+    }
+
+    return res.status(200).json(template);
+  } catch (err) {
+    console.error('Erro ao buscar template de treino:', err);
+    return res.status(500).json({ message: 'Erro ao buscar template de treino' });
+  }
+};
+
 // Salva treino completo enviado pelo front.
 // Endpoint esperado: POST /diario/salvar
 exports.salvarTreino = async (req, res) => {

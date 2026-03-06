@@ -141,6 +141,230 @@ exports.getCustomExercisesByUser = async ({ userId }) => {
   const result = await db.query(query, [userId]);
   return result.rows;
 };
+
+// Busca, para cada exercício informado, as séries do último treino finalizado
+// do usuário em que o exercício apareceu. Retorna os valores por número de série.
+exports.getLastSeriesByExercises = async ({
+  userId,
+  apiExerciseIds = [],
+  customExerciseIds = [],
+}) => {
+  const safeApiExerciseIds = Array.from(
+    new Set(
+      (Array.isArray(apiExerciseIds) ? apiExerciseIds : [])
+        .map((id) => (typeof id === 'string' ? id.trim() : ''))
+        .filter((id) => id.length > 0),
+    ),
+  );
+
+  const safeCustomExerciseIds = Array.from(
+    new Set(
+      (Array.isArray(customExerciseIds) ? customExerciseIds : [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  );
+
+  if (safeApiExerciseIds.length === 0 && safeCustomExerciseIds.length === 0) {
+    return [];
+  }
+
+  const result = await db.query(
+    `
+      WITH requested AS (
+        SELECT
+          'api'::text AS source,
+          api_id AS exercise_id,
+          NULL::int AS custom_exercise_id
+        FROM unnest($2::text[]) AS api_id
+        UNION ALL
+        SELECT
+          'custom'::text AS source,
+          NULL::text AS exercise_id,
+          custom_id AS custom_exercise_id
+        FROM unnest($3::int[]) AS custom_id
+      ),
+      latest_exercise_instance AS (
+        SELECT
+          r.source,
+          r.exercise_id,
+          r.custom_exercise_id,
+          (
+            SELECT edt.exercicio_treino_id
+            FROM exercicios_do_treino edt
+            JOIN treinos t
+              ON t.treino_id = edt.treino_id
+            WHERE
+              t.user_id = $1
+              AND t.finalizado = TRUE
+              AND (
+                (r.source = 'api' AND edt.exercise_id = r.exercise_id)
+                OR (r.source = 'custom' AND edt.custom_exercise_id = r.custom_exercise_id)
+              )
+            ORDER BY t.data DESC, t.treino_id DESC, edt.ordem ASC
+            LIMIT 1
+          ) AS exercicio_treino_id
+        FROM requested r
+      )
+      SELECT
+        lei.source,
+        lei.exercise_id,
+        lei.custom_exercise_id,
+        s.numero,
+        s.kg,
+        s.repeticoes
+      FROM latest_exercise_instance lei
+      JOIN series_do_exercicio s
+        ON s.exercicio_treino_id = lei.exercicio_treino_id
+      ORDER BY
+        lei.source ASC,
+        lei.exercise_id ASC NULLS LAST,
+        lei.custom_exercise_id ASC NULLS LAST,
+        s.numero ASC
+    `,
+    [userId, safeApiExerciseIds, safeCustomExerciseIds],
+  );
+
+  const grouped = result.rows.reduce((acc, row) => {
+    const key = row.source === 'api'
+      ? `api:${row.exercise_id}`
+      : `custom:${row.custom_exercise_id}`;
+
+    const current = acc.get(key) || {
+      source: row.source,
+      exercise_id: row.exercise_id ?? null,
+      custom_exercise_id: row.custom_exercise_id != null ? Number(row.custom_exercise_id) : null,
+      series: [],
+    };
+
+    current.series.push({
+      numero: Number(row.numero),
+      kg: row.kg != null ? Number(row.kg) : null,
+      repeticoes: row.repeticoes != null ? Number(row.repeticoes) : null,
+    });
+
+    acc.set(key, current);
+    return acc;
+  }, new Map());
+
+  return Array.from(grouped.values());
+};
+
+// Lista treinos finalizados do usuário para o fluxo de "repetir treino".
+exports.getRecentWorkoutsForRepeat = async ({ userId, limit = 20 }) => {
+  const safeLimit = Math.min(Math.max(Math.floor(Number(limit) || 20), 1), 50);
+
+  const result = await db.query(
+    `
+      SELECT
+        t.treino_id,
+        TO_CHAR(t.data, 'YYYY-MM-DD') AS data,
+        t.duracao,
+        t.peso_total,
+        t.total_series,
+        COUNT(DISTINCT edt.exercicio_treino_id)::int AS total_exercicios
+      FROM treinos t
+      LEFT JOIN exercicios_do_treino edt
+        ON edt.treino_id = t.treino_id
+      WHERE t.user_id = $1
+        AND t.finalizado = TRUE
+      GROUP BY t.treino_id, t.data, t.duracao, t.peso_total, t.total_series
+      ORDER BY t.data DESC, t.treino_id DESC
+      LIMIT $2
+    `,
+    [userId, safeLimit],
+  );
+
+  return result.rows.map((row) => ({
+    treino_id: Number(row.treino_id),
+    data: row.data,
+    duracao: row.duracao != null ? Number(row.duracao) : 0,
+    peso_total: row.peso_total != null ? Number(row.peso_total) : 0,
+    total_series: row.total_series != null ? Number(row.total_series) : 0,
+    total_exercicios: Number(row.total_exercicios || 0),
+  }));
+};
+
+// Retorna um template de treino para reutilização:
+// exercícios + quantidade de séries por exercício.
+exports.getWorkoutTemplateById = async ({ userId, treinoId, lang = 'pt' }) => {
+  const safeLang = lang === 'en' ? 'en' : 'pt';
+
+  const treinoResult = await db.query(
+    `
+      SELECT
+        t.treino_id,
+        TO_CHAR(t.data, 'YYYY-MM-DD') AS data
+      FROM treinos t
+      WHERE t.user_id = $1
+        AND t.treino_id = $2
+        AND t.finalizado = TRUE
+      LIMIT 1
+    `,
+    [userId, treinoId],
+  );
+
+  if (treinoResult.rowCount === 0) {
+    return null;
+  }
+
+  const exerciciosResult = await db.query(
+    `
+      SELECT
+        et.exercicio_treino_id,
+        et.exercise_id,
+        et.custom_exercise_id,
+        et.ordem,
+        COALESCE(ec.nome, tr_lang.nome, tr_en.nome, et.exercise_id, 'Exercício') AS nome,
+        tr_en.nome AS nome_en,
+        COALESCE(ec.img_url, e.gif_url) AS gif_url,
+        COUNT(s.serie_id)::int AS total_series
+      FROM exercicios_do_treino et
+      INNER JOIN treinos t
+        ON t.treino_id = et.treino_id
+      LEFT JOIN exercicios_customizados ec
+        ON ec.id_exercicio_customizado = et.custom_exercise_id
+      LEFT JOIN exercicios e
+        ON e.exercise_id = et.exercise_id
+      LEFT JOIN exercicio_traducoes tr_lang
+        ON tr_lang.exercise_id = et.exercise_id
+       AND tr_lang.lang = $3
+      LEFT JOIN exercicio_traducoes tr_en
+        ON tr_en.exercise_id = et.exercise_id
+       AND tr_en.lang = 'en'
+      LEFT JOIN series_do_exercicio s
+        ON s.exercicio_treino_id = et.exercicio_treino_id
+      WHERE t.user_id = $1
+        AND t.treino_id = $2
+      GROUP BY
+        et.exercicio_treino_id,
+        et.exercise_id,
+        et.custom_exercise_id,
+        et.ordem,
+        ec.nome,
+        ec.img_url,
+        tr_lang.nome,
+        tr_en.nome,
+        e.gif_url
+      ORDER BY et.ordem ASC, et.exercicio_treino_id ASC
+    `,
+    [userId, treinoId, safeLang],
+  );
+
+  return {
+    treino_id: Number(treinoResult.rows[0].treino_id),
+    data: treinoResult.rows[0].data,
+    exercicios: exerciciosResult.rows.map((row) => ({
+      source: row.custom_exercise_id ? 'custom' : 'api',
+      exercise_id: row.exercise_id || null,
+      custom_exercise_id: row.custom_exercise_id != null ? Number(row.custom_exercise_id) : null,
+      nome: row.nome,
+      nome_en: row.nome_en || null,
+      gif_url: row.gif_url || null,
+      total_series: Math.max(Number(row.total_series || 0), 1),
+    })),
+  };
+};
  
 // Persiste um treino completo (treino + exercícios + séries) de forma transacional.
 // Regras importantes:
