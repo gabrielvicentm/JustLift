@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -13,6 +14,8 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { createPost, uploadMediaToR2 } from "@/app/features/social/service";
+import { getApiErrorMessage } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 
@@ -23,6 +26,8 @@ type PostMedia = {
   uri: string;
   type: "image" | "video";
   fileName: string;
+  mimeType: string;
+  fileSize?: number;
 };
 
 export default function CriarPostScreen() {
@@ -33,6 +38,8 @@ export default function CriarPostScreen() {
   const [descricao, setDescricao] = useState("");
   const [midias, setMidias] = useState<PostMedia[]>([]);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const addNovasMidias = (assets: ImagePicker.ImagePickerAsset[]) => {
     const novasMidias: PostMedia[] = assets.map((asset, index) => ({
@@ -40,6 +47,8 @@ export default function CriarPostScreen() {
       uri: asset.uri,
       type: asset.type === "video" ? "video" : "image",
       fileName: asset.fileName ?? `midia-${Date.now()}-${index}`,
+      mimeType: asset.mimeType ?? (asset.type === "video" ? "video/mp4" : "image/jpeg"),
+      fileSize: asset.fileSize,
     }));
 
     setMidias((current) => {
@@ -112,18 +121,46 @@ export default function CriarPostScreen() {
   };
 
   const handlePublicar = async () => {
+    setError("");
+    setSuccess("");
+
     if (!descricao.trim() && midias.length === 0) {
-      Alert.alert("Post vazio", "Adicione uma descrição ou pelo menos uma mídia.");
+      setError("Adicione uma descricao ou pelo menos uma midia.");
       return;
     }
 
     setSending(true);
     try {
-      Alert.alert("Post pronto", "Tela de criação finalizada. Agora é só conectar ao endpoint de posts.");
+      const uploadedMedia = await Promise.all(
+        midias.map(async (item) => {
+          const uploaded = await uploadMediaToR2(item.uri, item.fileName, item.mimeType, item.fileSize);
+          return {
+            type: item.type,
+            url: uploaded.url,
+            key: uploaded.key,
+          } as const;
+        }),
+      );
+
+      await createPost({
+        descricao: descricao.trim(),
+        midias: uploadedMedia,
+      });
+
       setDescricao("");
       setMidias([]);
+      setSuccess("Post publicado com sucesso.");
+      Alert.alert("Sucesso", "Seu post foi publicado.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handlePublicarComTratamento = async () => {
+    try {
+      await handlePublicar();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "publicar post"));
     }
   };
 
@@ -188,9 +225,19 @@ export default function CriarPostScreen() {
         maxLength={1000}
       />
 
-      <Pressable style={[styles.publishButton, sending && styles.buttonDisabled]} onPress={handlePublicar} disabled={sending}>
-        <Text style={styles.publishButtonText}>{sending ? "Publicando..." : "Publicar post"}</Text>
+      <Pressable
+        style={[styles.publishButton, sending && styles.buttonDisabled]}
+        onPress={handlePublicarComTratamento}
+        disabled={sending}
+      >
+        {sending ? (
+          <ActivityIndicator color={theme.colors.buttonText} />
+        ) : (
+          <Text style={styles.publishButtonText}>Publicar post</Text>
+        )}
       </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {success ? <Text style={styles.success}>{success}</Text> : null}
 
       <Pressable style={styles.backButton} onPress={() => router.back()} disabled={sending}>
         <Text style={styles.backButtonText}>Voltar</Text>
@@ -342,6 +389,14 @@ function createStyles(theme: AppTheme) {
     },
     buttonDisabled: {
       opacity: 0.7,
+    },
+    error: {
+      color: theme.colors.error,
+      fontWeight: "600",
+    },
+    success: {
+      color: theme.colors.success,
+      fontWeight: "600",
     },
   });
 }

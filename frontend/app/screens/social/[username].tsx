@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -9,6 +9,9 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import type { PostSummary } from "@/app/features/social/types";
+import { fetchPostsByUser } from "@/app/features/social/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import type { PublicProfileResponse } from "@/app/features/profile/types";
@@ -29,8 +32,10 @@ export default function PublicProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingFollow, setUpdatingFollow] = useState(false);
+  const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     const safeUsername = String(username || "").trim();
     if (!safeUsername) {
       setError("Username invalido.");
@@ -48,11 +53,69 @@ export default function PublicProfileScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [username]);
 
   useEffect(() => {
     loadProfile();
-  }, [username]);
+  }, [loadProfile]);
+
+  useEffect(() => {
+    const userId = profile?.user_id;
+    if (!userId) {
+      return;
+    }
+
+    let active = true;
+    setLoadingPosts(true);
+
+    fetchPostsByUser(userId)
+      .then((data) => {
+        if (!active) return;
+        setPosts(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(getApiErrorMessage(err, "carregar posts"));
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoadingPosts(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile?.user_id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const userId = profile?.user_id;
+      if (!userId) {
+        return;
+      }
+
+      let active = true;
+      setLoadingPosts(true);
+
+      fetchPostsByUser(userId)
+        .then((data) => {
+          if (!active) return;
+          setPosts(data);
+        })
+        .catch((err) => {
+          if (!active) return;
+          setError(getApiErrorMessage(err, "carregar posts"));
+        })
+        .finally(() => {
+          if (!active) return;
+          setLoadingPosts(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [profile?.user_id]),
+  );
 
   const handleFollowToggle = async () => {
     if (!profile || profile.is_me) {
@@ -146,6 +209,47 @@ export default function PublicProfileScreen() {
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <View style={styles.postsSection}>
+          <Text style={styles.postsTitle}>Posts</Text>
+
+          {loadingPosts ? (
+            <View style={styles.postsLoading}>
+              <ActivityIndicator color={theme.colors.text} />
+              <Text style={styles.loadingText}>Carregando posts...</Text>
+            </View>
+          ) : null}
+
+          {!loadingPosts && posts.length === 0 ? (
+            <Text style={styles.emptyPosts}>Este usuario ainda nao publicou posts.</Text>
+          ) : null}
+
+          {posts.map((item) => {
+            const firstMedia = item.midias?.[0];
+            return (
+              <Pressable
+                key={item.id}
+                style={styles.postCard}
+                onPress={() => router.push(`/screens/social/Post/${item.id}` as never)}
+              >
+                {firstMedia ? (
+                  firstMedia.type === "image" ? (
+                    <Image source={{ uri: firstMedia.url }} style={styles.postPreview} />
+                  ) : (
+                    <View style={[styles.postPreview, styles.videoPreview]}>
+                      <Text style={styles.videoPreviewText}>Video</Text>
+                    </View>
+                  )
+                ) : null}
+                {item.descricao ? <Text style={styles.postDescription}>{item.descricao}</Text> : null}
+                <View style={styles.postMetaRow}>
+                  <Text style={styles.postMetaText}>Curtidas: {item.likes_count}</Text>
+                  <Text style={styles.postMetaText}>Comentarios: {item.comments_count}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
       </ScrollView>
     </View>
   );
@@ -278,6 +382,60 @@ function createStyles(theme: AppTheme) {
     error: {
       color: theme.colors.error,
       fontWeight: "500",
+    },
+    postsSection: {
+      gap: 8,
+    },
+    postsTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    postsLoading: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    emptyPosts: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+    },
+    postCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surface,
+      overflow: "hidden",
+      padding: 10,
+      gap: 8,
+    },
+    postPreview: {
+      width: "100%",
+      height: 180,
+      borderRadius: 10,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    videoPreview: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.button,
+    },
+    videoPreviewText: {
+      color: theme.colors.buttonText,
+      fontWeight: "700",
+    },
+    postDescription: {
+      color: theme.colors.text,
+      fontSize: 14,
+    },
+    postMetaRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    postMetaText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "600",
     },
   });
 }

@@ -8,7 +8,7 @@ const numberFromEnv = (envName, fallback) => {
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'fightclub',
+  password: process.env.DB_PASSWORD || 'pantufa',
   database: process.env.DB_NAME || 'dev_db',
   port: numberFromEnv('DB_PORT', 5432),
   max: numberFromEnv('DB_POOL_MAX', 20),
