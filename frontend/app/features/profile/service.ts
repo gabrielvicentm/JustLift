@@ -68,6 +68,22 @@ export async function updateMyProfile(payload: UpdateMyProfilePayload) {
   return response.data;
 }
 
+export async function requestAccountChange(payload: {
+  newUsername?: string;
+  newEmail?: string;
+  newPassword?: string;
+}) {
+  const headers = await getAuthHeader();
+  const response = await api.post("/profile/account-change/request", payload, { headers });
+  return response.data;
+}
+
+export async function confirmAccountChange(code: string) {
+  const headers = await getAuthHeader();
+  const response = await api.post("/profile/account-change/confirm", { code }, { headers });
+  return response.data;
+}
+
 export async function fetchProfileByUsername(username: string) {
   const headers = await getAuthHeader();
   const response = await api.get<PublicProfileResponse>(`/profile/u/${encodeURIComponent(username)}`, {

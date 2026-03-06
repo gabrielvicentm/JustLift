@@ -67,7 +67,7 @@ export default function ConfiguracoesScreen() {
           <Text style={styles.chevron}>›</Text>
         </Pressable>
 
-        <Pressable style={styles.optionRow} onPress={goHome}>
+        <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Conta")}>
           <Text style={styles.optionText}>Conta</Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>

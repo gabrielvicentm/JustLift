@@ -90,6 +90,19 @@ CREATE TABLE user_subscriptions (
   )
 );
 
+CREATE TABLE account_change_verifications (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  new_username TEXT,
+  new_email TEXT,
+  new_password_hash TEXT,
+  verification_code_hash TEXT NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  last_sent_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- TABELAS DO DIÁRIO DE TREINO --
 
 -- Exercícios canônicos da ExerciseDB (base EN para filtros/busca)
