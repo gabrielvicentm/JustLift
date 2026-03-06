@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -10,6 +10,9 @@ import {
 } from "react-native";
 import { useMyProfileQuery } from "@/app/features/profile/hooks";
 import { getApiErrorMessage } from "@/app/features/profile/service";
+import { fetchPostsByUser } from "@/app/features/social/service";
+import type { PostSummary } from "@/app/features/social/types";
+import { useFocusEffect } from "@react-navigation/native";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
@@ -22,6 +25,9 @@ export default function PerfilScreen() {
   const router = useRouter();
 
   const profileQuery = useMyProfileQuery();
+  const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postsError, setPostsError] = useState("");
 
   const loading = profileQuery.isLoading;
   const refreshing = profileQuery.isRefetching;
@@ -30,9 +36,39 @@ export default function PerfilScreen() {
 
   const profile = profileQuery.data;
 
+  const loadPosts = useCallback(async () => {
+    const userId = profileQuery.data?.user_id;
+    if (!userId) {
+      return;
+    }
+
+    setLoadingPosts(true);
+    setPostsError("");
+
+    try {
+      const data = await fetchPostsByUser(userId);
+      setPosts(data);
+    } catch (err) {
+      setPostsError(getApiErrorMessage(err, "carregar posts"));
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, [profileQuery.data?.user_id]);
+
   const handleRefresh = async () => {
     await profileQuery.refetch();
+    await loadPosts();
   };
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPosts();
+    }, [loadPosts]),
+  );
 
   if (loading) {
     return (
@@ -90,6 +126,52 @@ export default function PerfilScreen() {
           </View>
 
           {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+
+          <View style={styles.postsSection}>
+            <Text style={styles.postsTitle}>Posts</Text>
+
+            {loadingPosts ? (
+              <View style={styles.postsLoading}>
+                <ActivityIndicator color={theme.colors.text} />
+                <Text style={styles.loadingText}>Carregando posts...</Text>
+              </View>
+            ) : null}
+
+            {postsError ? <Text style={styles.error}>{postsError}</Text> : null}
+
+            {!loadingPosts && posts.length === 0 ? (
+              <Text style={styles.emptyPosts}>Voce ainda nao publicou nenhum post.</Text>
+            ) : null}
+
+            {posts.map((item) => {
+              const firstMedia = item.midias?.[0];
+
+              return (
+                <Pressable
+                  key={item.id}
+                  style={styles.postCard}
+                  onPress={() => router.push(`/screens/social/Post/${item.id}` as never)}
+                >
+                  {firstMedia ? (
+                    firstMedia.type === "image" ? (
+                      <Image source={{ uri: firstMedia.url }} style={styles.postPreview} />
+                    ) : (
+                      <View style={[styles.postPreview, styles.videoPreview]}>
+                        <Text style={styles.videoPreviewText}>Video</Text>
+                      </View>
+                    )
+                  ) : null}
+
+                  {item.descricao ? <Text style={styles.postDescription}>{item.descricao}</Text> : null}
+
+                  <View style={styles.postMetaRow}>
+                    <Text style={styles.postMetaText}>Curtidas: {item.likes_count}</Text>
+                    <Text style={styles.postMetaText}>Comentarios: {item.comments_count}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -209,6 +291,61 @@ function createStyles(theme: AppTheme) {
     error: {
       color: theme.colors.error,
       fontWeight: "500",
+    },
+    postsSection: {
+      marginTop: 4,
+      gap: 8,
+    },
+    postsTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    postsLoading: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    emptyPosts: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+    },
+    postCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surface,
+      overflow: "hidden",
+      padding: 10,
+      gap: 8,
+    },
+    postPreview: {
+      width: "100%",
+      height: 180,
+      borderRadius: 10,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    videoPreview: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.button,
+    },
+    videoPreviewText: {
+      color: theme.colors.buttonText,
+      fontWeight: "700",
+    },
+    postDescription: {
+      color: theme.colors.text,
+      fontSize: 14,
+    },
+    postMetaRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    postMetaText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "600",
     },
   });
 }

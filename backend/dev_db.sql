@@ -455,3 +455,73 @@ AS $$
   LIMIT GREATEST(p_limit, 1)
   OFFSET GREATEST(p_offset, 0);
 $$;
+
+-- POSTS (BASEADO NO MODELO INFORMADO PELO USUARIO)
+CREATE TABLE posts (
+  post_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  oculto BOOLEAN DEFAULT FALSE,
+  treino_id INT DEFAULT NULL,
+  user_id UUID NOT NULL,
+  descricao TEXT NOT NULL,
+  tipo VARCHAR(20) DEFAULT 'normal',
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE post_photos (
+  photo_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id INT NOT NULL,
+  media_type VARCHAR(10) NOT NULL DEFAULT 'image',
+  media_url TEXT NOT NULL,
+  media_key TEXT,
+  ordem INT,
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
+  CONSTRAINT chk_post_photos_media_type CHECK (media_type IN ('image', 'video'))
+);
+
+CREATE TABLE post_likes (
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id INT NOT NULL,
+  user_id UUID NOT NULL,
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_post_like UNIQUE (post_id, user_id)
+);
+
+CREATE TABLE post_saves (
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id INT NOT NULL,
+  user_id UUID NOT NULL,
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_post_save UNIQUE (post_id, user_id)
+);
+
+CREATE TABLE post_comments (
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id INT NOT NULL,
+  user_id UUID NOT NULL,
+  comentario TEXT NOT NULL,
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE post_reports (
+  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id INT NOT NULL,
+  user_id UUID NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_post_report UNIQUE (post_id, user_id)
+);
+
+CREATE INDEX idx_posts_user_created_at ON posts(user_id, created_at DESC);
+CREATE INDEX idx_post_photos_post_ordem ON post_photos(post_id, ordem ASC);
+CREATE INDEX idx_post_comments_post_created_at ON post_comments(post_id, created_at DESC);
