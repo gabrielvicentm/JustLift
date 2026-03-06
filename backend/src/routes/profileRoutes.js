@@ -7,6 +7,9 @@ const authMiddleware = require('../middleware/authMiddleware');
 router.post('/profile', authMiddleware, profileController.profile);
 router.put('/updateProfile', authMiddleware, profileController.updateProfile);
 
+router.post('/account-change/request', authMiddleware, profileController.requestAccountChange);
+router.post('/account-change/confirm', authMiddleware, profileController.confirmAccountChange);
+
 // REST routes
 router.get('/me', authMiddleware, profileController.getMe);
 router.put('/me', authMiddleware, profileController.updateMe);
