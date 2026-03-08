@@ -4,6 +4,8 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -59,13 +61,13 @@ export default function CriarPostScreen() {
 
   const handleEscolherDaGaleria = async () => {
     if (midias.length >= MAX_MIDIAS) {
-      Alert.alert("Limite atingido", `Cada post permite no máximo ${MAX_MIDIAS} mídias.`);
+      Alert.alert("Limite atingido", `Cada post permite no maximo ${MAX_MIDIAS} midias.`);
       return;
     }
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permissão necessária", "Autorize a galeria para selecionar mídias.");
+      Alert.alert("Permissao necessaria", "Autorize a galeria para selecionar midias.");
       return;
     }
 
@@ -86,13 +88,13 @@ export default function CriarPostScreen() {
 
   const handleAbrirCamera = async () => {
     if (midias.length >= MAX_MIDIAS) {
-      Alert.alert("Limite atingido", `Cada post permite no máximo ${MAX_MIDIAS} mídias.`);
+      Alert.alert("Limite atingido", `Cada post permite no maximo ${MAX_MIDIAS} midias.`);
       return;
     }
 
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permissão necessária", "Autorize a câmera para capturar mídias.");
+      Alert.alert("Permissao necessaria", "Autorize a camera para capturar midias.");
       return;
     }
 
@@ -109,9 +111,9 @@ export default function CriarPostScreen() {
   };
 
   const handleEscolherMidias = () => {
-    Alert.alert("Adicionar mídia", "Escolha uma opção", [
+    Alert.alert("Adicionar midia", "Escolha uma opcao", [
       { text: "Galeria", onPress: handleEscolherDaGaleria },
-      { text: "Câmera", onPress: handleAbrirCamera },
+      { text: "Camera", onPress: handleAbrirCamera },
       { text: "Cancelar", style: "cancel" },
     ]);
   };
@@ -165,84 +167,96 @@ export default function CriarPostScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Criar post</Text>
-        <Text style={styles.subtitle}>Adicione imagens e vídeos (máximo de 9).</Text>
-      </View>
-
-      <Pressable style={styles.addMediaButton} onPress={handleEscolherMidias} disabled={sending}>
-        <Ionicons name="images-outline" size={18} color={theme.colors.buttonText} />
-        <Text style={styles.addMediaButtonText}>Inserir mídia</Text>
-      </Pressable>
-
-      <Text style={styles.counterText}>
-        {midias.length}/{MAX_MIDIAS} mídias selecionadas
-      </Text>
-
-      {midias.length > 0 ? (
-        <FlatList
-          data={midias}
-          keyExtractor={(item) => item.id}
-          numColumns={3}
-          scrollEnabled={false}
-          contentContainerStyle={styles.grid}
-          columnWrapperStyle={styles.gridRow}
-          renderItem={({ item }) => (
-            <View style={styles.mediaCard}>
-              {item.type === "image" ? (
-                <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
-              ) : (
-                <View style={styles.videoPlaceholder}>
-                  <Ionicons name="videocam" size={22} color={theme.colors.buttonText} />
-                  <Text style={styles.videoText}>Vídeo</Text>
-                </View>
-              )}
-
-              <Pressable style={styles.removeButton} onPress={() => handleRemoverMidia(item.id)}>
-                <Ionicons name="close" size={14} color={theme.colors.buttonText} />
-              </Pressable>
-            </View>
-          )}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <Ionicons name="image-outline" size={20} color={theme.colors.mutedText} />
-          <Text style={styles.emptyStateText}>Nenhuma mídia selecionada.</Text>
-        </View>
-      )}
-
-      <Text style={styles.label}>Descrição</Text>
-      <TextInput
-        value={descricao}
-        onChangeText={setDescricao}
-        placeholder="Escreva algo sobre seu post..."
-        placeholderTextColor={theme.colors.mutedText}
-        style={styles.descriptionInput}
-        multiline
-        textAlignVertical="top"
-        editable={!sending}
-        maxLength={1000}
-      />
-
-      <Pressable
-        style={[styles.publishButton, sending && styles.buttonDisabled]}
-        onPress={handlePublicarComTratamento}
-        disabled={sending}
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+    >
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
-        {sending ? (
-          <ActivityIndicator color={theme.colors.buttonText} />
-        ) : (
-          <Text style={styles.publishButtonText}>Publicar post</Text>
-        )}
-      </Pressable>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {success ? <Text style={styles.success}>{success}</Text> : null}
+        <View style={styles.header}>
+          <Text style={styles.title}>Criar post</Text>
+          <Text style={styles.subtitle}>Adicione imagens e videos (maximo de 9).</Text>
+        </View>
 
-      <Pressable style={styles.backButton} onPress={() => router.back()} disabled={sending}>
-        <Text style={styles.backButtonText}>Voltar</Text>
-      </Pressable>
-    </ScrollView>
+        <Pressable style={styles.addMediaButton} onPress={handleEscolherMidias} disabled={sending}>
+          <Ionicons name="images-outline" size={18} color={theme.colors.buttonText} />
+          <Text style={styles.addMediaButtonText}>Inserir midia</Text>
+        </Pressable>
+
+        <Text style={styles.counterText}>
+          {midias.length}/{MAX_MIDIAS} midias selecionadas
+        </Text>
+
+        {midias.length > 0 ? (
+          <FlatList
+            data={midias}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            scrollEnabled={false}
+            contentContainerStyle={styles.grid}
+            columnWrapperStyle={styles.gridRow}
+            renderItem={({ item }) => (
+              <View style={styles.mediaCard}>
+                {item.type === "image" ? (
+                  <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
+                ) : (
+                  <View style={styles.videoPlaceholder}>
+                    <Ionicons name="videocam" size={22} color={theme.colors.buttonText} />
+                    <Text style={styles.videoText}>Video</Text>
+                  </View>
+                )}
+
+                <Pressable style={styles.removeButton} onPress={() => handleRemoverMidia(item.id)}>
+                  <Ionicons name="close" size={14} color={theme.colors.buttonText} />
+                </Pressable>
+              </View>
+            )}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="image-outline" size={20} color={theme.colors.mutedText} />
+            <Text style={styles.emptyStateText}>Nenhuma midia selecionada.</Text>
+          </View>
+        )}
+
+        <Text style={styles.label}>Descricao</Text>
+        <TextInput
+          value={descricao}
+          onChangeText={setDescricao}
+          placeholder="Escreva algo sobre seu post..."
+          placeholderTextColor={theme.colors.mutedText}
+          style={styles.descriptionInput}
+          multiline
+          textAlignVertical="top"
+          editable={!sending}
+          maxLength={1000}
+        />
+
+        <Pressable
+          style={[styles.publishButton, sending && styles.buttonDisabled]}
+          onPress={handlePublicarComTratamento}
+          disabled={sending}
+        >
+          {sending ? (
+            <ActivityIndicator color={theme.colors.buttonText} />
+          ) : (
+            <Text style={styles.publishButtonText}>Publicar post</Text>
+          )}
+        </Pressable>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {success ? <Text style={styles.success}>{success}</Text> : null}
+
+        <Pressable style={styles.backButton} onPress={() => router.back()} disabled={sending}>
+          <Text style={styles.backButtonText}>Voltar</Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -255,7 +269,7 @@ function createStyles(theme: AppTheme) {
     container: {
       padding: 16,
       gap: 10,
-      paddingBottom: 26,
+      paddingBottom: 44,
     },
     header: {
       gap: 4,
@@ -363,6 +377,7 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
     },
     publishButton: {
+      marginTop: 10,
       height: 46,
       borderRadius: 10,
       backgroundColor: theme.colors.button,

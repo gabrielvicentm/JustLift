@@ -266,6 +266,123 @@ exports.getPostById = async ({ postId, viewerUserId }) => {
   };
 };
 
+exports.updatePost = async ({ postId, userId, descricao, midias = [], replaceMidias = false }) => {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const ownerCheck = await client.query(
+      `
+        SELECT post_id
+        FROM posts
+        WHERE post_id = $1
+          AND user_id = $2
+        LIMIT 1
+      `,
+      [postId, userId],
+    );
+
+    if (ownerCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    if (replaceMidias) {
+      await client.query(
+        `
+          DELETE FROM post_photos
+          WHERE post_id = $1
+        `,
+        [postId],
+      );
+
+      if (midias.length > 0) {
+        const values = [];
+        const placeholders = midias.map((item, index) => {
+          const base = index * 5;
+          values.push(postId, item.type, item.url, item.key, index + 1);
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+        });
+
+        await client.query(
+          `
+            INSERT INTO post_photos (
+              post_id,
+              media_type,
+              media_url,
+              media_key,
+              ordem
+            )
+            VALUES ${placeholders.join(', ')}
+          `,
+          values,
+        );
+      }
+    }
+
+    let mediaCount = 0;
+    if (replaceMidias) {
+      mediaCount = midias.length;
+    } else {
+      const mediaCountResult = await client.query(
+        `
+          SELECT COUNT(*)::INT AS total
+          FROM post_photos
+          WHERE post_id = $1
+        `,
+        [postId],
+      );
+      mediaCount = mediaCountResult.rows[0]?.total || 0;
+    }
+
+    if (!descricao && mediaCount === 0) {
+      await client.query('ROLLBACK');
+      throw new Error('POST_EMPTY');
+    }
+
+    await client.query(
+      `
+        UPDATE posts
+        SET
+          descricao = $1
+        WHERE post_id = $2
+          AND user_id = $3
+      `,
+      [descricao || '', postId, userId],
+    );
+
+    await client.query('COMMIT');
+
+    const summary = await getPostSummaryById(postId, userId);
+    const updatedMidias = await getMediaByPostId(postId);
+    return mergePostWithMedia(summary, updatedMidias);
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // noop
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+exports.deletePost = async ({ postId, userId }) => {
+  const deleted = await db.query(
+    `
+      DELETE FROM posts
+      WHERE post_id = $1
+        AND user_id = $2
+      RETURNING post_id
+    `,
+    [postId, userId],
+  );
+
+  return deleted.rows.length > 0;
+};
+
 exports.toggleLike = async ({ postId, userId }) => {
   if (!(await postExists(postId))) {
     return null;

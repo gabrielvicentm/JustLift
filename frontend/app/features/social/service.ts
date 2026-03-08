@@ -14,6 +14,11 @@ type CreatePostPayload = {
   midias: PostMediaPayload[];
 };
 
+type UpdatePostPayload = {
+  descricao: string;
+  midias?: PostMediaPayload[];
+};
+
 export async function uploadMediaToR2(
   uri: string,
   filename: string,
@@ -78,6 +83,17 @@ export async function fetchPostById(postId: number): Promise<PostDetail> {
   const headers = await getAuthHeader();
   const response = await api.get<{ post: PostDetail }>(`/posts/${postId}`, { headers });
   return response.data.post;
+}
+
+export async function updatePost(postId: number, payload: UpdatePostPayload): Promise<PostSummary> {
+  const headers = await getAuthHeader();
+  const response = await api.put<{ post: PostSummary }>(`/posts/${postId}`, payload, { headers });
+  return response.data.post;
+}
+
+export async function deletePost(postId: number): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/posts/${postId}`, { headers });
 }
 
 export async function togglePostLike(postId: number): Promise<{ liked: boolean; likes_count: number }> {
