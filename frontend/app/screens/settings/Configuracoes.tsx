@@ -90,6 +90,11 @@ export default function ConfiguracoesScreen() {
           <Text style={styles.chevron}>›</Text>
         </Pressable>
 
+        <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/GerenciarPosts")}>
+          <Text style={styles.optionText}>Gerenciar posts</Text>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
+
         <Pressable style={styles.optionRow} onPress={goHome}>
           <Text style={styles.optionText}>Sobre</Text>
           <Text style={styles.chevron}>›</Text>
@@ -281,3 +286,4 @@ function createStyles(theme: AppTheme) {
     },
   });
 }
+
