@@ -79,6 +79,10 @@ exports.getPostsByUser = async (req, res) => {
     const posts = await postService.getPostsByUser({ userId, viewerUserId });
     return res.status(200).json({ posts });
   } catch (err) {
+    if (err.message === 'PROFILE_PRIVATE') {
+      return res.status(403).json({ message: 'Perfil privado. Solicite para seguir para ver os posts.' });
+    }
+
     console.error('Erro ao buscar posts por usuario:', err);
     return res.status(500).json({ message: 'Erro ao buscar posts' });
   }
@@ -103,6 +107,10 @@ exports.getPostById = async (req, res) => {
 
     return res.status(200).json({ post });
   } catch (err) {
+    if (err.message === 'PROFILE_PRIVATE') {
+      return res.status(403).json({ message: 'Perfil privado. Solicite para seguir para ver os posts.' });
+    }
+
     console.error('Erro ao buscar post por id:', err);
     return res.status(500).json({ message: 'Erro ao buscar post' });
   }

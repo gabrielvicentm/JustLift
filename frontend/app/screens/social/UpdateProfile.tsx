@@ -35,6 +35,7 @@ export default function EditarPerfilScreen() {
   const [fotoPerfilUrl, setFotoPerfilUrl] = useState<string | null>(null);
   const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [formHydrated, setFormHydrated] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -47,6 +48,7 @@ export default function EditarPerfilScreen() {
       setBiografia(profileQuery.data.biografia ?? "");
       setFotoPerfilUrl(profileQuery.data.foto_perfil ?? null);
       setBannerUrl(profileQuery.data.banner ?? null);
+      setIsPrivate(Boolean(profileQuery.data.is_private));
       setFormHydrated(true);
     }
   }, [formHydrated, profileQuery.data]);
@@ -78,6 +80,7 @@ export default function EditarPerfilScreen() {
         biografia: biografia.trim(),
         foto_perfil: finalFotoPerfilUrl,
         banner: finalBannerUrl,
+        is_private: isPrivate,
       });
 
       return {
@@ -231,6 +234,19 @@ export default function EditarPerfilScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Privacidade</Text>
+          <Pressable
+            style={[styles.privacyToggle, isPrivate && styles.privacyToggleActive, loading && styles.buttonDisabled]}
+            onPress={() => setIsPrivate((prev) => !prev)}
+            disabled={loading}
+          >
+            <Text style={[styles.privacyToggleText, isPrivate && styles.privacyToggleTextActive]}>
+              {isPrivate ? "Perfil privado (solicitacao para seguir)" : "Perfil publico"}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.label}>Nome de Exibicao</Text>
           <TextInput
             style={styles.input}
@@ -326,6 +342,30 @@ function createStyles(theme: AppTheme) {
       fontSize: 16,
       fontWeight: "600",
       color: theme.colors.text,
+    },
+    privacyToggle: {
+      minHeight: 44,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    privacyToggleActive: {
+      borderColor: theme.colors.button,
+      backgroundColor: `${theme.colors.button}22`,
+    },
+    privacyToggleText: {
+      color: theme.colors.text,
+      fontWeight: "600",
+      fontSize: 14,
+      textAlign: "center",
+    },
+    privacyToggleTextActive: {
+      color: theme.colors.button,
     },
     label: {
       fontSize: 14,

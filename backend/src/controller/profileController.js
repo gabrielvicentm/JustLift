@@ -20,14 +20,15 @@ exports.getMe = exports.profile;
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { nome_exibicao, biografia, foto_perfil, banner } = req.body;
+    const { nome_exibicao, biografia, foto_perfil, banner, is_private } = req.body;
 
     const updatedProfile = await profileService.updateProfile(
       userId,
       nome_exibicao,
       biografia,
       foto_perfil,
-      banner
+      banner,
+      typeof is_private === 'boolean' ? is_private : null
     );
 
     return res.status(200).json({

@@ -4,7 +4,9 @@ import * as FileSystem from "expo-file-system/legacy";
 import { api } from "@/app/config/api";
 import type {
   FollowListItem,
+  FollowActionResponse,
   MyProfileResponse,
+  NotificationItem,
   PublicProfileResponse,
   PresignResponse,
   SearchUserResponseItem,
@@ -121,7 +123,8 @@ export async function fetchFollowing(query = "", limit = 50, offset = 0) {
 
 export async function removeFollowing(targetUserId: string) {
   const headers = await getAuthHeader();
-  await api.delete(`/follows/following/${targetUserId}`, { headers });
+  const response = await api.delete<{ message: string }>(`/follows/following/${targetUserId}`, { headers });
+  return response.data;
 }
 
 export async function removeFollower(followerUserId: string) {
@@ -131,7 +134,39 @@ export async function removeFollower(followerUserId: string) {
 
 export async function followUser(targetUserId: string) {
   const headers = await getAuthHeader();
-  await api.post(`/follows/following/${targetUserId}`, {}, { headers });
+  const response = await api.post<FollowActionResponse>(`/follows/following/${targetUserId}`, {}, { headers });
+  return response.data;
+}
+
+export async function acceptFollowRequest(requestId: number) {
+  const headers = await getAuthHeader();
+  await api.post(`/follows/requests/${requestId}/accept`, {}, { headers });
+}
+
+export async function fetchNotifications(limit = 20, offset = 0) {
+  const headers = await getAuthHeader();
+  const response = await api.get<NotificationItem[]>("/follows/notifications", {
+    headers,
+    params: { limit, offset },
+  });
+  return response.data ?? [];
+}
+
+export async function fetchUnreadNotificationsCount() {
+  const headers = await getAuthHeader();
+  const response = await api.get<{ total: number }>("/follows/notifications/unread-count", { headers });
+  return response.data?.total ?? 0;
+}
+
+export async function markNotificationAsRead(notificationId: number) {
+  const headers = await getAuthHeader();
+  await api.patch(`/follows/notifications/${notificationId}/read`, {}, { headers });
+}
+
+export async function markAllNotificationsAsRead() {
+  const headers = await getAuthHeader();
+  const response = await api.patch<{ updatedCount: number }>("/follows/notifications/read-all", {}, { headers });
+  return response.data?.updatedCount ?? 0;
 }
 
 export async function uploadImageToR2(

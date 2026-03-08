@@ -12,6 +12,7 @@ exports.getProfile = async (userId) => {
        up.biografia,
        up.foto_perfil,
        up.banner,
+       COALESCE(up.is_private, FALSE) AS is_private,
        (
          SELECT COUNT(*)
          FROM user_follows uf
@@ -36,18 +37,19 @@ exports.getProfile = async (userId) => {
   return result.rows[0];
 };
 
-exports.updateProfile = async (userId, nome_exibicao, biografia, foto_perfil, banner) => {
+exports.updateProfile = async (userId, nome_exibicao, biografia, foto_perfil, banner, isPrivate = null) => {
   const result = await db.query(
-    `INSERT INTO users_profile (user_id, nome_exibicao, biografia, foto_perfil, banner)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO users_profile (user_id, nome_exibicao, biografia, foto_perfil, banner, is_private)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, FALSE))
      ON CONFLICT (user_id)
      DO UPDATE SET
        nome_exibicao = EXCLUDED.nome_exibicao,
        biografia = EXCLUDED.biografia,
        foto_perfil = EXCLUDED.foto_perfil,
-       banner = EXCLUDED.banner
-     RETURNING user_id, nome_exibicao, biografia, foto_perfil, banner`,
-    [userId, nome_exibicao, biografia, foto_perfil, banner]
+       banner = EXCLUDED.banner,
+       is_private = COALESCE($6, users_profile.is_private)
+     RETURNING user_id, nome_exibicao, biografia, foto_perfil, banner, is_private`,
+    [userId, nome_exibicao, biografia, foto_perfil, banner, isPrivate]
   );
 
   if (result.rows.length === 0) {
@@ -68,6 +70,7 @@ exports.getProfileByUsern = async (requestUserId, username) => {
        up.biografia,
        up.foto_perfil,
        up.banner,
+       COALESCE(up.is_private, FALSE) AS is_private,
        (
          SELECT COUNT(*)
          FROM user_follows uf
@@ -86,6 +89,15 @@ exports.getProfileByUsern = async (requestUserId, username) => {
              AND uf.following_id = u.id
          )
        ) AS is_following,
+       (
+         EXISTS (
+           SELECT 1
+           FROM follow_requests fr
+           WHERE fr.requester_id = $1
+             AND fr.target_id = u.id
+             AND fr.status = 'pending'
+         )
+       ) AS has_pending_follow_request,
        (u.id = $1) AS is_me,
        u.created_at
      FROM users u
@@ -99,7 +111,14 @@ exports.getProfileByUsern = async (requestUserId, username) => {
     throw new Error('USER_NOT_FOUND');
   }
 
-  return result.rows[0];
+  const profile = result.rows[0];
+
+  if (profile.is_private && !profile.is_me && !profile.is_following) {
+    profile.biografia = null;
+    profile.banner = null;
+  }
+
+  return profile;
 };
 
 const VERIFICATION_CODE_EXPIRATION_MINUTES = Number(process.env.EMAIL_VERIFICATION_EXPIRES_MINUTES || 10);

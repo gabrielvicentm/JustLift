@@ -61,7 +61,10 @@ export default function PublicProfileScreen() {
 
   useEffect(() => {
     const userId = profile?.user_id;
-    if (!userId) {
+    const canViewPosts = Boolean(profile?.is_me || profile?.is_following || !profile?.is_private);
+    if (!userId || !canViewPosts) {
+      setPosts([]);
+      setLoadingPosts(false);
       return;
     }
 
@@ -85,12 +88,13 @@ export default function PublicProfileScreen() {
     return () => {
       active = false;
     };
-  }, [profile?.user_id]);
+  }, [profile?.user_id, profile?.is_following, profile?.is_me, profile?.is_private]);
 
   useFocusEffect(
     useCallback(() => {
       const userId = profile?.user_id;
-      if (!userId) {
+      const canViewPosts = Boolean(profile?.is_me || profile?.is_following || !profile?.is_private);
+      if (!userId || !canViewPosts) {
         return;
       }
 
@@ -114,7 +118,7 @@ export default function PublicProfileScreen() {
       return () => {
         active = false;
       };
-    }, [profile?.user_id]),
+    }, [profile?.user_id, profile?.is_following, profile?.is_me, profile?.is_private]),
   );
 
   const handleFollowToggle = async () => {
@@ -131,13 +135,25 @@ export default function PublicProfileScreen() {
         setProfile({
           ...profile,
           is_following: false,
+          has_pending_follow_request: false,
           followers_count: Math.max(0, profile.followers_count - 1),
         });
       } else {
-        await followUser(profile.user_id);
+        const response = await followUser(profile.user_id);
+
+        if (response.status === "requested" || response.status === "already_requested") {
+          setProfile({
+            ...profile,
+            is_following: false,
+            has_pending_follow_request: true,
+          });
+          return;
+        }
+
         setProfile({
           ...profile,
           is_following: true,
+          has_pending_follow_request: false,
           followers_count: profile.followers_count + 1,
         });
       }
@@ -156,6 +172,8 @@ export default function PublicProfileScreen() {
       </View>
     );
   }
+
+  const canViewPosts = Boolean(profile?.is_me || profile?.is_following || !profile?.is_private);
 
   return (
     <View style={styles.container}>
@@ -180,6 +198,9 @@ export default function PublicProfileScreen() {
 
             <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Perfil"}</Text>
             {profile?.biografia ? <Text style={styles.bioText}>{profile.biografia}</Text> : null}
+            {profile?.is_private && !profile?.is_me ? (
+              <Text style={styles.privateBadge}>Perfil privado</Text>
+            ) : null}
 
             <View style={styles.socialSummary}>
               <Text style={styles.socialSummaryText}>
@@ -201,7 +222,13 @@ export default function PublicProfileScreen() {
                 {updatingFollow ? (
                   <ActivityIndicator color={theme.colors.buttonText} />
                 ) : (
-                  <Text style={styles.buttonText}>{profile?.is_following ? "Seguindo" : "Seguir"}</Text>
+                  <Text style={styles.buttonText}>
+                    {profile?.is_following
+                      ? "Seguindo"
+                      : profile?.has_pending_follow_request
+                        ? "Solicitado"
+                        : "Seguir"}
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -213,18 +240,22 @@ export default function PublicProfileScreen() {
         <View style={styles.postsSection}>
           <Text style={styles.postsTitle}>Posts</Text>
 
-          {loadingPosts ? (
+          {!canViewPosts ? (
+            <Text style={styles.emptyPosts}>Perfil privado. Solicite para seguir para ver os posts.</Text>
+          ) : null}
+
+          {canViewPosts && loadingPosts ? (
             <View style={styles.postsLoading}>
               <ActivityIndicator color={theme.colors.text} />
               <Text style={styles.loadingText}>Carregando posts...</Text>
             </View>
           ) : null}
 
-          {!loadingPosts && posts.length === 0 ? (
+          {canViewPosts && !loadingPosts && posts.length === 0 ? (
             <Text style={styles.emptyPosts}>Este usuario ainda nao publicou posts.</Text>
           ) : null}
 
-          {posts.map((item) => {
+          {canViewPosts && posts.map((item) => {
             const firstMedia = item.midias?.[0];
             return (
               <Pressable
@@ -342,6 +373,12 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.mutedText,
       fontSize: 14,
       textAlign: "center",
+    },
+    privateBadge: {
+      marginTop: 4,
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.colors.button,
     },
     socialSummary: {
       marginTop: 8,

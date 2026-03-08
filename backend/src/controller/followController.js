@@ -52,10 +52,14 @@ exports.unfollow = async (req, res) => {
     }
 
     const { targetUserId } = req.params;
-    const removed = await followService.unfollow({ userId, targetUserId });
+    const result = await followService.unfollow({ userId, targetUserId });
 
-    if (!removed) {
-      return res.status(404).json({ message: 'Relacao de seguindo nao encontrada.' });
+    if (result.status === 'not_found') {
+      return res.status(404).json({ message: 'Relacao de seguindo ou solicitacao nao encontrada.' });
+    }
+
+    if (result.status === 'request_canceled') {
+      return res.status(200).json({ message: 'Solicitacao de follow cancelada com sucesso.' });
     }
 
     return res.status(200).json({ message: 'Usuario removido de seguindo com sucesso.' });
@@ -94,13 +98,21 @@ exports.follow = async (req, res) => {
     }
 
     const { targetUserId } = req.params;
-    const created = await followService.follow({ userId, targetUserId });
+    const result = await followService.follow({ userId, targetUserId });
 
-    if (!created) {
-      return res.status(200).json({ message: 'Usuario ja estava sendo seguido.' });
+    if (result.status === 'already_following') {
+      return res.status(200).json({ message: 'Usuario ja estava sendo seguido.', status: result.status });
     }
 
-    return res.status(201).json({ message: 'Agora voce esta seguindo este usuario.' });
+    if (result.status === 'already_requested') {
+      return res.status(200).json({ message: 'Solicitacao de follow ja enviada.', status: result.status });
+    }
+
+    if (result.status === 'requested') {
+      return res.status(202).json({ message: 'Solicitacao de follow enviada.', status: result.status });
+    }
+
+    return res.status(201).json({ message: 'Agora voce esta seguindo este usuario.', status: result.status });
   } catch (err) {
     if (err.message === 'CANNOT_FOLLOW_SELF') {
       return res.status(400).json({ message: 'Nao e permitido seguir a si mesmo.' });
@@ -111,5 +123,139 @@ exports.follow = async (req, res) => {
 
     console.error('Erro ao seguir usuario:', err);
     return res.status(500).json({ message: 'Erro no servidor ao seguir usuario.' });
+  }
+};
+
+exports.getIncomingFollowRequests = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const requests = await followService.listIncomingFollowRequests({
+      userId,
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+
+    return res.status(200).json(requests);
+  } catch (err) {
+    console.error('Erro ao listar solicitacoes de follow:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao listar solicitacoes de follow.' });
+  }
+};
+
+exports.acceptFollowRequest = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const { requestId } = req.params;
+    await followService.acceptFollowRequest({ userId, requestId });
+    return res.status(200).json({ message: 'Solicitacao de follow aceita com sucesso.' });
+  } catch (err) {
+    if (err.message === 'FOLLOW_REQUEST_NOT_FOUND') {
+      return res.status(404).json({ message: 'Solicitacao de follow nao encontrada.' });
+    }
+
+    console.error('Erro ao aceitar solicitacao de follow:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao aceitar solicitacao de follow.' });
+  }
+};
+
+exports.rejectFollowRequest = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const { requestId } = req.params;
+    await followService.rejectFollowRequest({ userId, requestId });
+    return res.status(200).json({ message: 'Solicitacao de follow recusada com sucesso.' });
+  } catch (err) {
+    if (err.message === 'FOLLOW_REQUEST_NOT_FOUND') {
+      return res.status(404).json({ message: 'Solicitacao de follow nao encontrada.' });
+    }
+
+    console.error('Erro ao recusar solicitacao de follow:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao recusar solicitacao de follow.' });
+  }
+};
+
+exports.getNotifications = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const notifications = await followService.listNotifications({
+      userId,
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+
+    return res.status(200).json(notifications);
+  } catch (err) {
+    console.error('Erro ao listar notificacoes:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao listar notificacoes.' });
+  }
+};
+
+exports.getUnreadNotificationsCount = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const total = await followService.countUnreadNotifications({ userId });
+    return res.status(200).json({ total });
+  } catch (err) {
+    console.error('Erro ao contar notificacoes nao lidas:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao contar notificacoes.' });
+  }
+};
+
+exports.readNotification = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const { notificationId } = req.params;
+    const updated = await followService.markNotificationAsRead({
+      userId,
+      notificationId,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Notificacao nao encontrada.' });
+    }
+
+    return res.status(200).json({ message: 'Notificacao marcada como lida.' });
+  } catch (err) {
+    console.error('Erro ao marcar notificacao como lida:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao atualizar notificacao.' });
+  }
+};
+
+exports.readAllNotifications = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const updatedCount = await followService.markAllNotificationsAsRead({ userId });
+    return res.status(200).json({ updatedCount });
+  } catch (err) {
+    console.error('Erro ao marcar todas notificacoes como lidas:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao atualizar notificacoes.' });
   }
 };

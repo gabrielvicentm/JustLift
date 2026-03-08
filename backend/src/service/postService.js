@@ -96,6 +96,35 @@ async function getPostSummaryById(postId, viewerUserId) {
   return result.rows[0] || null;
 }
 
+async function canViewUserPosts(ownerUserId, viewerUserId) {
+  if (ownerUserId === viewerUserId) {
+    return true;
+  }
+
+  const result = await db.query(
+    `SELECT
+       COALESCE(up.is_private, FALSE) AS is_private,
+       EXISTS (
+         SELECT 1
+         FROM user_follows uf
+         WHERE uf.follower_id = $2
+           AND uf.following_id = u.id
+       ) AS is_following
+     FROM users u
+     LEFT JOIN users_profile up ON up.user_id = u.id
+     WHERE u.id = $1
+     LIMIT 1`,
+    [ownerUserId, viewerUserId]
+  );
+
+  if (result.rows.length === 0) {
+    return false;
+  }
+
+  const row = result.rows[0];
+  return !row.is_private || row.is_following;
+}
+
 function mergePostWithMedia(post, midias) {
   return {
     ...post,
@@ -161,6 +190,11 @@ exports.createPost = async ({ userId, descricao, midias }) => {
 };
 
 exports.getPostsByUser = async ({ userId, viewerUserId }) => {
+  const canView = await canViewUserPosts(userId, viewerUserId);
+  if (!canView) {
+    throw new Error('PROFILE_PRIVATE');
+  }
+
   const result = await db.query(
     `
       SELECT
@@ -252,6 +286,11 @@ exports.getPostById = async ({ postId, viewerUserId }) => {
   const summary = await getPostSummaryById(postId, viewerUserId);
   if (!summary) {
     return null;
+  }
+
+  const canView = await canViewUserPosts(summary.user_id, viewerUserId);
+  if (!canView) {
+    throw new Error('PROFILE_PRIVATE');
   }
 
   const [midias, comentarios] = await Promise.all([
