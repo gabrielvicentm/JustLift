@@ -12,6 +12,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import type { PostSummary } from "@/app/features/social/types";
 import { fetchPostsByUser } from "@/app/features/social/service";
+import { fetchDailySummaryByUser } from "@/app/features/daily/service";
+import type { DailySummary } from "@/app/features/daily/types";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import type { PublicProfileResponse } from "@/app/features/profile/types";
@@ -34,6 +36,7 @@ export default function PublicProfileScreen() {
   const [updatingFollow, setUpdatingFollow] = useState(false);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
 
   const loadProfile = useCallback(async () => {
     const safeUsername = String(username || "").trim();
@@ -87,6 +90,29 @@ export default function PublicProfileScreen() {
     };
   }, [profile?.user_id]);
 
+  useEffect(() => {
+    const userId = profile?.user_id;
+    if (!userId) {
+      return;
+    }
+
+    let active = true;
+
+    fetchDailySummaryByUser(userId)
+      .then((data) => {
+        if (!active) return;
+        setDailySummary(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(getApiErrorMessage(err, "carregar Daily"));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile?.user_id]);
+
   useFocusEffect(
     useCallback(() => {
       const userId = profile?.user_id;
@@ -111,11 +137,31 @@ export default function PublicProfileScreen() {
           setLoadingPosts(false);
         });
 
+      fetchDailySummaryByUser(userId)
+        .then((data) => {
+          if (!active) return;
+          setDailySummary(data);
+        })
+        .catch((err) => {
+          if (!active) return;
+          setError(getApiErrorMessage(err, "carregar Daily"));
+        });
+
       return () => {
         active = false;
       };
     }, [profile?.user_id]),
   );
+
+  const hasActiveDaily = dailySummary?.has_active_daily ?? false;
+  const hasUnseenDaily = dailySummary?.has_unseen_daily ?? false;
+
+  const handleOpenDaily = () => {
+    if (!profile?.user_id || !hasActiveDaily) {
+      return;
+    }
+    router.push({ pathname: "/screens/social/verDayli", params: { userId: profile.user_id } } as never);
+  };
 
   const handleFollowToggle = async () => {
     if (!profile || profile.is_me) {
@@ -170,13 +216,22 @@ export default function PublicProfileScreen() {
           {profile?.banner ? <Image source={{ uri: profile.banner }} style={styles.banner} /> : null}
 
           <View style={styles.profileBody}>
-            {profile?.foto_perfil ? (
-              <Image source={{ uri: profile.foto_perfil }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Text style={styles.avatarPlaceholderText}>Sem foto</Text>
-              </View>
-            )}
+            <Pressable
+              style={[
+                styles.avatarRing,
+                hasActiveDaily && (hasUnseenDaily ? styles.avatarRingUnseen : styles.avatarRingSeen),
+              ]}
+              onPress={handleOpenDaily}
+              disabled={!hasActiveDaily}
+            >
+              {profile?.foto_perfil ? (
+                <Image source={{ uri: profile.foto_perfil }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarPlaceholderText}>Sem foto</Text>
+                </View>
+              )}
+            </Pressable>
 
             <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Perfil"}</Text>
             {profile?.biografia ? <Text style={styles.bioText}>{profile.biografia}</Text> : null}
@@ -320,6 +375,18 @@ function createStyles(theme: AppTheme) {
       height: 88,
       borderRadius: 44,
       backgroundColor: theme.colors.inputBackground,
+    },
+    avatarRing: {
+      borderRadius: 50,
+      padding: 3,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    avatarRingUnseen: {
+      borderColor: theme.colors.button,
+    },
+    avatarRingSeen: {
+      borderColor: theme.colors.border,
     },
     avatarPlaceholder: {
       alignItems: "center",

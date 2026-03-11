@@ -8,23 +8,21 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { createPost, uploadMediaToR2 } from "@/app/features/social/service";
+import { uploadMediaToR2 } from "@/app/features/social/service";
 import { createDailyBatch } from "@/app/features/daily/service";
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 
-const MAX_POST_MIDIAS = 9;
 const MAX_DAILY_MIDIAS = 20;
 const MAX_DAILY_VIDEO_DURATION_SECONDS = 15;
 
-type LocalMedia = {
+type DailyMedia = {
   id: string;
   uri: string;
   type: "image" | "video";
@@ -34,24 +32,18 @@ type LocalMedia = {
   durationMs?: number | null;
 };
 
-export default function CriarPostScreen() {
+export default function CriarDailyScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [abaAtiva, setAbaAtiva] = useState<"post" | "daily">("post");
-  const [descricao, setDescricao] = useState("");
-  const [midiasPost, setMidiasPost] = useState<LocalMedia[]>([]);
-  const [midiasDaily, setMidiasDaily] = useState<LocalMedia[]>([]);
+  const [midias, setMidias] = useState<DailyMedia[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const midiasSelecionadas = abaAtiva === "post" ? midiasPost : midiasDaily;
-  const limiteAtual = abaAtiva === "post" ? MAX_POST_MIDIAS : MAX_DAILY_MIDIAS;
-
   const addNovasMidias = (assets: ImagePicker.ImagePickerAsset[]) => {
-    const novasMidias: LocalMedia[] = [];
+    const novasMidias: DailyMedia[] = [];
     let teveVideoCortado = false;
 
     for (const [index, asset] of assets.entries()) {
@@ -59,7 +51,7 @@ export default function CriarPostScreen() {
       const durationMs = isVideo ? asset.duration ?? null : null;
       const durationSeconds = durationMs ? durationMs / 1000 : 0;
 
-      if (abaAtiva === "daily" && isVideo && durationSeconds > MAX_DAILY_VIDEO_DURATION_SECONDS) {
+      if (isVideo && durationSeconds > MAX_DAILY_VIDEO_DURATION_SECONDS) {
         teveVideoCortado = true;
       }
 
@@ -67,19 +59,14 @@ export default function CriarPostScreen() {
         id: `${asset.assetId ?? asset.uri}-${Date.now()}-${index}`,
         uri: asset.uri,
         type: isVideo ? "video" : "image",
-        fileName: asset.fileName ?? `midia-${Date.now()}-${index}`,
+        fileName: asset.fileName ?? `daily-${Date.now()}-${index}`,
         mimeType: asset.mimeType ?? (isVideo ? "video/mp4" : "image/jpeg"),
         fileSize: asset.fileSize,
         durationMs,
       });
     }
 
-    if (abaAtiva === "post") {
-      setMidiasPost((current) => [...current, ...novasMidias].slice(0, MAX_POST_MIDIAS));
-      return;
-    }
-
-    setMidiasDaily((current) => [...current, ...novasMidias].slice(0, MAX_DAILY_MIDIAS));
+    setMidias((current) => [...current, ...novasMidias].slice(0, MAX_DAILY_MIDIAS));
 
     if (teveVideoCortado) {
       Alert.alert(
@@ -90,8 +77,8 @@ export default function CriarPostScreen() {
   };
 
   const handleEscolherDaGaleria = async () => {
-    if (midiasSelecionadas.length >= limiteAtual) {
-      Alert.alert("Limite atingido", `Esta aba permite no maximo ${limiteAtual} midias.`);
+    if (midias.length >= MAX_DAILY_MIDIAS) {
+      Alert.alert("Limite atingido", `Cada envio permite no maximo ${MAX_DAILY_MIDIAS} midias.`);
       return;
     }
 
@@ -103,7 +90,7 @@ export default function CriarPostScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsMultipleSelection: true,
-      selectionLimit: limiteAtual - midiasSelecionadas.length,
+      selectionLimit: MAX_DAILY_MIDIAS - midias.length,
       mediaTypes: ["images", "videos"],
       quality: 0.9,
     });
@@ -116,8 +103,8 @@ export default function CriarPostScreen() {
   };
 
   const handleAbrirCamera = async () => {
-    if (midiasSelecionadas.length >= limiteAtual) {
-      Alert.alert("Limite atingido", `Esta aba permite no maximo ${limiteAtual} midias.`);
+    if (midias.length >= MAX_DAILY_MIDIAS) {
+      Alert.alert("Limite atingido", `Cada envio permite no maximo ${MAX_DAILY_MIDIAS} midias.`);
       return;
     }
 
@@ -130,7 +117,7 @@ export default function CriarPostScreen() {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images", "videos"],
       quality: 0.9,
-      videoMaxDuration: abaAtiva === "daily" ? MAX_DAILY_VIDEO_DURATION_SECONDS : undefined,
+      videoMaxDuration: MAX_DAILY_VIDEO_DURATION_SECONDS,
     });
 
     if (result.canceled || result.assets.length === 0) {
@@ -149,118 +136,58 @@ export default function CriarPostScreen() {
   };
 
   const handleRemoverMidia = (id: string) => {
-    if (abaAtiva === "post") {
-      setMidiasPost((current) => current.filter((item) => item.id !== id));
-      return;
-    }
-    setMidiasDaily((current) => current.filter((item) => item.id !== id));
+    setMidias((current) => current.filter((item) => item.id !== id));
   };
 
-  const handlePublicarPost = async () => {
-    if (!descricao.trim() && midiasPost.length === 0) {
-      setError("Adicione uma descricao ou pelo menos uma midia.");
-      return;
-    }
-
-    const uploadedMedia = await Promise.all(
-      midiasPost.map(async (item) => {
-        const uploaded = await uploadMediaToR2(item.uri, item.fileName, item.mimeType, item.fileSize);
-        return {
-          type: item.type,
-          url: uploaded.url,
-          key: uploaded.key,
-        } as const;
-      }),
-    );
-
-    await createPost({
-      descricao: descricao.trim(),
-      midias: uploadedMedia,
-    });
-
-    setDescricao("");
-    setMidiasPost([]);
-    setSuccess("Post publicado com sucesso.");
-    Alert.alert("Sucesso", "Seu post foi publicado.");
-  };
-
-  const handlePublicarDaily = async () => {
-    if (midiasDaily.length === 0) {
+  const handlePublicar = async () => {
+    if (midias.length === 0) {
       setError("Selecione pelo menos uma midia para publicar no Daily.");
       return;
     }
 
-    const uploadedMedia = await Promise.all(
-      midiasDaily.map(async (item) => {
-        const uploaded = await uploadMediaToR2(item.uri, item.fileName, item.mimeType, item.fileSize);
-        return {
-          type: item.type,
-          url: uploaded.url,
-          key: uploaded.key,
-          duration_seconds:
-            item.type === "video"
-              ? Math.max(1, Math.min(MAX_DAILY_VIDEO_DURATION_SECONDS, Math.ceil((item.durationMs ?? 15000) / 1000)))
-              : MAX_DAILY_VIDEO_DURATION_SECONDS,
-        } as const;
-      }),
-    );
-
-    await createDailyBatch({ midias: uploadedMedia });
-    setMidiasDaily([]);
-    setSuccess("Daily publicado com sucesso.");
-    Alert.alert("Sucesso", "Seu Daily foi publicado.");
-  };
-
-  const handlePublicarComTratamento = async () => {
+    setSending(true);
     setError("");
     setSuccess("");
-    setSending(true);
 
     try {
-      if (abaAtiva === "post") {
-        await handlePublicarPost();
-      } else {
-        await handlePublicarDaily();
-      }
-    } catch (err) {
-      setError(getApiErrorMessage(err, abaAtiva === "post" ? "publicar post" : "publicar Daily"));
+      const uploadedMedia = await Promise.all(
+        midias.map(async (item) => {
+          const uploaded = await uploadMediaToR2(item.uri, item.fileName, item.mimeType, item.fileSize);
+          return {
+            type: item.type,
+            url: uploaded.url,
+            key: uploaded.key,
+            duration_seconds:
+              item.type === "video"
+                ? Math.max(1, Math.min(MAX_DAILY_VIDEO_DURATION_SECONDS, Math.ceil((item.durationMs ?? 15000) / 1000)))
+                : MAX_DAILY_VIDEO_DURATION_SECONDS,
+          } as const;
+        }),
+      );
+
+      await createDailyBatch({ midias: uploadedMedia });
+
+      setMidias([]);
+      setSuccess("Daily publicado com sucesso.");
+      Alert.alert("Sucesso", "Seu Daily foi publicado.");
     } finally {
       setSending(false);
     }
   };
 
-  const trocarAba = (aba: "post" | "daily") => {
-    setAbaAtiva(aba);
-    setError("");
-    setSuccess("");
+  const handlePublicarComTratamento = async () => {
+    try {
+      await handlePublicar();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "publicar Daily"));
+    }
   };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Criar conteudo</Text>
-        <Text style={styles.subtitle}>
-          {abaAtiva === "post"
-            ? "Adicione imagens e videos para seu post."
-            : "Daily: foto/video de ate 15 segundos e exibicao por 24 horas."}
-        </Text>
-      </View>
-
-      <View style={styles.tabsRow}>
-        <Pressable
-          style={[styles.tabButton, abaAtiva === "post" && styles.tabButtonActive]}
-          onPress={() => trocarAba("post")}
-          disabled={sending}
-        >
-          <Text style={[styles.tabButtonText, abaAtiva === "post" && styles.tabButtonTextActive]}>Post</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tabButton, abaAtiva === "daily" && styles.tabButtonActive]}
-          onPress={() => trocarAba("daily")}
-          disabled={sending}
-        >
-          <Text style={[styles.tabButtonText, abaAtiva === "daily" && styles.tabButtonTextActive]}>Daily</Text>
-        </Pressable>
+        <Text style={styles.title}>Criar Daily</Text>
+        <Text style={styles.subtitle}>Foto ou video de ate 15 segundos. Some da exibicao em 24h.</Text>
       </View>
 
       <Pressable style={styles.addMediaButton} onPress={handleEscolherMidias} disabled={sending}>
@@ -269,12 +196,12 @@ export default function CriarPostScreen() {
       </Pressable>
 
       <Text style={styles.counterText}>
-        {midiasSelecionadas.length}/{limiteAtual} midias selecionadas
+        {midias.length}/{MAX_DAILY_MIDIAS} midias selecionadas
       </Text>
 
-      {midiasSelecionadas.length > 0 ? (
+      {midias.length > 0 ? (
         <FlatList
-          data={midiasSelecionadas}
+          data={midias}
           keyExtractor={(item) => item.id}
           numColumns={3}
           scrollEnabled={false}
@@ -304,23 +231,6 @@ export default function CriarPostScreen() {
         </View>
       )}
 
-      {abaAtiva === "post" ? (
-        <>
-          <Text style={styles.label}>Descricao</Text>
-          <TextInput
-            value={descricao}
-            onChangeText={setDescricao}
-            placeholder="Escreva algo sobre seu post..."
-            placeholderTextColor={theme.colors.mutedText}
-            style={styles.descriptionInput}
-            multiline
-            textAlignVertical="top"
-            editable={!sending}
-            maxLength={1000}
-          />
-        </>
-      ) : null}
-
       <Pressable
         style={[styles.publishButton, sending && styles.buttonDisabled]}
         onPress={handlePublicarComTratamento}
@@ -329,9 +239,10 @@ export default function CriarPostScreen() {
         {sending ? (
           <ActivityIndicator color={theme.colors.buttonText} />
         ) : (
-          <Text style={styles.publishButtonText}>{abaAtiva === "post" ? "Publicar post" : "Publicar Daily"}</Text>
+          <Text style={styles.publishButtonText}>Publicar Daily</Text>
         )}
       </Pressable>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {success ? <Text style={styles.success}>{success}</Text> : null}
 
@@ -364,31 +275,6 @@ function createStyles(theme: AppTheme) {
     subtitle: {
       color: theme.colors.mutedText,
       fontSize: 13,
-    },
-    tabsRow: {
-      flexDirection: "row",
-      gap: 8,
-    },
-    tabButton: {
-      flex: 1,
-      minHeight: 42,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 10,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surface,
-    },
-    tabButtonActive: {
-      backgroundColor: theme.colors.button,
-      borderColor: theme.colors.button,
-    },
-    tabButtonText: {
-      color: theme.colors.text,
-      fontWeight: "700",
-    },
-    tabButtonTextActive: {
-      color: theme.colors.buttonText,
     },
     addMediaButton: {
       height: 44,
@@ -467,21 +353,6 @@ function createStyles(theme: AppTheme) {
     emptyStateText: {
       color: theme.colors.mutedText,
       fontSize: 13,
-    },
-    label: {
-      color: theme.colors.text,
-      fontWeight: "600",
-      marginTop: 2,
-    },
-    descriptionInput: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      minHeight: 140,
-      backgroundColor: theme.colors.inputBackground,
-      color: theme.colors.text,
     },
     publishButton: {
       height: 46,
