@@ -12,9 +12,5 @@ router.delete('/followers/:followerUserId', authMiddleware, followController.rem
 router.get('/requests/incoming', authMiddleware, followController.getIncomingFollowRequests);
 router.post('/requests/:requestId/accept', authMiddleware, followController.acceptFollowRequest);
 router.post('/requests/:requestId/reject', authMiddleware, followController.rejectFollowRequest);
-router.get('/notifications', authMiddleware, followController.getNotifications);
-router.get('/notifications/unread-count', authMiddleware, followController.getUnreadNotificationsCount);
-router.patch('/notifications/:notificationId/read', authMiddleware, followController.readNotification);
-router.patch('/notifications/read-all', authMiddleware, followController.readAllNotifications);
 
 module.exports = router;

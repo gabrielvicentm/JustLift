@@ -40,19 +40,6 @@ export type FollowListItem = {
   followed_at: string;
 };
 
-export type NotificationItem = {
-  id: number;
-  type: "new_follower" | "follow_request";
-  follow_request_id: number | null;
-  follow_request_status: "pending" | "accepted" | "rejected" | "canceled" | null;
-  read_at: string | null;
-  created_at: string;
-  actor_id: string;
-  actor_username: string;
-  actor_nome_exibicao: string | null;
-  actor_foto_perfil: string | null;
-};
-
 export type FollowActionResponse = {
   message: string;
   status?: "following" | "requested" | "already_requested" | "already_following";

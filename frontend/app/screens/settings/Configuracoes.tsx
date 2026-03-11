@@ -60,13 +60,7 @@ export default function ConfiguracoesScreen() {
               thumbColor={theme.colors.buttonText}
             />
           </View>
-        </View>
-
-        <Pressable style={styles.optionRow} onPress={goHome}>
-          <Text style={styles.optionText}>Notificações</Text>
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
-
+        </View>\r\n
         <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Conta")}>
           <Text style={styles.optionText}>Conta</Text>
           <Text style={styles.chevron}>›</Text>
@@ -281,3 +275,4 @@ function createStyles(theme: AppTheme) {
     },
   });
 }
+

@@ -1,4 +1,6 @@
 const db = require('../utils/db');
+const notificationsService = require('./notificationsService');
+const notificationsPush = require('./notificationsPush');
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -160,6 +162,7 @@ exports.follow = async ({ userId, targetUserId }) => {
   }
 
   const client = await db.connect();
+  let createdNotification = null;
   try {
     await client.query('BEGIN');
 
@@ -182,32 +185,76 @@ exports.follow = async ({ userId, targetUserId }) => {
 
       const followRequestId = requestResult.rows[0]?.id || null;
       if (followRequestId) {
-        await client.query(
-          `INSERT INTO notifications (recipient_id, actor_id, follow_request_id, type)
-           VALUES ($1, $2, $3, 'follow_request')`,
-          [targetUserId, userId, followRequestId]
+        createdNotification = await notificationsService.createNotification(
+          {
+            recipientId: targetUserId,
+            actorId: userId,
+            type: 'follow_request',
+            data: { followRequestId },
+          },
+          client
         );
       }
 
       await client.query('COMMIT');
+      if (createdNotification) {
+        try {
+          await notificationsPush.sendPushToUser({
+            userId: targetUserId,
+            title: 'Pedido para seguir',
+            body: 'Alguem quer seguir voce.',
+            data: {
+              notificationId: createdNotification.id,
+              type: createdNotification.type,
+              actorId: createdNotification.actor_id,
+              followRequestId,
+            },
+          });
+        } catch (err) {
+          console.error('Falha ao enviar push de pedido de follow:', err);
+        }
+      }
       return { status: 'requested' };
     }
 
-    await client.query(
+    const followInsert = await client.query(
       `INSERT INTO user_follows (follower_id, following_id)
        VALUES ($1, $2)
        ON CONFLICT (follower_id, following_id)
-       DO NOTHING`,
+       DO NOTHING
+       RETURNING follower_id`,
       [userId, targetUserId]
     );
 
-    await client.query(
-      `INSERT INTO notifications (recipient_id, actor_id, type)
-       VALUES ($1, $2, 'new_follower')`,
-      [targetUserId, userId]
-    );
+    if (followInsert.rowCount > 0) {
+      createdNotification = await notificationsService.createNotification(
+        {
+          recipientId: targetUserId,
+          actorId: userId,
+          type: 'new_follower',
+          data: { actorId: userId },
+        },
+        client
+      );
+    }
 
     await client.query('COMMIT');
+    if (createdNotification) {
+      try {
+        await notificationsPush.sendPushToUser({
+          userId: targetUserId,
+          title: 'Novo seguidor',
+          body: 'Alguem comecou a seguir voce.',
+          data: {
+            notificationId: createdNotification.id,
+            type: createdNotification.type,
+            actorId: createdNotification.actor_id,
+          },
+        });
+      } catch (err) {
+        console.error('Falha ao enviar push de novo seguidor:', err);
+      }
+    }
     return { status: 'following' };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -264,7 +311,7 @@ exports.acceptFollowRequest = async ({ userId, requestId }) => {
 
     const request = requestResult.rows[0];
 
-    const followInsert = await client.query(
+    await client.query(
       `INSERT INTO user_follows (follower_id, following_id)
        VALUES ($1, $2)
        ON CONFLICT (follower_id, following_id)
@@ -280,21 +327,6 @@ exports.acceptFollowRequest = async ({ userId, requestId }) => {
       [request.id]
     );
 
-    await client.query(
-      `UPDATE notifications
-       SET read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
-       WHERE follow_request_id = $1
-         AND recipient_id = $2`,
-      [request.id, userId]
-    );
-
-    if (followInsert.rowCount > 0) {
-      await client.query(
-        `INSERT INTO notifications (recipient_id, actor_id, type)
-         VALUES ($1, $2, 'new_follower')`,
-        [request.target_id, request.requester_id]
-      );
-    }
 
     await client.query('COMMIT');
     return { status: 'accepted' };
@@ -322,79 +354,5 @@ exports.rejectFollowRequest = async ({ userId, requestId }) => {
     throw new Error('FOLLOW_REQUEST_NOT_FOUND');
   }
 
-  await db.query(
-    `UPDATE notifications
-     SET read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
-     WHERE follow_request_id = $1
-       AND recipient_id = $2`,
-    [requestId, userId]
-  );
-
   return { status: 'rejected' };
-};
-
-exports.listNotifications = async ({ userId, limit, offset }) => {
-  const safeLimit = normalizeLimit(limit);
-  const safeOffset = normalizeOffset(offset);
-
-  const result = await db.query(
-    `SELECT
-       n.id,
-       n.type,
-       n.follow_request_id,
-       n.read_at,
-       n.created_at,
-       fr.status AS follow_request_status,
-       u.id AS actor_id,
-       u.username AS actor_username,
-       up.nome_exibicao AS actor_nome_exibicao,
-       up.foto_perfil AS actor_foto_perfil
-     FROM notifications n
-     LEFT JOIN follow_requests fr ON fr.id = n.follow_request_id
-     INNER JOIN users u ON u.id = n.actor_id
-     LEFT JOIN users_profile up ON up.user_id = u.id
-     WHERE n.recipient_id = $1
-     ORDER BY n.created_at DESC, n.id DESC
-     LIMIT $2 OFFSET $3`,
-    [userId, safeLimit, safeOffset]
-  );
-
-  return result.rows;
-};
-
-exports.countUnreadNotifications = async ({ userId }) => {
-  const result = await db.query(
-    `SELECT COUNT(*)::INT AS total
-     FROM notifications
-     WHERE recipient_id = $1
-       AND read_at IS NULL`,
-    [userId]
-  );
-
-  return result.rows[0]?.total || 0;
-};
-
-exports.markNotificationAsRead = async ({ userId, notificationId }) => {
-  const result = await db.query(
-    `UPDATE notifications
-     SET read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
-     WHERE id = $1
-       AND recipient_id = $2
-     RETURNING id`,
-    [notificationId, userId]
-  );
-
-  return result.rowCount > 0;
-};
-
-exports.markAllNotificationsAsRead = async ({ userId }) => {
-  const result = await db.query(
-    `UPDATE notifications
-     SET read_at = CURRENT_TIMESTAMP
-     WHERE recipient_id = $1
-       AND read_at IS NULL`,
-    [userId]
-  );
-
-  return result.rowCount;
 };

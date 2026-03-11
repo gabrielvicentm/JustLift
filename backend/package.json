@@ -18,6 +18,8 @@
     "cors": "^2.8.6",
     "crypto": "^1.0.1",
     "dotenv": "^17.3.1",
+    "expo": "^55.0.5",
+    "expo-notifications": "~55.0.11",
     "express": "^5.2.1",
     "google-auth-library": "^10.6.1",
     "jsonwebtoken": "^9.0.3",

@@ -76,27 +76,42 @@ CREATE TABLE follow_requests (
     CHECK (requester_id <> target_id)
 );
 
-
--- Notificacoes (inicialmente apenas para novo seguidor)
 CREATE TABLE notifications (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   recipient_id UUID NOT NULL,
-  actor_id UUID NOT NULL,
-  follow_request_id BIGINT,
-  type VARCHAR(40) NOT NULL,
-  read_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_notifications_recipient
-    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_notifications_actor
-    FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_notifications_follow_request
-    FOREIGN KEY (follow_request_id) REFERENCES follow_requests(id) ON DELETE SET NULL,
-  CONSTRAINT chk_notifications_type
-    CHECK (type IN ('new_follower', 'follow_request')),
-  CONSTRAINT chk_notifications_not_self
-    CHECK (recipient_id <> actor_id)
+  actor_id UUID,
+  type VARCHAR(50) NOT NULL,
+  data JSONB,
+  read_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+
+  CONSTRAINT fk_recipient
+    FOREIGN KEY (recipient_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_actor
+    FOREIGN KEY (actor_id)
+    REFERENCES users(id)
+    ON DELETE SET NULL
 );
+
+CREATE TABLE user_push_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL,
+  expo_push_token TEXT NOT NULL,
+  platform VARCHAR(10),
+  is_active BOOLEAN DEFAULT TRUE,
+  last_seen_at TIMESTAMP,
+  revoked_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+
+  CONSTRAINT fk_user
+    FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
+);
+
 --Isso é um “atalho” para o banco achar usernames mais rápido;
 --em buscas como ILIKE '%nome%', sem varrer todos os usuários.
 CREATE INDEX idx_users_username_trgm
@@ -109,6 +124,12 @@ ON user_follows(follower_id, created_at DESC);
 CREATE INDEX idx_user_follows_following
 ON user_follows(following_id, created_at DESC);
 
+CREATE UNIQUE INDEX uq_user_push_tokens_expo_token
+ON user_push_tokens(expo_push_token);
+
+CREATE INDEX idx_user_push_tokens_user
+ON user_push_tokens(user_id, is_active);
+
 CREATE INDEX idx_follow_requests_target_pending
 ON follow_requests(target_id, created_at DESC)
 WHERE status = 'pending';
@@ -116,13 +137,6 @@ WHERE status = 'pending';
 CREATE INDEX idx_follow_requests_requester_pending
 ON follow_requests(requester_id, created_at DESC)
 WHERE status = 'pending';
-
-CREATE INDEX idx_notifications_recipient_created
-ON notifications(recipient_id, created_at DESC);
-
-CREATE INDEX idx_notifications_recipient_unread
-ON notifications(recipient_id, read_at)
-WHERE read_at IS NULL;
 
 -- Assinaturas por usuário (fonte da verdade do premium)
 CREATE TABLE user_subscriptions (

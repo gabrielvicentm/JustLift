@@ -6,7 +6,6 @@ import type {
   FollowListItem,
   FollowActionResponse,
   MyProfileResponse,
-  NotificationItem,
   PublicProfileResponse,
   PresignResponse,
   SearchUserResponseItem,
@@ -141,32 +140,6 @@ export async function followUser(targetUserId: string) {
 export async function acceptFollowRequest(requestId: number) {
   const headers = await getAuthHeader();
   await api.post(`/follows/requests/${requestId}/accept`, {}, { headers });
-}
-
-export async function fetchNotifications(limit = 20, offset = 0) {
-  const headers = await getAuthHeader();
-  const response = await api.get<NotificationItem[]>("/follows/notifications", {
-    headers,
-    params: { limit, offset },
-  });
-  return response.data ?? [];
-}
-
-export async function fetchUnreadNotificationsCount() {
-  const headers = await getAuthHeader();
-  const response = await api.get<{ total: number }>("/follows/notifications/unread-count", { headers });
-  return response.data?.total ?? 0;
-}
-
-export async function markNotificationAsRead(notificationId: number) {
-  const headers = await getAuthHeader();
-  await api.patch(`/follows/notifications/${notificationId}/read`, {}, { headers });
-}
-
-export async function markAllNotificationsAsRead() {
-  const headers = await getAuthHeader();
-  const response = await api.patch<{ updatedCount: number }>("/follows/notifications/read-all", {}, { headers });
-  return response.data?.updatedCount ?? 0;
 }
 
 export async function uploadImageToR2(
