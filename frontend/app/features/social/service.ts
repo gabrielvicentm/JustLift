@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "@/app/config/api";
 import { getAuthHeader } from "@/app/features/profile/service";
-import type { PostCommentItem, PostDetail, PostMediaPayload, PostSummary } from "./types";
+import type { PostCommentItem, PostDetail, PostMediaPayload, PostSummary, TreinoResumo } from "./types";
 
 type PresignResponse = {
   key: string;
@@ -17,6 +17,12 @@ type CreatePostPayload = {
 type UpdatePostPayload = {
   descricao: string;
   midias?: PostMediaPayload[];
+};
+
+type CreateTreinoPostPayload = {
+  treinoId: number;
+  descricao: string;
+  midias: PostMediaPayload[];
 };
 
 export async function uploadMediaToR2(
@@ -70,6 +76,21 @@ export async function uploadMediaToR2(
 export async function createPost(payload: CreatePostPayload): Promise<PostSummary> {
   const headers = await getAuthHeader();
   const response = await api.post<{ post: PostSummary }>("/posts", payload, { headers });
+  return response.data.post;
+}
+
+export async function fetchTreinoPostPreview(treinoId: number, lang: "pt" | "en" = "pt"): Promise<TreinoResumo> {
+  const headers = await getAuthHeader();
+  const response = await api.get<{ resumo: TreinoResumo }>(`/treino-posts/preview/${treinoId}`, {
+    headers,
+    params: { lang },
+  });
+  return response.data.resumo;
+}
+
+export async function createTreinoPost(payload: CreateTreinoPostPayload): Promise<PostSummary> {
+  const headers = await getAuthHeader();
+  const response = await api.post<{ post: PostSummary }>("/treino-posts", payload, { headers });
   return response.data.post;
 }
 
