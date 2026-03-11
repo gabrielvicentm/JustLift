@@ -108,6 +108,84 @@ exports.getPostById = async (req, res) => {
   }
 };
 
+exports.updatePost = async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuario nao autenticado' });
+    }
+
+    const postId = Number(req.params?.postId);
+    if (!Number.isInteger(postId) || postId <= 0) {
+      return res.status(400).json({ message: 'postId invalido' });
+    }
+
+    const descricao = String(req.body?.descricao || '').trim();
+    const shouldUpdateMidias = Array.isArray(req.body?.midias);
+    const midias = shouldUpdateMidias ? normalizeMediaList(req.body?.midias) : undefined;
+
+    if (descricao.length > MAX_DESCRICAO) {
+      return res.status(400).json({ message: `Descricao maior que ${MAX_DESCRICAO} caracteres` });
+    }
+
+    if (shouldUpdateMidias) {
+      if ((midias || []).length > MAX_MIDIAS) {
+        return res.status(400).json({ message: `Limite de ${MAX_MIDIAS} midias por post` });
+      }
+      if ((midias || []).some((item) => item.type !== 'image' && item.type !== 'video')) {
+        return res.status(400).json({ message: 'Tipo de midia invalido. Use image ou video.' });
+      }
+    }
+
+    const updated = await postService.updatePost({
+      postId,
+      userId,
+      descricao,
+      midias: midias || [],
+      replaceMidias: shouldUpdateMidias,
+    });
+    if (!updated) {
+      return res.status(404).json({ message: 'Post nao encontrado ou sem permissao' });
+    }
+
+    return res.status(200).json({
+      message: 'Post atualizado com sucesso',
+      post: updated,
+    });
+  } catch (err) {
+    if (err?.message === 'POST_EMPTY') {
+      return res.status(400).json({ message: 'Post vazio. Mantenha descricao ou ao menos 1 midia.' });
+    }
+
+    console.error('Erro ao atualizar post:', err);
+    return res.status(500).json({ message: 'Erro ao atualizar post' });
+  }
+};
+
+exports.deletePost = async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuario nao autenticado' });
+    }
+
+    const postId = Number(req.params?.postId);
+    if (!Number.isInteger(postId) || postId <= 0) {
+      return res.status(400).json({ message: 'postId invalido' });
+    }
+
+    const deleted = await postService.deletePost({ postId, userId });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Post nao encontrado ou sem permissao' });
+    }
+
+    return res.status(200).json({ message: 'Post excluido com sucesso' });
+  } catch (err) {
+    console.error('Erro ao excluir post:', err);
+    return res.status(500).json({ message: 'Erro ao excluir post' });
+  }
+};
+
 exports.toggleLike = async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);

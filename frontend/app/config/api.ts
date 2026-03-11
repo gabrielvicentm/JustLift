@@ -19,7 +19,7 @@ const fallbackBaseURL = Platform.select({
   default: "http://localhost:3000/api",
 });
 
-const baseURL = process.env.EXPO_PUBLIC_API_URL ?? fallbackBaseURL;
+const baseURL = fallbackBaseURL;
 
 export const api = axios.create({
   baseURL,

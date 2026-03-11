@@ -144,14 +144,23 @@ export default function DetalheTreinoScreen() {
             {treinos.map((treino, index) => (
               <View key={treino.treino_id} style={styles.workoutCard}>
                 <View style={styles.workoutHeader}>
-                  <Text style={styles.workoutTitle}>{isEn ? "Workout" : "Treino"} #{index + 1}</Text>
-                  <View style={[styles.statusBadge, treino.finalizado ? styles.statusDone : styles.statusDraft]}>
-                    <Text style={styles.statusBadgeText}>
-                      {treino.finalizado
-                        ? (isEn ? "Finished" : "Finalizado")
-                        : (isEn ? "Draft" : "Rascunho")}
-                    </Text>
+                  <View style={styles.workoutHeaderLeft}>
+                    <Text style={styles.workoutTitle}>{isEn ? "Workout" : "Treino"} #{index + 1}</Text>
+                    <View style={[styles.statusBadge, treino.finalizado ? styles.statusDone : styles.statusDraft]}>
+                      <Text style={styles.statusBadgeText}>
+                        {treino.finalizado
+                          ? (isEn ? "Finished" : "Finalizado")
+                          : (isEn ? "Draft" : "Rascunho")}
+                      </Text>
+                    </View>
                   </View>
+
+                  <Pressable
+                    style={styles.shareButton}
+                    onPress={() => router.push(`/screens/diario/CriarPostTreino?treinoId=${treino.treino_id}` as never)}
+                  >
+                    <Text style={styles.shareButtonText}>{isEn ? "Share" : "Compartilhar"}</Text>
+                  </Pressable>
                 </View>
 
                 <View style={styles.metricsRow}>
@@ -295,10 +304,30 @@ function createStyles(theme: AppTheme) {
       justifyContent: "space-between",
       gap: 8,
     },
+    workoutHeaderLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+      flex: 1,
+    },
     workoutTitle: {
       color: theme.colors.text,
       fontSize: 19,
       fontWeight: "800",
+    },
+    shareButton: {
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    shareButtonText: {
+      color: theme.colors.text,
+      fontSize: 12,
+      fontWeight: "700",
     },
     statusBadge: {
       borderRadius: 999,

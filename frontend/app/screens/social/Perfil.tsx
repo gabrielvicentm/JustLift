@@ -185,6 +185,7 @@ export default function PerfilScreen() {
 
             {posts.map((item) => {
               const firstMedia = item.midias?.[0];
+              const isTreino = item.tipo === "treino" && item.treino;
 
               return (
                 <Pressable
@@ -200,6 +201,26 @@ export default function PerfilScreen() {
                         <Text style={styles.videoPreviewText}>Video</Text>
                       </View>
                     )
+                  ) : null}
+
+                  {isTreino ? (
+                    <View style={styles.treinoResumo}>
+                      <Text style={styles.treinoBadge}>Treino compartilhado</Text>
+                      <View style={styles.treinoMetrics}>
+                        <Text style={styles.treinoMetricText}>
+                          Duracao: {item.treino?.duracao ? Math.round(item.treino.duracao / 60) : 0} min
+                        </Text>
+                        <Text style={styles.treinoMetricText}>
+                          Peso: {Number(item.treino?.peso_total ?? 0).toFixed(1)}kg
+                        </Text>
+                        <Text style={styles.treinoMetricText}>
+                          Series: {item.treino?.total_series ?? 0}
+                        </Text>
+                        <Text style={styles.treinoMetricText}>
+                          Exercicios: {item.treino?.total_exercicios ?? 0}
+                        </Text>
+                      </View>
+                    </View>
                   ) : null}
 
                   {item.descricao ? <Text style={styles.postDescription}>{item.descricao}</Text> : null}
@@ -370,6 +391,28 @@ function createStyles(theme: AppTheme) {
       overflow: "hidden",
       padding: 10,
       gap: 8,
+    },
+    treinoResumo: {
+      gap: 6,
+      padding: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    treinoBadge: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.colors.text,
+    },
+    treinoMetrics: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    treinoMetricText: {
+      fontSize: 12,
+      color: theme.colors.mutedText,
     },
     postPreview: {
       width: "100%",
