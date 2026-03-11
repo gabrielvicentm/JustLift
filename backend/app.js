@@ -12,6 +12,7 @@ const profileRoutes = require('./src/routes/profileRoutes');
 const searchRoutes = require('./src/routes/searchRoutes');
 const followRoutes = require('./src/routes/followRoutes');
 const postRoutes = require('./src/routes/postRoutes');
+const treinoPostRoutes = require('./src/routes/treinoPostRoutes');
 
 //const rateLimiter = require('./src/middleware/rateLimiter');
 
@@ -33,6 +34,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/treino-posts', treinoPostRoutes);
 
 
 module.exports = app;
