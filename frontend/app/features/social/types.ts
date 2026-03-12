@@ -32,6 +32,8 @@ export type PostCommentItem = {
   foto_perfil: string | null;
   comentario: string;
   created_at: string;
+  likes_count: number;
+  viewer_liked: boolean;
 };
 
 export type PostSummary = {
