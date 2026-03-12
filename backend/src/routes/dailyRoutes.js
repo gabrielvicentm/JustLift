@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.post('/', authMiddleware, dailyController.createDailyBatch);
 router.get('/user/:userId/summary', authMiddleware, dailyController.getDailySummaryByUser);
-router.get('/user/:userId', authMiddleware, dailyController.getActiveDailiesByUser);
+router.get('/user/:userId', authMiddleware, dailyController.getActiveDailyByUser);
 router.post('/:dailyId/like', authMiddleware, dailyController.toggleLike);
 router.post('/:dailyId/view', authMiddleware, dailyController.markViewed);
 

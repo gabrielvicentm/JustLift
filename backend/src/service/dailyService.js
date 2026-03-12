@@ -3,7 +3,7 @@ const db = require('../utils/db');
 const ACTIVE_DAILY_WINDOW_SQL = "CURRENT_TIMESTAMP - INTERVAL '24 hours'";
 
 async function dailyExists(dailyId) {
-  const exists = await db.query('SELECT 1 FROM dailies WHERE daily_id = $1 LIMIT 1', [dailyId]);
+  const exists = await db.query('SELECT 1 FROM daily WHERE daily_id = $1 LIMIT 1', [dailyId]);
   return exists.rows.length > 0;
 }
 
@@ -38,7 +38,7 @@ exports.createDailyBatch = async ({ userId, midias }) => {
     for (const item of midias) {
       const result = await client.query(
         `
-          INSERT INTO dailies (
+          INSERT INTO daily (
             user_id,
             media_type,
             media_url,
@@ -72,7 +72,7 @@ exports.createDailyBatch = async ({ userId, midias }) => {
           0::INT AS likes_count,
           false AS viewer_liked,
           false AS viewer_viewed
-        FROM dailies d
+        FROM daily d
         JOIN users u ON u.id = d.user_id
         LEFT JOIN users_profile up ON up.user_id = d.user_id
         WHERE d.daily_id = ANY($1::int[])
@@ -90,7 +90,7 @@ exports.createDailyBatch = async ({ userId, midias }) => {
   }
 };
 
-exports.getActiveDailiesByUser = async ({ userId, viewerUserId }) => {
+exports.getActiveDailyByUser = async ({ userId, viewerUserId }) => {
   const result = await db.query(
     `
       SELECT
@@ -121,7 +121,7 @@ exports.getActiveDailiesByUser = async ({ userId, viewerUserId }) => {
           WHERE vv.daily_id = d.daily_id
             AND vv.user_id = $2
         ) AS viewer_viewed
-      FROM dailies d
+      FROM daily d
       JOIN users u ON u.id = d.user_id
       LEFT JOIN users_profile up ON up.user_id = d.user_id
       WHERE d.user_id = $1
@@ -147,15 +147,15 @@ exports.getDailySummaryByUser = async ({ userId, viewerUserId }) => {
               AND v.user_id = $2
           )
         )::INT AS unseen_count
-      FROM dailies d
+      FROM daily d
       WHERE d.user_id = $1
         AND d.created_at >= ${ACTIVE_DAILY_WINDOW_SQL}
     `,
     [userId, viewerUserId],
   );
 
-  const totalActive = result.rows[0]?.total_active || 0; //quantidade de dailies
-  const unseenCount = result.rows[0]?.unseen_count || 0; //quantidade de dailies que o usuário ainda não viu
+  const totalActive = result.rows[0]?.total_active || 0; //quantidade de daily
+  const unseenCount = result.rows[0]?.unseen_count || 0; //quantidade de daily que o usuario ainda nao viu
 
   return {
     total_active: totalActive,

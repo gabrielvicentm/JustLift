@@ -6,7 +6,7 @@ import { VideoView, useVideoPlayer } from "expo-video";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import { getApiErrorMessage } from "@/app/features/profile/service";
-import { fetchActiveDailiesByUser, markDailyViewed, toggleDailyLike } from "@/app/features/daily/service";
+import { fetchActiveDailyByUser, markDailyViewed, toggleDailyLike } from "@/app/features/daily/service";
 import type { DailyItem } from "@/app/features/daily/types";
 
 const DEFAULT_DAILY_DURATION_SECONDS = 15;
@@ -21,7 +21,7 @@ export default function VerDayliScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [dailies, setDailies] = useState<DailyItem[]>([]);
+  const [dailyList, setDailyList] = useState<DailyItem[]>([]);
   const [indexAtual, setIndexAtual] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [pausado, setPausado] = useState(false);
@@ -31,7 +31,7 @@ export default function VerDayliScreen() {
   const [togglingLike, setTogglingLike] = useState(false);
   const navegandoRef = useRef(false);
 
-  const dailyAtual = dailies[indexAtual] ?? null;
+  const dailyAtual = dailyList[indexAtual] ?? null;
   const durationMs = Math.max(
     1000,
     (dailyAtual?.duration_seconds || DEFAULT_DAILY_DURATION_SECONDS) * 1000,
@@ -67,8 +67,8 @@ export default function VerDayliScreen() {
       try {
         setError("");
         setLoading(true);
-        const data = await fetchActiveDailiesByUser(userId);
-        setDailies(data);
+        const data = await fetchActiveDailyByUser(userId);
+        setDailyList(data);
         setIndexAtual(0);
         setElapsedMs(0);
       } catch (err) {
@@ -163,14 +163,14 @@ export default function VerDayliScreen() {
         setElapsedMs(0);
         return;
       }
-      if (nextIndex >= dailies.length) {
+      if (nextIndex >= dailyList.length) {
         voltarTelaAnterior();
         return;
       }
       setIndexAtual(nextIndex);
       setElapsedMs(0);
     },
-    [dailies.length, voltarTelaAnterior],
+    [dailyList.length, voltarTelaAnterior],
   );
 
   useEffect(() => {
@@ -194,10 +194,10 @@ export default function VerDayliScreen() {
 
   useEffect(() => {
     if (loading) return;
-    if (dailies.length === 0) {
+    if (dailyList.length === 0) {
       voltarTelaAnterior();
     }
-  }, [dailies.length, loading, voltarTelaAnterior]);
+  }, [dailyList.length, loading, voltarTelaAnterior]);
 
   const handleIrProximo = () => {
     irParaIndice(indexAtual + 1);
@@ -221,7 +221,7 @@ export default function VerDayliScreen() {
     try {
       setTogglingLike(true);
       const result = await toggleDailyLike(dailyAtual.id);
-      setDailies((current) =>
+      setDailyList((current) =>
         current.map((item) =>
           item.id === dailyAtual.id
             ? {
@@ -266,12 +266,12 @@ export default function VerDayliScreen() {
           <Ionicons name="close" size={20} color="#ffffff" />
         </Pressable>
         <Text style={styles.counterText}>
-          {indexAtual + 1}/{dailies.length}
+          {indexAtual + 1}/{dailyList.length}
         </Text>
       </View>
 
       <View style={styles.progressContainer}>
-        {dailies.map((item, idx) => {
+        {dailyList.map((item, idx) => {
           const fill = idx < indexAtual ? 100 : idx === indexAtual ? progress * 100 : 0;
           return (
             <View key={item.id} style={styles.progressTrack}>

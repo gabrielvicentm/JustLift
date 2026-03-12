@@ -1,6 +1,6 @@
 const dailyService = require('../service/dailyService');
 
-const MAX_DAILIES_PER_REQUEST = 20;
+const MAX_DAILY_PER_REQUEST = 20;
 const MAX_VIDEO_DURATION_SECONDS = 15;
 
 function getUserIdFromRequest(req) {
@@ -34,8 +34,8 @@ exports.createDailyBatch = async (req, res) => {
       return res.status(400).json({ message: 'Selecione pelo menos uma midia para o Daily.' });
     }
 
-    if (midias.length > MAX_DAILIES_PER_REQUEST) {
-      return res.status(400).json({ message: `Limite de ${MAX_DAILIES_PER_REQUEST} midias por envio de Daily.` });
+    if (midias.length > MAX_DAILY_PER_REQUEST) {
+      return res.status(400).json({ message: `Limite de ${MAX_DAILY_PER_REQUEST} midias por envio de Daily.` });
     }
 
     if (midias.some((item) => item.type !== 'image' && item.type !== 'video')) {
@@ -65,7 +65,7 @@ exports.createDailyBatch = async (req, res) => {
 
     return res.status(201).json({
       message: 'Daily publicado com sucesso',
-      dailies: created,
+      daily: created,
     });
   } catch (err) {
     console.error('Erro ao criar Daily:', err);
@@ -73,7 +73,7 @@ exports.createDailyBatch = async (req, res) => {
   }
 };
 
-exports.getActiveDailiesByUser = async (req, res) => {
+exports.getActiveDailyByUser = async (req, res) => {
   try {
     const viewerUserId = getUserIdFromRequest(req);
     if (!viewerUserId) {
@@ -85,11 +85,11 @@ exports.getActiveDailiesByUser = async (req, res) => {
       return res.status(400).json({ message: 'userId obrigatorio' });
     }
 
-    const dailies = await dailyService.getActiveDailiesByUser({ userId, viewerUserId });
-    return res.status(200).json({ dailies });
+    const daily = await dailyService.getActiveDailyByUser({ userId, viewerUserId });
+    return res.status(200).json({ daily });
   } catch (err) {
-    console.error('Erro ao buscar Dailies ativos:', err);
-    return res.status(500).json({ message: 'Erro ao buscar Dailies' });
+    console.error('Erro ao buscar Daily ativo:', err);
+    return res.status(500).json({ message: 'Erro ao buscar Daily' });
   }
 };
 

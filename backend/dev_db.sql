@@ -583,7 +583,7 @@ CREATE INDEX idx_post_photos_post_ordem ON post_photos(post_id, ordem ASC);
 CREATE INDEX idx_post_comments_post_created_at ON post_comments(post_id, created_at DESC);
 
 -- DAILY (STORIES DE 24 HORAS)
-CREATE TABLE dailies (
+CREATE TABLE daily (
   daily_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id UUID NOT NULL,
   media_type VARCHAR(10) NOT NULL DEFAULT 'image',
@@ -592,8 +592,8 @@ CREATE TABLE dailies (
   duration_seconds INT NOT NULL DEFAULT 15,
   created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT chk_dailies_media_type CHECK (media_type IN ('image', 'video')),
-  CONSTRAINT chk_dailies_duration CHECK (duration_seconds > 0 AND duration_seconds <= 15)
+  CONSTRAINT chk_daily_media_type CHECK (media_type IN ('image', 'video')),
+  CONSTRAINT chk_daily_duration CHECK (duration_seconds > 0 AND duration_seconds <= 15)
 );
 
 CREATE TABLE daily_likes (
@@ -601,7 +601,7 @@ CREATE TABLE daily_likes (
   daily_id INT NOT NULL,
   user_id UUID NOT NULL,
   created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (daily_id) REFERENCES dailies(daily_id) ON DELETE CASCADE,
+  FOREIGN KEY (daily_id) REFERENCES daily(daily_id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT uq_daily_like UNIQUE (daily_id, user_id)
 );
@@ -611,11 +611,11 @@ CREATE TABLE daily_views (
   daily_id INT NOT NULL,
   user_id UUID NOT NULL,
   viewed_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (daily_id) REFERENCES dailies(daily_id) ON DELETE CASCADE,
+  FOREIGN KEY (daily_id) REFERENCES daily(daily_id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT uq_daily_view UNIQUE (daily_id, user_id)
 );
 
-CREATE INDEX idx_dailies_user_created_at ON dailies(user_id, created_at DESC);
-CREATE INDEX idx_dailies_created_at ON dailies(created_at DESC);
+CREATE INDEX idx_daily_user_created_at ON daily(user_id, created_at DESC);
+CREATE INDEX idx_daily_created_at ON daily(created_at DESC);
 CREATE INDEX idx_daily_views_user_daily ON daily_views(user_id, daily_id);

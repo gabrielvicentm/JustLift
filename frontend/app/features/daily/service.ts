@@ -8,14 +8,14 @@ type CreateDailyPayload = {
 
 export async function createDailyBatch(payload: CreateDailyPayload): Promise<DailyItem[]> {
   const headers = await getAuthHeader();
-  const response = await api.post<{ dailies: DailyItem[] }>("/daily", payload, { headers });
-  return response.data.dailies ?? [];
+  const response = await api.post<{ daily: DailyItem[] }>("/daily", payload, { headers });
+  return response.data.daily ?? [];
 }
 
-export async function fetchActiveDailiesByUser(userId: string): Promise<DailyItem[]> {
+export async function fetchActiveDailyByUser(userId: string): Promise<DailyItem[]> {
   const headers = await getAuthHeader();
-  const response = await api.get<{ dailies: DailyItem[] }>(`/daily/user/${encodeURIComponent(userId)}`, { headers });
-  return response.data.dailies ?? [];
+  const response = await api.get<{ daily: DailyItem[] }>(`/daily/user/${encodeURIComponent(userId)}`, { headers });
+  return response.data.daily ?? [];
 }
 
 export async function fetchDailySummaryByUser(userId: string): Promise<DailySummary> {
