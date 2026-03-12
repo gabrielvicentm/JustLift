@@ -6,7 +6,11 @@ const router = express.Router();
 
 router.get('/followers', authMiddleware, followController.getFollowers);
 router.get('/following', authMiddleware, followController.getFollowing);
+router.get('/requests', authMiddleware, followController.listFollowRequests);
 router.post('/following/:targetUserId', authMiddleware, followController.follow);
+router.post('/requests/:targetUserId', authMiddleware, followController.requestFollow);
+router.post('/requests/:requestId/accept', authMiddleware, followController.acceptFollowRequest);
+router.delete('/requests/:requestId', authMiddleware, followController.declineFollowRequest);
 router.delete('/following/:targetUserId', authMiddleware, followController.unfollow);
 router.delete('/followers/:followerUserId', authMiddleware, followController.removeFollower);
 

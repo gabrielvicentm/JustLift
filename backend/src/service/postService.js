@@ -1,8 +1,23 @@
 const db = require('../utils/db');
+const notificationService = require('./notificationService');
 
 async function postExists(postId) {
   const exists = await db.query('SELECT 1 FROM posts WHERE post_id = $1 LIMIT 1', [postId]);
   return exists.rows.length > 0;
+}
+
+async function getPostOwnerId(postId) {
+  const result = await db.query(
+    `
+      SELECT user_id
+      FROM posts
+      WHERE post_id = $1
+      LIMIT 1
+    `,
+    [postId],
+  );
+
+  return result.rows[0]?.user_id || null;
 }
 
 async function getMediaByPostId(postId) {
@@ -23,7 +38,7 @@ async function getMediaByPostId(postId) {
   return result.rows;
 }
 
-async function getCommentsByPostId(postId) {
+async function getCommentsByPostId(postId, viewerUserId) {
   const result = await db.query(
     `
       SELECT
@@ -33,7 +48,18 @@ async function getCommentsByPostId(postId) {
         up.nome_exibicao,
         up.foto_perfil,
         c.comentario,
-        c.created_at
+        c.created_at,
+        (
+          SELECT COUNT(*)
+          FROM comment_likes cl
+          WHERE cl.comment_id = c.id
+        )::INT AS likes_count,
+        EXISTS (
+          SELECT 1
+          FROM comment_likes clv
+          WHERE clv.comment_id = c.id
+            AND clv.user_id = $2
+        ) AS viewer_liked
       FROM post_comments c
       JOIN users u ON u.id = c.user_id
       LEFT JOIN users_profile up ON up.user_id = u.id
@@ -41,11 +67,49 @@ async function getCommentsByPostId(postId) {
       ORDER BY c.created_at DESC, c.id DESC
       LIMIT 100
     `,
-    [postId],
+    [postId, viewerUserId],
   );
   return result.rows;
 }
 
+async function findMentionedUsers(text) {
+  const matches = String(text || '').match(/@([a-zA-Z0-9_\.]+)/g);
+  if (!matches) {
+    return [];
+  }
+
+  const usernames = Array.from(
+    new Set(matches.map((item) => item.replace('@', '').trim().toLowerCase()).filter(Boolean)),
+  );
+
+  if (usernames.length === 0) {
+    return [];
+  }
+
+  const result = await db.query(
+    `
+      SELECT id, username
+      FROM users
+      WHERE lower(username) = ANY($1::text[])
+    `,
+    [usernames],
+  );
+
+  return result.rows;
+}
+
+async function getCommentOwner(commentId) {
+  const result = await db.query(
+    `
+      SELECT user_id, post_id
+      FROM post_comments
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [commentId],
+  );
+
+  return result.rows[0] || null;
 function mapPostSummaryRow(row) {
   return {
     id: row.id,
@@ -196,6 +260,20 @@ exports.createPost = async ({ userId, descricao, midias }) => {
     const summary = await getPostSummaryById(postId, userId);
     const medias = await getMediaByPostId(postId);
 
+    try {
+      const mentioned = await findMentionedUsers(descricao);
+      for (const user of mentioned) {
+        if (user.id === userId) continue;
+        await notificationService.createMentionNotification({
+          recipientUserId: user.id,
+          actorUserId: userId,
+          postId,
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao criar notificacao de mencao no post:', err);
+    }
+
     return mergePostWithMedia(summary, medias);
   } catch (err) {
     await client.query('ROLLBACK');
@@ -317,7 +395,7 @@ exports.getPostById = async ({ postId, viewerUserId }) => {
 
   const [midias, comentarios] = await Promise.all([
     getMediaByPostId(postId),
-    getCommentsByPostId(postId),
+    getCommentsByPostId(postId, viewerUserId),
   ]);
 
   return {
@@ -445,7 +523,8 @@ exports.deletePost = async ({ postId, userId }) => {
 };
 
 exports.toggleLike = async ({ postId, userId }) => {
-  if (!(await postExists(postId))) {
+  const ownerUserId = await getPostOwnerId(postId);
+  if (!ownerUserId) {
     return null;
   }
 
@@ -471,6 +550,28 @@ exports.toggleLike = async ({ postId, userId }) => {
     liked = true;
   }
 
+  if (liked) {
+    try {
+      await notificationService.createPostLikeNotification({
+        recipientUserId: ownerUserId,
+        actorUserId: userId,
+        postId,
+      });
+    } catch (err) {
+      console.error('Erro ao criar notificacao de curtida:', err);
+    }
+  } else {
+    try {
+      await notificationService.deletePostLikeNotification({
+        recipientUserId: ownerUserId,
+        actorUserId: userId,
+        postId,
+      });
+    } catch (err) {
+      console.error('Erro ao remover notificacao de curtida:', err);
+    }
+  }
+
   const likesCount = await db.query(
     `
       SELECT COUNT(*)::INT AS likes_count
@@ -487,7 +588,8 @@ exports.toggleLike = async ({ postId, userId }) => {
 };
 
 exports.toggleSave = async ({ postId, userId }) => {
-  if (!(await postExists(postId))) {
+  const ownerUserId = await getPostOwnerId(postId);
+  if (!ownerUserId) {
     return null;
   }
 
@@ -511,6 +613,28 @@ exports.toggleSave = async ({ postId, userId }) => {
       [postId, userId],
     );
     saved = true;
+  }
+
+  if (saved) {
+    try {
+      await notificationService.createPostSaveNotification({
+        recipientUserId: ownerUserId,
+        actorUserId: userId,
+        postId,
+      });
+    } catch (err) {
+      console.error('Erro ao criar notificacao de salvamento:', err);
+    }
+  } else {
+    try {
+      await notificationService.deletePostSaveNotification({
+        recipientUserId: ownerUserId,
+        actorUserId: userId,
+        postId,
+      });
+    } catch (err) {
+      console.error('Erro ao remover notificacao de salvamento:', err);
+    }
   }
 
   return { saved };
@@ -541,7 +665,8 @@ exports.reportPost = async ({ postId, userId, reason }) => {
 };
 
 exports.createComment = async ({ postId, userId, comentario }) => {
-  if (!(await postExists(postId))) {
+  const ownerUserId = await getPostOwnerId(postId);
+  if (!ownerUserId) {
     return null;
   }
 
@@ -564,6 +689,33 @@ exports.createComment = async ({ postId, userId, comentario }) => {
   );
 
   const comment = result.rows[0];
+
+  try {
+    await notificationService.createPostCommentNotification({
+      recipientUserId: ownerUserId,
+      actorUserId: userId,
+      postId,
+      commentId: comment.id,
+    });
+  } catch (err) {
+    console.error('Erro ao criar notificacao de comentario:', err);
+  }
+
+  try {
+    const mentioned = await findMentionedUsers(comentario);
+    for (const user of mentioned) {
+      if (user.id === userId) continue;
+      await notificationService.createMentionNotification({
+        recipientUserId: user.id,
+        actorUserId: userId,
+        postId,
+        commentId: comment.id,
+      });
+    }
+  } catch (err) {
+    console.error('Erro ao criar notificacao de mencao no comentario:', err);
+  }
+
   const author = await db.query(
     `
       SELECT
@@ -583,5 +735,73 @@ exports.createComment = async ({ postId, userId, comentario }) => {
     username: author.rows[0]?.username || null,
     nome_exibicao: author.rows[0]?.nome_exibicao || null,
     foto_perfil: author.rows[0]?.foto_perfil || null,
+    likes_count: 0,
+    viewer_liked: false,
+  };
+};
+
+exports.toggleCommentLike = async ({ postId, commentId, userId }) => {
+  const owner = await getCommentOwner(commentId);
+  if (!owner || owner.post_id !== postId) {
+    return null;
+  }
+
+  const deleted = await db.query(
+    `
+      DELETE FROM comment_likes
+      WHERE comment_id = $1
+        AND user_id = $2
+      RETURNING id
+    `,
+    [commentId, userId],
+  );
+
+  let liked = false;
+  if (deleted.rows.length === 0) {
+    await db.query(
+      `
+        INSERT INTO comment_likes (comment_id, user_id)
+        VALUES ($1, $2)
+      `,
+      [commentId, userId],
+    );
+    liked = true;
+  }
+
+  if (liked) {
+    try {
+      await notificationService.createCommentLikeNotification({
+        recipientUserId: owner.user_id,
+        actorUserId: userId,
+        postId,
+        commentId,
+      });
+    } catch (err) {
+      console.error('Erro ao criar notificacao de like no comentario:', err);
+    }
+  } else {
+    try {
+      await notificationService.deleteCommentLikeNotification({
+        recipientUserId: owner.user_id,
+        actorUserId: userId,
+        commentId,
+      });
+    } catch (err) {
+      console.error('Erro ao remover notificacao de like no comentario:', err);
+    }
+  }
+
+  const likesCount = await db.query(
+    `
+      SELECT COUNT(*)::INT AS likes_count
+      FROM comment_likes
+      WHERE comment_id = $1
+    `,
+    [commentId],
+  );
+
+  return {
+    liked,
+    likes_count: likesCount.rows[0]?.likes_count || 0,
   };
 };
