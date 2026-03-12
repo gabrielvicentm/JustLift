@@ -110,6 +110,33 @@ async function getCommentOwner(commentId) {
   );
 
   return result.rows[0] || null;
+function mapPostSummaryRow(row) {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    username: row.username,
+    nome_exibicao: row.nome_exibicao,
+    foto_perfil: row.foto_perfil,
+    descricao: row.descricao,
+    created_at: row.created_at,
+    likes_count: row.likes_count,
+    saves_count: row.saves_count,
+    comments_count: row.comments_count,
+    viewer_liked: row.viewer_liked,
+    viewer_saved: row.viewer_saved,
+    tipo: row.tipo || 'normal',
+    treino: row.treino_id
+      ? {
+          treino_id: row.treino_id,
+          data: row.treino_data,
+          duracao: row.treino_duracao,
+          peso_total: row.treino_peso_total,
+          total_series: row.treino_total_series,
+          total_exercicios: row.treino_total_exercicios,
+          finalizado: row.treino_finalizado,
+        }
+      : null,
+  };
 }
 
 async function getPostSummaryById(postId, viewerUserId) {
@@ -122,6 +149,21 @@ async function getPostSummaryById(postId, viewerUserId) {
         up.nome_exibicao,
         up.foto_perfil,
         p.descricao,
+        p.tipo,
+        p.treino_id,
+        t.data AS treino_data,
+        t.duracao AS treino_duracao,
+        t.peso_total AS treino_peso_total,
+        t.total_series AS treino_total_series,
+        t.finalizado AS treino_finalizado,
+        CASE
+          WHEN p.treino_id IS NULL THEN NULL
+          ELSE (
+            SELECT COUNT(*)
+            FROM exercicios_do_treino et
+            WHERE et.treino_id = p.treino_id
+          )::INT
+        END AS treino_total_exercicios,
         p.created_at,
         (
           SELECT COUNT(*)
@@ -153,13 +195,14 @@ async function getPostSummaryById(postId, viewerUserId) {
       FROM posts p
       JOIN users u ON u.id = p.user_id
       LEFT JOIN users_profile up ON up.user_id = u.id
+      LEFT JOIN treinos t ON t.treino_id = p.treino_id
       WHERE p.post_id = $1
       LIMIT 1
     `,
     [postId, viewerUserId],
   );
 
-  return result.rows[0] || null;
+  return result.rows[0] ? mapPostSummaryRow(result.rows[0]) : null;
 }
 
 function mergePostWithMedia(post, midias) {
@@ -250,6 +293,21 @@ exports.getPostsByUser = async ({ userId, viewerUserId }) => {
         up.nome_exibicao,
         up.foto_perfil,
         p.descricao,
+        p.tipo,
+        p.treino_id,
+        t.data AS treino_data,
+        t.duracao AS treino_duracao,
+        t.peso_total AS treino_peso_total,
+        t.total_series AS treino_total_series,
+        t.finalizado AS treino_finalizado,
+        CASE
+          WHEN p.treino_id IS NULL THEN NULL
+          ELSE (
+            SELECT COUNT(*)
+            FROM exercicios_do_treino et
+            WHERE et.treino_id = p.treino_id
+          )::INT
+        END AS treino_total_exercicios,
         p.created_at,
         (
           SELECT COUNT(*)
@@ -281,13 +339,14 @@ exports.getPostsByUser = async ({ userId, viewerUserId }) => {
       FROM posts p
       JOIN users u ON u.id = p.user_id
       LEFT JOIN users_profile up ON up.user_id = u.id
+      LEFT JOIN treinos t ON t.treino_id = p.treino_id
       WHERE p.user_id = $1
       ORDER BY p.created_at DESC, p.post_id DESC
     `,
     [userId, viewerUserId],
   );
 
-  const posts = result.rows;
+  const posts = result.rows.map(mapPostSummaryRow);
   if (posts.length === 0) {
     return [];
   }
@@ -344,6 +403,123 @@ exports.getPostById = async ({ postId, viewerUserId }) => {
     midias,
     comentarios,
   };
+};
+
+exports.updatePost = async ({ postId, userId, descricao, midias = [], replaceMidias = false }) => {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const ownerCheck = await client.query(
+      `
+        SELECT post_id
+        FROM posts
+        WHERE post_id = $1
+          AND user_id = $2
+        LIMIT 1
+      `,
+      [postId, userId],
+    );
+
+    if (ownerCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    if (replaceMidias) {
+      await client.query(
+        `
+          DELETE FROM post_photos
+          WHERE post_id = $1
+        `,
+        [postId],
+      );
+
+      if (midias.length > 0) {
+        const values = [];
+        const placeholders = midias.map((item, index) => {
+          const base = index * 5;
+          values.push(postId, item.type, item.url, item.key, index + 1);
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+        });
+
+        await client.query(
+          `
+            INSERT INTO post_photos (
+              post_id,
+              media_type,
+              media_url,
+              media_key,
+              ordem
+            )
+            VALUES ${placeholders.join(', ')}
+          `,
+          values,
+        );
+      }
+    }
+
+    let mediaCount = 0;
+    if (replaceMidias) {
+      mediaCount = midias.length;
+    } else {
+      const mediaCountResult = await client.query(
+        `
+          SELECT COUNT(*)::INT AS total
+          FROM post_photos
+          WHERE post_id = $1
+        `,
+        [postId],
+      );
+      mediaCount = mediaCountResult.rows[0]?.total || 0;
+    }
+
+    if (!descricao && mediaCount === 0) {
+      await client.query('ROLLBACK');
+      throw new Error('POST_EMPTY');
+    }
+
+    await client.query(
+      `
+        UPDATE posts
+        SET
+          descricao = $1
+        WHERE post_id = $2
+          AND user_id = $3
+      `,
+      [descricao || '', postId, userId],
+    );
+
+    await client.query('COMMIT');
+
+    const summary = await getPostSummaryById(postId, userId);
+    const updatedMidias = await getMediaByPostId(postId);
+    return mergePostWithMedia(summary, updatedMidias);
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // noop
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+exports.deletePost = async ({ postId, userId }) => {
+  const deleted = await db.query(
+    `
+      DELETE FROM posts
+      WHERE post_id = $1
+        AND user_id = $2
+      RETURNING post_id
+    `,
+    [postId, userId],
+  );
+
+  return deleted.rows.length > 0;
 };
 
 exports.toggleLike = async ({ postId, userId }) => {

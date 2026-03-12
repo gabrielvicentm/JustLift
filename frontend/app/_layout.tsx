@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useAppTheme } from "@/providers/ThemeProvider";
 import { I18nProvider } from "@/providers/I18nProvider";
 import { AppQueryProvider } from "@/app/providers/QueryProvider";
@@ -54,14 +55,16 @@ function RootStack() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <I18nProvider>
-          <AppQueryProvider>
-            <RootStack />
-          </AppQueryProvider>
-        </I18nProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <AppQueryProvider>
+              <RootStack />
+            </AppQueryProvider>
+          </I18nProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
