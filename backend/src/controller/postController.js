@@ -216,3 +216,32 @@ exports.createComment = async (req, res) => {
     return res.status(500).json({ message: 'Erro ao comentar no post' });
   }
 };
+
+exports.toggleCommentLike = async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuario nao autenticado' });
+    }
+
+    const postId = Number(req.params?.postId);
+    if (!Number.isInteger(postId) || postId <= 0) {
+      return res.status(400).json({ message: 'postId invalido' });
+    }
+
+    const commentId = Number(req.params?.commentId);
+    if (!Number.isInteger(commentId) || commentId <= 0) {
+      return res.status(400).json({ message: 'commentId invalido' });
+    }
+
+    const result = await postService.toggleCommentLike({ postId, commentId, userId });
+    if (!result) {
+      return res.status(404).json({ message: 'Comentario nao encontrado' });
+    }
+
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('Erro ao curtir comentario:', err);
+    return res.status(500).json({ message: 'Erro ao curtir comentario' });
+  }
+};

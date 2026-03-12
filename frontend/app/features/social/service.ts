@@ -102,3 +102,16 @@ export async function createPostComment(postId: number, comentario: string): Pro
   const response = await api.post<{ comment: PostCommentItem }>(`/posts/${postId}/comments`, { comentario }, { headers });
   return response.data.comment;
 }
+
+export async function toggleCommentLike(
+  postId: number,
+  commentId: number,
+): Promise<{ liked: boolean; likes_count: number }> {
+  const headers = await getAuthHeader();
+  const response = await api.post<{ liked: boolean; likes_count: number }>(
+    `/posts/${postId}/comments/${commentId}/like`,
+    {},
+    { headers },
+  );
+  return response.data;
+}

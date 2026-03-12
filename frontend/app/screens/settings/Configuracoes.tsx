@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "@/app/config/api";
+import { fetchUnreadNotificationsCount } from "@/app/features/notifications/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { useI18n } from "@/providers/I18nProvider";
 import type { AppTheme } from "@/theme/theme";
@@ -15,6 +17,7 @@ export default function ConfiguracoesScreen() {
   const isDarkMode = mode === "dark";
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const goHome = () => router.push("/screens/Home");
 
@@ -35,6 +38,31 @@ export default function ConfiguracoesScreen() {
       setIsLoggingOut(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const loadUnreadCount = async () => {
+        try {
+          const count = await fetchUnreadNotificationsCount();
+          if (isActive) {
+            setUnreadNotificationsCount(count);
+          }
+        } catch {
+          if (isActive) {
+            setUnreadNotificationsCount(0);
+          }
+        }
+      };
+
+      loadUnreadCount();
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   return (
     <View style={styles.container}>
@@ -62,19 +90,28 @@ export default function ConfiguracoesScreen() {
           </View>
         </View>
 
-        <Pressable style={styles.optionRow} onPress={goHome}>
-          <Text style={styles.optionText}>Notificações</Text>
-          <Text style={styles.chevron}>›</Text>
+        <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Notificacoes")}>
+          <View style={styles.optionTextWrap}>
+            <Text style={styles.optionText}>Notificacoes</Text>
+            {unreadNotificationsCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadNotificationsCount > 99 ? "99+" : String(unreadNotificationsCount)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.chevron}>{">"}</Text>
         </Pressable>
 
         <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Conta")}>
           <Text style={styles.optionText}>Conta</Text>
-          <Text style={styles.chevron}>›</Text>
+          <Text style={styles.chevron}>{">"}</Text>
         </Pressable>
 
         <Pressable style={styles.optionRow} onPress={goHome}>
           <Text style={styles.optionText}>Suporte</Text>
-          <Text style={styles.chevron}>›</Text>
+          <Text style={styles.chevron}>{">"}</Text>
         </Pressable>
 
         <Pressable style={styles.optionRow} onPress={() => setShowLanguageModal(true)}>
@@ -82,17 +119,17 @@ export default function ConfiguracoesScreen() {
           <Text style={styles.optionHint}>
             {language === "pt" ? t("settings_language_pt") : t("settings_language_en")}
           </Text>
-          <Text style={styles.chevron}>›</Text>
+          <Text style={styles.chevron}>{">"}</Text>
         </Pressable>
 
         <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Premium")}>
           <Text style={styles.optionText}>Obter Premium</Text>
-          <Text style={styles.chevron}>›</Text>
+          <Text style={styles.chevron}>{">"}</Text>
         </Pressable>
 
         <Pressable style={styles.optionRow} onPress={goHome}>
           <Text style={styles.optionText}>Sobre</Text>
-          <Text style={styles.chevron}>›</Text>
+          <Text style={styles.chevron}>{">"}</Text>
         </Pressable>
       </View>
 
@@ -113,7 +150,7 @@ export default function ConfiguracoesScreen() {
               }}
             >
               <Text style={styles.modalOptionText}>{t("settings_language_pt")}</Text>
-              {language === "pt" ? <Text style={styles.modalSelected}>✓</Text> : null}
+              {language === "pt" ? <Text style={styles.modalSelected}>OK</Text> : null}
             </Pressable>
 
             <Pressable
@@ -124,7 +161,7 @@ export default function ConfiguracoesScreen() {
               }}
             >
               <Text style={styles.modalOptionText}>{t("settings_language_en")}</Text>
-              {language === "en" ? <Text style={styles.modalSelected}>✓</Text> : null}
+              {language === "en" ? <Text style={styles.modalSelected}>OK</Text> : null}
             </Pressable>
 
             <Pressable style={styles.modalCancel} onPress={() => setShowLanguageModal(false)}>
@@ -198,6 +235,25 @@ function createStyles(theme: AppTheme) {
       fontSize: 16,
       fontWeight: "600",
     },
+    optionTextWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    badge: {
+      minWidth: 22,
+      height: 22,
+      borderRadius: 11,
+      paddingHorizontal: 6,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.button,
+    },
+    badgeText: {
+      color: theme.colors.buttonText,
+      fontSize: 11,
+      fontWeight: "800",
+    },
     optionHint: {
       color: theme.colors.mutedText,
       fontSize: 12,
@@ -262,7 +318,7 @@ function createStyles(theme: AppTheme) {
     },
     modalSelected: {
       color: theme.colors.button,
-      fontSize: 18,
+      fontSize: 12,
       fontWeight: "700",
     },
     modalCancel: {

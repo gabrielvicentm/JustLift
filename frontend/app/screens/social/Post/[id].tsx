@@ -19,6 +19,7 @@ import {
   createPostComment,
   fetchPostById,
   reportPost,
+  toggleCommentLike,
   togglePostLike,
   togglePostSave,
 } from "@/app/features/social/service";
@@ -40,6 +41,7 @@ export default function PostDetailScreen() {
   const [togglingLike, setTogglingLike] = useState(false);
   const [togglingSave, setTogglingSave] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [togglingCommentLike, setTogglingCommentLike] = useState<Record<number, boolean>>({});
 
   const loadPost = useCallback(async () => {
     if (!Number.isInteger(postId) || postId <= 0) {
@@ -131,6 +133,30 @@ export default function PostDetailScreen() {
       setError(getApiErrorMessage(err, "comentar post"));
     } finally {
       setSendingComment(false);
+    }
+  };
+
+  const handleToggleCommentLike = async (commentId: number) => {
+    if (!post || togglingCommentLike[commentId]) return;
+    try {
+      setTogglingCommentLike((prev) => ({ ...prev, [commentId]: true }));
+      const result = await toggleCommentLike(post.id, commentId);
+      setPost({
+        ...post,
+        comentarios: post.comentarios.map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                viewer_liked: result.liked,
+                likes_count: result.likes_count,
+              }
+            : comment,
+        ),
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "curtir comentario"));
+    } finally {
+      setTogglingCommentLike((prev) => ({ ...prev, [commentId]: false }));
     }
   };
 
@@ -234,6 +260,18 @@ export default function PostDetailScreen() {
           <View key={comment.id} style={styles.commentCard}>
             <Text style={styles.commentAuthor}>{comment.nome_exibicao || comment.username || "Usuario"}</Text>
             <Text style={styles.commentText}>{comment.comentario}</Text>
+            <Pressable
+              style={styles.commentLikeButton}
+              onPress={() => handleToggleCommentLike(comment.id)}
+              disabled={togglingCommentLike[comment.id]}
+            >
+              <Ionicons
+                name={comment.viewer_liked ? "heart" : "heart-outline"}
+                size={16}
+                color={theme.colors.text}
+              />
+              <Text style={styles.commentLikeText}>Curtir ({comment.likes_count})</Text>
+            </Pressable>
           </View>
         ))}
 
@@ -416,6 +454,17 @@ function createStyles(theme: AppTheme) {
     commentText: {
       color: theme.colors.text,
       fontSize: 14,
+    },
+    commentLikeButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 4,
+    },
+    commentLikeText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "600",
     },
     errorText: {
       color: theme.colors.error,
