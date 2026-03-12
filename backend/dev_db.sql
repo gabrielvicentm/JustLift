@@ -57,6 +57,19 @@ CREATE TABLE user_follows (
   CONSTRAINT chk_user_follows_not_self CHECK (follower_id <> following_id)
 );
 
+CREATE TABLE follow_requests (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  requester_id UUID NOT NULL,
+  target_user_id UUID NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_follow_request_requester
+    FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_follow_request_target
+    FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_follow_request UNIQUE (requester_id, target_user_id),
+  CONSTRAINT chk_follow_request_not_self CHECK (requester_id <> target_user_id)
+);
+
 --Isso é um “atalho” para o banco achar usernames mais rápido;
 --em buscas como ILIKE '%nome%', sem varrer todos os usuários.
 CREATE INDEX idx_users_username_trgm
@@ -68,6 +81,12 @@ ON user_follows(follower_id, created_at DESC);
 
 CREATE INDEX idx_user_follows_following
 ON user_follows(following_id, created_at DESC);
+
+CREATE INDEX idx_follow_requests_target_created
+ON follow_requests(target_user_id, created_at DESC);
+
+CREATE INDEX idx_follow_requests_requester_created
+ON follow_requests(requester_id, created_at DESC);
 
 -- Assinaturas por usuário (fonte da verdade do premium)
 CREATE TABLE user_subscriptions (
@@ -567,6 +586,16 @@ CREATE TABLE post_comments (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE comment_likes (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  comment_id INT NOT NULL,
+  user_id UUID NOT NULL,
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (comment_id) REFERENCES post_comments(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_comment_like UNIQUE (comment_id, user_id)
+);
+
 CREATE TABLE post_reports (
   id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   post_id INT NOT NULL,
@@ -577,6 +606,63 @@ CREATE TABLE post_reports (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT uq_post_report UNIQUE (post_id, user_id)
 );
+
+CREATE TABLE notifications (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  recipient_user_id UUID NOT NULL,
+  actor_user_id UUID NOT NULL,
+  post_id INT,
+  comment_id INT,
+  type VARCHAR(20) NOT NULL,
+  read_at TIMESTAMP(0),
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
+  FOREIGN KEY (comment_id) REFERENCES post_comments(id) ON DELETE CASCADE,
+  CONSTRAINT chk_notifications_type CHECK (
+    type IN (
+      'post_like',
+      'post_save',
+      'post_comment',
+      'user_follow',
+      'follow_request',
+      'follow_accepted',
+      'comment_like',
+      'mention'
+    )
+  )
+);
+
+CREATE TABLE user_push_tokens (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL,
+  token TEXT NOT NULL,
+  platform VARCHAR(20) DEFAULT 'unknown',
+  device_id TEXT,
+  created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_user_push_token UNIQUE (user_id, token)
+);
+
+CREATE UNIQUE INDEX uq_notifications_like_once
+ON notifications(recipient_user_id, actor_user_id, post_id, type)
+WHERE type = 'post_like';
+
+CREATE UNIQUE INDEX uq_notifications_save_once
+ON notifications(recipient_user_id, actor_user_id, post_id, type)
+WHERE type = 'post_save';
+
+CREATE UNIQUE INDEX uq_notifications_follow_once
+ON notifications(recipient_user_id, actor_user_id, type)
+WHERE type = 'user_follow';
+
+CREATE UNIQUE INDEX uq_notifications_follow_request_once
+ON notifications(recipient_user_id, actor_user_id, type)
+WHERE type = 'follow_request';
+
+CREATE INDEX idx_comment_likes_comment_created_at ON comment_likes(comment_id, created_at DESC);
 
 CREATE INDEX idx_posts_user_created_at ON posts(user_id, created_at DESC);
 CREATE INDEX idx_post_photos_post_ordem ON post_photos(post_id, ordem ASC);
