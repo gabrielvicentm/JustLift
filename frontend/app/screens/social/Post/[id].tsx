@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,11 +16,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
-import { getApiErrorMessage } from "@/app/features/profile/service";
+import { fetchMyProfile, getApiErrorMessage } from "@/app/features/profile/service";
 import {
   createPostComment,
+  deletePost,
   fetchPostById,
   reportPost,
+  toggleCommentLike,
   togglePostLike,
   togglePostSave,
 } from "@/app/features/social/service";
@@ -40,6 +44,9 @@ export default function PostDetailScreen() {
   const [togglingLike, setTogglingLike] = useState(false);
   const [togglingSave, setTogglingSave] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [togglingCommentLike, setTogglingCommentLike] = useState<Record<number, boolean>>({});
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadPost = useCallback(async () => {
     if (!Number.isInteger(postId) || postId <= 0) {
@@ -51,14 +58,17 @@ export default function PostDetailScreen() {
     try {
       setError("");
       setLoading(true);
-      const data = await fetchPostById(postId);
+      const [data, myProfile] = await Promise.all([fetchPostById(postId), fetchMyProfile()]);
       setPost(data);
+      setViewerUserId(myProfile.user_id);
     } catch (err) {
       setError(getApiErrorMessage(err, "carregar post"));
     } finally {
       setLoading(false);
     }
   }, [postId]);
+
+  const isOwner = Boolean(post && viewerUserId && post.user_id === viewerUserId);
 
   useEffect(() => {
     loadPost();
@@ -134,6 +144,60 @@ export default function PostDetailScreen() {
     }
   };
 
+  const handleToggleCommentLike = async (commentId: number) => {
+    if (!post || togglingCommentLike[commentId]) return;
+    try {
+      setTogglingCommentLike((prev) => ({ ...prev, [commentId]: true }));
+      const result = await toggleCommentLike(post.id, commentId);
+      setPost({
+        ...post,
+        comentarios: post.comentarios.map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                viewer_liked: result.liked,
+                likes_count: result.likes_count,
+              }
+            : comment,
+        ),
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "curtir comentario"));
+    } finally {
+      setTogglingCommentLike((prev) => ({ ...prev, [commentId]: false }));
+    }
+  const handleDeletePost = async () => {
+    if (!post || deleting || !isOwner) return;
+    Alert.alert("Excluir post", "Tem certeza que deseja excluir este post?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setDeleting(true);
+            await deletePost(post.id);
+            Alert.alert("Post excluido", "Seu post foi removido.");
+            router.back();
+          } catch (err) {
+            setError(getApiErrorMessage(err, "excluir post"));
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const openOwnerActions = () => {
+    if (!post || !isOwner) return;
+    Alert.alert("Gerenciar post", "Escolha uma acao", [
+      { text: "Editar", onPress: () => router.push(`/screens/social/EditarPost?postId=${post.id}` as never) },
+      { text: "Excluir", style: "destructive", onPress: handleDeletePost },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -155,12 +219,26 @@ export default function PostDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.contentContainer}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+    >
+      <ScrollView
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      >
         <View style={styles.topRow}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Text style={styles.backButtonText}>Voltar</Text>
           </Pressable>
+
+          {isOwner ? (
+            <Pressable onPress={openOwnerActions} style={styles.manageButton} disabled={deleting}>
+              {deleting ? <ActivityIndicator color={theme.colors.text} /> : <Text style={styles.manageButtonText}>Gerenciar</Text>}
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.authorRow}>
@@ -234,12 +312,24 @@ export default function PostDetailScreen() {
           <View key={comment.id} style={styles.commentCard}>
             <Text style={styles.commentAuthor}>{comment.nome_exibicao || comment.username || "Usuario"}</Text>
             <Text style={styles.commentText}>{comment.comentario}</Text>
+            <Pressable
+              style={styles.commentLikeButton}
+              onPress={() => handleToggleCommentLike(comment.id)}
+              disabled={togglingCommentLike[comment.id]}
+            >
+              <Ionicons
+                name={comment.viewer_liked ? "heart" : "heart-outline"}
+                size={16}
+                color={theme.colors.text}
+              />
+              <Text style={styles.commentLikeText}>Curtir ({comment.likes_count})</Text>
+            </Pressable>
           </View>
         ))}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -252,7 +342,7 @@ function createStyles(theme: AppTheme) {
     contentContainer: {
       padding: 16,
       gap: 10,
-      paddingBottom: 24,
+      paddingBottom: 44,
     },
     center: {
       flex: 1,
@@ -268,7 +358,8 @@ function createStyles(theme: AppTheme) {
     },
     topRow: {
       flexDirection: "row",
-      justifyContent: "flex-start",
+      justifyContent: "space-between",
+      alignItems: "center",
     },
     backButton: {
       borderWidth: 1,
@@ -281,6 +372,20 @@ function createStyles(theme: AppTheme) {
     backButtonText: {
       color: theme.colors.text,
       fontWeight: "600",
+    },
+    manageButton: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: theme.colors.surface,
+      minWidth: 92,
+      alignItems: "center",
+    },
+    manageButtonText: {
+      color: theme.colors.text,
+      fontWeight: "700",
     },
     authorRow: {
       flexDirection: "row",
@@ -416,6 +521,17 @@ function createStyles(theme: AppTheme) {
     commentText: {
       color: theme.colors.text,
       fontSize: 14,
+    },
+    commentLikeButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 4,
+    },
+    commentLikeText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "600",
     },
     errorText: {
       color: theme.colors.error,

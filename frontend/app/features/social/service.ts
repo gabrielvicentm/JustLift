@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "@/app/config/api";
 import { getAuthHeader } from "@/app/features/profile/service";
-import type { PostCommentItem, PostDetail, PostMediaPayload, PostSummary } from "./types";
+import type { PostCommentItem, PostDetail, PostMediaPayload, PostSummary, TreinoResumo } from "./types";
 
 type PresignResponse = {
   key: string;
@@ -10,6 +10,17 @@ type PresignResponse = {
 };
 
 type CreatePostPayload = {
+  descricao: string;
+  midias: PostMediaPayload[];
+};
+
+type UpdatePostPayload = {
+  descricao: string;
+  midias?: PostMediaPayload[];
+};
+
+type CreateTreinoPostPayload = {
+  treinoId: number;
   descricao: string;
   midias: PostMediaPayload[];
 };
@@ -68,6 +79,21 @@ export async function createPost(payload: CreatePostPayload): Promise<PostSummar
   return response.data.post;
 }
 
+export async function fetchTreinoPostPreview(treinoId: number, lang: "pt" | "en" = "pt"): Promise<TreinoResumo> {
+  const headers = await getAuthHeader();
+  const response = await api.get<{ resumo: TreinoResumo }>(`/treino-posts/preview/${treinoId}`, {
+    headers,
+    params: { lang },
+  });
+  return response.data.resumo;
+}
+
+export async function createTreinoPost(payload: CreateTreinoPostPayload): Promise<PostSummary> {
+  const headers = await getAuthHeader();
+  const response = await api.post<{ post: PostSummary }>("/treino-posts", payload, { headers });
+  return response.data.post;
+}
+
 export async function fetchPostsByUser(userId: string): Promise<PostSummary[]> {
   const headers = await getAuthHeader();
   const response = await api.get<{ posts: PostSummary[] }>(`/posts/user/${encodeURIComponent(userId)}`, { headers });
@@ -78,6 +104,17 @@ export async function fetchPostById(postId: number): Promise<PostDetail> {
   const headers = await getAuthHeader();
   const response = await api.get<{ post: PostDetail }>(`/posts/${postId}`, { headers });
   return response.data.post;
+}
+
+export async function updatePost(postId: number, payload: UpdatePostPayload): Promise<PostSummary> {
+  const headers = await getAuthHeader();
+  const response = await api.put<{ post: PostSummary }>(`/posts/${postId}`, payload, { headers });
+  return response.data.post;
+}
+
+export async function deletePost(postId: number): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/posts/${postId}`, { headers });
 }
 
 export async function togglePostLike(postId: number): Promise<{ liked: boolean; likes_count: number }> {
@@ -101,4 +138,17 @@ export async function createPostComment(postId: number, comentario: string): Pro
   const headers = await getAuthHeader();
   const response = await api.post<{ comment: PostCommentItem }>(`/posts/${postId}/comments`, { comentario }, { headers });
   return response.data.comment;
+}
+
+export async function toggleCommentLike(
+  postId: number,
+  commentId: number,
+): Promise<{ liked: boolean; likes_count: number }> {
+  const headers = await getAuthHeader();
+  const response = await api.post<{ liked: boolean; likes_count: number }>(
+    `/posts/${postId}/comments/${commentId}/like`,
+    {},
+    { headers },
+  );
+  return response.data;
 }

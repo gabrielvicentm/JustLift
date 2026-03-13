@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
 import { api } from "@/app/config/api";
+import { registerPushTokenIfPossible } from "@/app/features/notifications/push";
 
 export default function Index() {
   const router = useRouter();
@@ -23,11 +24,17 @@ export default function Index() {
           if (newAccess) await AsyncStorage.setItem("accessToken", newAccess);
           if (newRefresh) await AsyncStorage.setItem("refreshToken", newRefresh);
 
+          try {
+            await registerPushTokenIfPossible();
+          } catch {}
           if (!cancelled) router.replace("/(tabs)/home_tab");
           return;
         }
 
         if (accessToken) {
+          try {
+            await registerPushTokenIfPossible();
+          } catch {}
           if (!cancelled) router.replace("/(tabs)/home_tab");
           return;
         }

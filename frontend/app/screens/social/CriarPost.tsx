@@ -4,6 +4,8 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -326,19 +328,82 @@ export default function CriarPostScreen() {
         onPress={handlePublicarComTratamento}
         disabled={sending}
       >
-        {sending ? (
-          <ActivityIndicator color={theme.colors.buttonText} />
+        <View style={styles.header}>
+          <Text style={styles.title}>Criar post</Text>
+          <Text style={styles.subtitle}>Adicione imagens e videos (maximo de 9).</Text>
+        </View>
+
+        <Pressable style={styles.addMediaButton} onPress={handleEscolherMidias} disabled={sending}>
+          <Ionicons name="images-outline" size={18} color={theme.colors.buttonText} />
+          <Text style={styles.addMediaButtonText}>Inserir midia</Text>
+        </Pressable>
+
+        <Text style={styles.counterText}>
+          {midias.length}/{MAX_MIDIAS} midias selecionadas
+        </Text>
+
+        {midias.length > 0 ? (
+          <FlatList
+            data={midias}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            scrollEnabled={false}
+            contentContainerStyle={styles.grid}
+            columnWrapperStyle={styles.gridRow}
+            renderItem={({ item }) => (
+              <View style={styles.mediaCard}>
+                {item.type === "image" ? (
+                  <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
+                ) : (
+                  <View style={styles.videoPlaceholder}>
+                    <Ionicons name="videocam" size={22} color={theme.colors.buttonText} />
+                    <Text style={styles.videoText}>Video</Text>
+                  </View>
+                )}
+
+                <Pressable style={styles.removeButton} onPress={() => handleRemoverMidia(item.id)}>
+                  <Ionicons name="close" size={14} color={theme.colors.buttonText} />
+                </Pressable>
+              </View>
+            )}
+          />
         ) : (
           <Text style={styles.publishButtonText}>{abaAtiva === "post" ? "Publicar post" : "Publicar Daily"}</Text>
         )}
-      </Pressable>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {success ? <Text style={styles.success}>{success}</Text> : null}
 
-      <Pressable style={styles.backButton} onPress={() => router.back()} disabled={sending}>
-        <Text style={styles.backButtonText}>Voltar</Text>
-      </Pressable>
-    </ScrollView>
+        <Text style={styles.label}>Descricao</Text>
+        <TextInput
+          value={descricao}
+          onChangeText={setDescricao}
+          placeholder="Escreva algo sobre seu post..."
+          placeholderTextColor={theme.colors.mutedText}
+          style={styles.descriptionInput}
+          multiline
+          textAlignVertical="top"
+          editable={!sending}
+          maxLength={1000}
+        />
+
+        <Pressable
+          style={[styles.publishButton, sending && styles.buttonDisabled]}
+          onPress={handlePublicarComTratamento}
+          disabled={sending}
+        >
+          {sending ? (
+            <ActivityIndicator color={theme.colors.buttonText} />
+          ) : (
+            <Text style={styles.publishButtonText}>Publicar post</Text>
+          )}
+        </Pressable>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {success ? <Text style={styles.success}>{success}</Text> : null}
+
+        <Pressable style={styles.backButton} onPress={() => router.back()} disabled={sending}>
+          <Text style={styles.backButtonText}>Voltar</Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -351,7 +416,7 @@ function createStyles(theme: AppTheme) {
     container: {
       padding: 16,
       gap: 10,
-      paddingBottom: 26,
+      paddingBottom: 44,
     },
     header: {
       gap: 4,
@@ -484,6 +549,7 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
     },
     publishButton: {
+      marginTop: 10,
       height: 46,
       borderRadius: 10,
       backgroundColor: theme.colors.button,

@@ -12,6 +12,17 @@ export type PostMediaItem = {
   media_order: number;
 };
 
+export type TreinoResumo = {
+  treino_id: number;
+  data: string;
+  duracao: number | null;
+  peso_total: number | null;
+  total_series: number | null;
+  total_exercicios: number | null;
+  finalizado: boolean;
+  exercicios?: { exercicio_treino_id: number; nome: string }[];
+};
+
 export type PostCommentItem = {
   id: number;
   post_id: number;
@@ -21,6 +32,8 @@ export type PostCommentItem = {
   foto_perfil: string | null;
   comentario: string;
   created_at: string;
+  likes_count: number;
+  viewer_liked: boolean;
 };
 
 export type PostSummary = {
@@ -37,6 +50,8 @@ export type PostSummary = {
   viewer_liked: boolean;
   viewer_saved: boolean;
   midias: PostMediaItem[];
+  tipo?: "normal" | "treino";
+  treino?: TreinoResumo | null;
 };
 
 export type PostDetail = PostSummary & {
