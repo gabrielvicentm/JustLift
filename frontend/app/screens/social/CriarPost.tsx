@@ -17,19 +17,23 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { createPost, uploadMediaToR2 } from "@/app/features/social/service";
+import { createDailyBatch } from "@/app/features/daily/service";
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 
-const MAX_MIDIAS = 9;
+const MAX_POST_MIDIAS = 9;
+const MAX_DAILY_MIDIAS = 20;
+const MAX_DAILY_VIDEO_DURATION_SECONDS = 15;
 
-type PostMedia = {
+type LocalMedia = {
   id: string;
   uri: string;
   type: "image" | "video";
   fileName: string;
   mimeType: string;
   fileSize?: number;
+  durationMs?: number | null;
 };
 
 export default function CriarPostScreen() {
@@ -37,31 +41,59 @@ export default function CriarPostScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const [abaAtiva, setAbaAtiva] = useState<"post" | "daily">("post");
   const [descricao, setDescricao] = useState("");
-  const [midias, setMidias] = useState<PostMedia[]>([]);
+  const [midiasPost, setMidiasPost] = useState<LocalMedia[]>([]);
+  const [midiasDaily, setMidiasDaily] = useState<LocalMedia[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const addNovasMidias = (assets: ImagePicker.ImagePickerAsset[]) => {
-    const novasMidias: PostMedia[] = assets.map((asset, index) => ({
-      id: `${asset.assetId ?? asset.uri}-${Date.now()}-${index}`,
-      uri: asset.uri,
-      type: asset.type === "video" ? "video" : "image",
-      fileName: asset.fileName ?? `midia-${Date.now()}-${index}`,
-      mimeType: asset.mimeType ?? (asset.type === "video" ? "video/mp4" : "image/jpeg"),
-      fileSize: asset.fileSize,
-    }));
+  const midiasSelecionadas = abaAtiva === "post" ? midiasPost : midiasDaily;
+  const limiteAtual = abaAtiva === "post" ? MAX_POST_MIDIAS : MAX_DAILY_MIDIAS;
 
-    setMidias((current) => {
-      const merged = [...current, ...novasMidias];
-      return merged.slice(0, MAX_MIDIAS);
-    });
+  const addNovasMidias = (assets: ImagePicker.ImagePickerAsset[]) => {
+    const novasMidias: LocalMedia[] = [];
+    let teveVideoCortado = false;
+
+    for (const [index, asset] of assets.entries()) {
+      const isVideo = asset.type === "video";
+      const durationMs = isVideo ? asset.duration ?? null : null;
+      const durationSeconds = durationMs ? durationMs / 1000 : 0;
+
+      if (abaAtiva === "daily" && isVideo && durationSeconds > MAX_DAILY_VIDEO_DURATION_SECONDS) {
+        teveVideoCortado = true;
+      }
+
+      novasMidias.push({
+        id: `${asset.assetId ?? asset.uri}-${Date.now()}-${index}`,
+        uri: asset.uri,
+        type: isVideo ? "video" : "image",
+        fileName: asset.fileName ?? `midia-${Date.now()}-${index}`,
+        mimeType: asset.mimeType ?? (isVideo ? "video/mp4" : "image/jpeg"),
+        fileSize: asset.fileSize,
+        durationMs,
+      });
+    }
+
+    if (abaAtiva === "post") {
+      setMidiasPost((current) => [...current, ...novasMidias].slice(0, MAX_POST_MIDIAS));
+      return;
+    }
+
+    setMidiasDaily((current) => [...current, ...novasMidias].slice(0, MAX_DAILY_MIDIAS));
+
+    if (teveVideoCortado) {
+      Alert.alert(
+        "Video ajustado",
+        `Videos com mais de ${MAX_DAILY_VIDEO_DURATION_SECONDS}s vao usar apenas os primeiros ${MAX_DAILY_VIDEO_DURATION_SECONDS}s no Daily.`,
+      );
+    }
   };
 
   const handleEscolherDaGaleria = async () => {
-    if (midias.length >= MAX_MIDIAS) {
-      Alert.alert("Limite atingido", `Cada post permite no maximo ${MAX_MIDIAS} midias.`);
+    if (midiasSelecionadas.length >= limiteAtual) {
+      Alert.alert("Limite atingido", `Esta aba permite no maximo ${limiteAtual} midias.`);
       return;
     }
 
@@ -71,10 +103,9 @@ export default function CriarPostScreen() {
       return;
     }
 
-    const maxSelectable = MAX_MIDIAS - midias.length;
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsMultipleSelection: true,
-      selectionLimit: maxSelectable,
+      selectionLimit: limiteAtual - midiasSelecionadas.length,
       mediaTypes: ["images", "videos"],
       quality: 0.9,
     });
@@ -87,8 +118,8 @@ export default function CriarPostScreen() {
   };
 
   const handleAbrirCamera = async () => {
-    if (midias.length >= MAX_MIDIAS) {
-      Alert.alert("Limite atingido", `Cada post permite no maximo ${MAX_MIDIAS} midias.`);
+    if (midiasSelecionadas.length >= limiteAtual) {
+      Alert.alert("Limite atingido", `Esta aba permite no maximo ${limiteAtual} midias.`);
       return;
     }
 
@@ -101,6 +132,7 @@ export default function CriarPostScreen() {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images", "videos"],
       quality: 0.9,
+      videoMaxDuration: abaAtiva === "daily" ? MAX_DAILY_VIDEO_DURATION_SECONDS : undefined,
     });
 
     if (result.canceled || result.assets.length === 0) {
@@ -119,64 +151,182 @@ export default function CriarPostScreen() {
   };
 
   const handleRemoverMidia = (id: string) => {
-    setMidias((current) => current.filter((item) => item.id !== id));
+    if (abaAtiva === "post") {
+      setMidiasPost((current) => current.filter((item) => item.id !== id));
+      return;
+    }
+    setMidiasDaily((current) => current.filter((item) => item.id !== id));
   };
 
-  const handlePublicar = async () => {
-    setError("");
-    setSuccess("");
-
-    if (!descricao.trim() && midias.length === 0) {
+  const handlePublicarPost = async () => {
+    if (!descricao.trim() && midiasPost.length === 0) {
       setError("Adicione uma descricao ou pelo menos uma midia.");
       return;
     }
 
+    const uploadedMedia = await Promise.all(
+      midiasPost.map(async (item) => {
+        const uploaded = await uploadMediaToR2(item.uri, item.fileName, item.mimeType, item.fileSize);
+        return {
+          type: item.type,
+          url: uploaded.url,
+          key: uploaded.key,
+        } as const;
+      }),
+    );
+
+    await createPost({
+      descricao: descricao.trim(),
+      midias: uploadedMedia,
+    });
+
+    setDescricao("");
+    setMidiasPost([]);
+    setSuccess("Post publicado com sucesso.");
+    Alert.alert("Sucesso", "Seu post foi publicado.");
+  };
+
+  const handlePublicarDaily = async () => {
+    if (midiasDaily.length === 0) {
+      setError("Selecione pelo menos uma midia para publicar no Daily.");
+      return;
+    }
+
+    const uploadedMedia = await Promise.all(
+      midiasDaily.map(async (item) => {
+        const uploaded = await uploadMediaToR2(item.uri, item.fileName, item.mimeType, item.fileSize);
+        return {
+          type: item.type,
+          url: uploaded.url,
+          key: uploaded.key,
+          duration_seconds:
+            item.type === "video"
+              ? Math.max(1, Math.min(MAX_DAILY_VIDEO_DURATION_SECONDS, Math.ceil((item.durationMs ?? 15000) / 1000)))
+              : MAX_DAILY_VIDEO_DURATION_SECONDS,
+        } as const;
+      }),
+    );
+
+    await createDailyBatch({ midias: uploadedMedia });
+    setMidiasDaily([]);
+    setSuccess("Daily publicado com sucesso.");
+    Alert.alert("Sucesso", "Seu Daily foi publicado.");
+  };
+
+  const handlePublicarComTratamento = async () => {
+    setError("");
+    setSuccess("");
     setSending(true);
+
     try {
-      const uploadedMedia = await Promise.all(
-        midias.map(async (item) => {
-          const uploaded = await uploadMediaToR2(item.uri, item.fileName, item.mimeType, item.fileSize);
-          return {
-            type: item.type,
-            url: uploaded.url,
-            key: uploaded.key,
-          } as const;
-        }),
-      );
-
-      await createPost({
-        descricao: descricao.trim(),
-        midias: uploadedMedia,
-      });
-
-      setDescricao("");
-      setMidias([]);
-      setSuccess("Post publicado com sucesso.");
-      Alert.alert("Sucesso", "Seu post foi publicado.");
+      if (abaAtiva === "post") {
+        await handlePublicarPost();
+      } else {
+        await handlePublicarDaily();
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, abaAtiva === "post" ? "publicar post" : "publicar Daily"));
     } finally {
       setSending(false);
     }
   };
 
-  const handlePublicarComTratamento = async () => {
-    try {
-      await handlePublicar();
-    } catch (err) {
-      setError(getApiErrorMessage(err, "publicar post"));
-    }
+  const trocarAba = (aba: "post" | "daily") => {
+    setAbaAtiva(aba);
+    setError("");
+    setSuccess("");
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-    >
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+    <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Criar conteudo</Text>
+        <Text style={styles.subtitle}>
+          {abaAtiva === "post"
+            ? "Adicione imagens e videos para seu post."
+            : "Daily: foto/video de ate 15 segundos e exibicao por 24 horas."}
+        </Text>
+      </View>
+
+      <View style={styles.tabsRow}>
+        <Pressable
+          style={[styles.tabButton, abaAtiva === "post" && styles.tabButtonActive]}
+          onPress={() => trocarAba("post")}
+          disabled={sending}
+        >
+          <Text style={[styles.tabButtonText, abaAtiva === "post" && styles.tabButtonTextActive]}>Post</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tabButton, abaAtiva === "daily" && styles.tabButtonActive]}
+          onPress={() => trocarAba("daily")}
+          disabled={sending}
+        >
+          <Text style={[styles.tabButtonText, abaAtiva === "daily" && styles.tabButtonTextActive]}>Daily</Text>
+        </Pressable>
+      </View>
+
+      <Pressable style={styles.addMediaButton} onPress={handleEscolherMidias} disabled={sending}>
+        <Ionicons name="images-outline" size={18} color={theme.colors.buttonText} />
+        <Text style={styles.addMediaButtonText}>Inserir midia</Text>
+      </Pressable>
+
+      <Text style={styles.counterText}>
+        {midiasSelecionadas.length}/{limiteAtual} midias selecionadas
+      </Text>
+
+      {midiasSelecionadas.length > 0 ? (
+        <FlatList
+          data={midiasSelecionadas}
+          keyExtractor={(item) => item.id}
+          numColumns={3}
+          scrollEnabled={false}
+          contentContainerStyle={styles.grid}
+          columnWrapperStyle={styles.gridRow}
+          renderItem={({ item }) => (
+            <View style={styles.mediaCard}>
+              {item.type === "image" ? (
+                <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
+              ) : (
+                <View style={styles.videoPlaceholder}>
+                  <Ionicons name="videocam" size={22} color={theme.colors.buttonText} />
+                  <Text style={styles.videoText}>Video</Text>
+                </View>
+              )}
+
+              <Pressable style={styles.removeButton} onPress={() => handleRemoverMidia(item.id)}>
+                <Ionicons name="close" size={14} color={theme.colors.buttonText} />
+              </Pressable>
+            </View>
+          )}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Ionicons name="image-outline" size={20} color={theme.colors.mutedText} />
+          <Text style={styles.emptyStateText}>Nenhuma midia selecionada.</Text>
+        </View>
+      )}
+
+      {abaAtiva === "post" ? (
+        <>
+          <Text style={styles.label}>Descricao</Text>
+          <TextInput
+            value={descricao}
+            onChangeText={setDescricao}
+            placeholder="Escreva algo sobre seu post..."
+            placeholderTextColor={theme.colors.mutedText}
+            style={styles.descriptionInput}
+            multiline
+            textAlignVertical="top"
+            editable={!sending}
+            maxLength={1000}
+          />
+        </>
+      ) : null}
+
+      <Pressable
+        style={[styles.publishButton, sending && styles.buttonDisabled]}
+        onPress={handlePublicarComTratamento}
+        disabled={sending}
       >
         <View style={styles.header}>
           <Text style={styles.title}>Criar post</Text>
@@ -218,10 +368,7 @@ export default function CriarPostScreen() {
             )}
           />
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="image-outline" size={20} color={theme.colors.mutedText} />
-            <Text style={styles.emptyStateText}>Nenhuma midia selecionada.</Text>
-          </View>
+          <Text style={styles.publishButtonText}>{abaAtiva === "post" ? "Publicar post" : "Publicar Daily"}</Text>
         )}
 
         <Text style={styles.label}>Descricao</Text>
@@ -282,6 +429,31 @@ function createStyles(theme: AppTheme) {
     subtitle: {
       color: theme.colors.mutedText,
       fontSize: 13,
+    },
+    tabsRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    tabButton: {
+      flex: 1,
+      minHeight: 42,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surface,
+    },
+    tabButtonActive: {
+      backgroundColor: theme.colors.button,
+      borderColor: theme.colors.button,
+    },
+    tabButtonText: {
+      color: theme.colors.text,
+      fontWeight: "700",
+    },
+    tabButtonTextActive: {
+      color: theme.colors.buttonText,
     },
     addMediaButton: {
       height: 44,

@@ -12,6 +12,8 @@ import { useMyProfileQuery } from "@/app/features/profile/hooks";
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { fetchPostsByUser } from "@/app/features/social/service";
 import type { PostSummary } from "@/app/features/social/types";
+import { fetchDailySummaryByUser } from "@/app/features/daily/service";
+import type { DailySummary } from "@/app/features/daily/types";
 import { useFocusEffect } from "@react-navigation/native";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -28,6 +30,7 @@ export default function PerfilScreen() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsError, setPostsError] = useState("");
+  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
 
   const loading = profileQuery.isLoading;
   const refreshing = profileQuery.isRefetching;
@@ -55,20 +58,47 @@ export default function PerfilScreen() {
     }
   }, [profileQuery.data?.user_id]);
 
+  const loadDailySummary = useCallback(async () => {
+    const userId = profileQuery.data?.user_id;
+    if (!userId) {
+      return;
+    }
+
+    try {
+      const data = await fetchDailySummaryByUser(userId);
+      setDailySummary(data);
+    } catch (err) {
+      setPostsError(getApiErrorMessage(err, "carregar Daily"));
+    }
+  }, [profileQuery.data?.user_id]);
+
   const handleRefresh = async () => {
     await profileQuery.refetch();
     await loadPosts();
+    await loadDailySummary();
   };
 
   useEffect(() => {
     loadPosts();
-  }, [loadPosts]);
+    loadDailySummary();
+  }, [loadPosts, loadDailySummary]);
 
   useFocusEffect(
     useCallback(() => {
       loadPosts();
-    }, [loadPosts]),
+      loadDailySummary();
+    }, [loadPosts, loadDailySummary]),
   );
+
+  const hasActiveDaily = dailySummary?.has_active_daily ?? false;
+  const hasUnseenDaily = dailySummary?.has_unseen_daily ?? false;
+
+  const handleOpenDaily = () => {
+    if (!profile?.user_id || !hasActiveDaily) {
+      return;
+    }
+    router.push({ pathname: "/screens/social/VerDaily", params: { userId: profile.user_id } } as never);
+  };
 
   if (loading) {
     return (
@@ -89,13 +119,22 @@ export default function PerfilScreen() {
             {profile?.banner ? <Image source={{ uri: profile.banner }} style={styles.banner} /> : null}
 
             <View style={styles.profileBody}>
-              {profile?.foto_perfil ? (
-                <Image source={{ uri: profile.foto_perfil }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarPlaceholderText}>Sem foto</Text>
-                </View>
-              )}
+              <Pressable
+                style={[
+                  styles.avatarRing,
+                  hasActiveDaily && (hasUnseenDaily ? styles.avatarRingUnseen : styles.avatarRingSeen),
+                ]}
+                onPress={handleOpenDaily}
+                disabled={!hasActiveDaily}
+              >
+                {profile?.foto_perfil ? (
+                  <Image source={{ uri: profile.foto_perfil }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarPlaceholderText}>Sem foto</Text>
+                  </View>
+                )}
+              </Pressable>
 
               <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Seu perfil"}</Text>
 
@@ -123,6 +162,7 @@ export default function PerfilScreen() {
                 <Text style={styles.buttonText}>Editar Perfil</Text>
               </Pressable>
             </View>
+
           </View>
 
           {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
@@ -253,6 +293,18 @@ function createStyles(theme: AppTheme) {
       height: 88,
       borderRadius: 44,
       backgroundColor: theme.colors.inputBackground,
+    },
+    avatarRing: {
+      borderRadius: 50,
+      padding: 3,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    avatarRingUnseen: {
+      borderColor: theme.colors.button,
+    },
+    avatarRingSeen: {
+      borderColor: theme.colors.border,
     },
     avatarPlaceholder: {
       alignItems: "center",
