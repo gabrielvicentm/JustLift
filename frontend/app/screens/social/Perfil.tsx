@@ -97,7 +97,7 @@ export default function PerfilScreen() {
     if (!profile?.user_id || !hasActiveDaily) {
       return;
     }
-    router.push({ pathname: "/screens/social/verDayli", params: { userId: profile.user_id } } as never);
+    router.push({ pathname: "/screens/social/VerDaily", params: { userId: profile.user_id } } as never);
   };
 
   if (loading) {
