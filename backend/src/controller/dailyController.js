@@ -100,6 +100,11 @@ exports.getDailySummaryByUser = async (req, res) => {
       return res.status(401).json({ message: 'Usuario nao autenticado' });
     }
 
+    const userId = String(req.params?.userId || '').trim();
+    if (!userId) {
+      return res.status(400).json({ message: 'userId obrigatorio' });
+    }
+
     const summary = await dailyService.getDailySummaryByUser({ userId, viewerUserId });
     return res.status(200).json({ summary });
   } catch (err) {
