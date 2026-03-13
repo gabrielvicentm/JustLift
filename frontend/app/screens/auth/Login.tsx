@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '@/app/config/api';
+import { registerPushTokenIfPossible } from '@/app/features/notifications/push';
 import { useI18n } from '@/providers/I18nProvider';
 import { useAppTheme } from '@/providers/ThemeProvider';
 import { AppTheme } from '@/theme/theme';
@@ -118,6 +119,9 @@ export default function Login() {
       });
 
       await saveTokens(response.data.accessToken, response.data.refreshToken);
+      try {
+        await registerPushTokenIfPossible();
+      } catch {}
 
       setMessage(response.data.message ?? t('login_success_default'));
       router.replace('/(tabs)/home_tab');
@@ -179,6 +183,9 @@ export default function Login() {
       console.log('[GoogleAuth][Frontend][Login] api:/user/google/login:success', response.data);
 
       await saveTokens(response.data.accessToken, response.data.refreshToken);
+      try {
+        await registerPushTokenIfPossible();
+      } catch {}
       setMessage(response.data.message ?? 'Login Google efetuado com sucesso.');
       router.replace('/(tabs)/home_tab');
     } catch (err: any) {
