@@ -238,7 +238,17 @@ export default function CriarPostScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+    >
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      >
       <View style={styles.header}>
         <Text style={styles.title}>Criar conteudo</Text>
         <Text style={styles.subtitle}>
@@ -328,80 +338,21 @@ export default function CriarPostScreen() {
         onPress={handlePublicarComTratamento}
         disabled={sending}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Criar post</Text>
-          <Text style={styles.subtitle}>Adicione imagens e videos (maximo de 9).</Text>
-        </View>
-
-        <Pressable style={styles.addMediaButton} onPress={handleEscolherMidias} disabled={sending}>
-          <Ionicons name="images-outline" size={18} color={theme.colors.buttonText} />
-          <Text style={styles.addMediaButtonText}>Inserir midia</Text>
-        </Pressable>
-
-        <Text style={styles.counterText}>
-          {midias.length}/{MAX_MIDIAS} midias selecionadas
-        </Text>
-
-        {midias.length > 0 ? (
-          <FlatList
-            data={midias}
-            keyExtractor={(item) => item.id}
-            numColumns={3}
-            scrollEnabled={false}
-            contentContainerStyle={styles.grid}
-            columnWrapperStyle={styles.gridRow}
-            renderItem={({ item }) => (
-              <View style={styles.mediaCard}>
-                {item.type === "image" ? (
-                  <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
-                ) : (
-                  <View style={styles.videoPlaceholder}>
-                    <Ionicons name="videocam" size={22} color={theme.colors.buttonText} />
-                    <Text style={styles.videoText}>Video</Text>
-                  </View>
-                )}
-
-                <Pressable style={styles.removeButton} onPress={() => handleRemoverMidia(item.id)}>
-                  <Ionicons name="close" size={14} color={theme.colors.buttonText} />
-                </Pressable>
-              </View>
-            )}
-          />
+        {sending ? (
+          <ActivityIndicator color={theme.colors.buttonText} />
         ) : (
-          <Text style={styles.publishButtonText}>{abaAtiva === "post" ? "Publicar post" : "Publicar Daily"}</Text>
+          <Text style={styles.publishButtonText}>
+            {abaAtiva === "post" ? "Publicar post" : "Publicar Daily"}
+          </Text>
         )}
+      </Pressable>
 
-        <Text style={styles.label}>Descricao</Text>
-        <TextInput
-          value={descricao}
-          onChangeText={setDescricao}
-          placeholder="Escreva algo sobre seu post..."
-          placeholderTextColor={theme.colors.mutedText}
-          style={styles.descriptionInput}
-          multiline
-          textAlignVertical="top"
-          editable={!sending}
-          maxLength={1000}
-        />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {success ? <Text style={styles.success}>{success}</Text> : null}
 
-        <Pressable
-          style={[styles.publishButton, sending && styles.buttonDisabled]}
-          onPress={handlePublicarComTratamento}
-          disabled={sending}
-        >
-          {sending ? (
-            <ActivityIndicator color={theme.colors.buttonText} />
-          ) : (
-            <Text style={styles.publishButtonText}>Publicar post</Text>
-          )}
-        </Pressable>
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {success ? <Text style={styles.success}>{success}</Text> : null}
-
-        <Pressable style={styles.backButton} onPress={() => router.back()} disabled={sending}>
-          <Text style={styles.backButtonText}>Voltar</Text>
-        </Pressable>
+      <Pressable style={styles.backButton} onPress={() => router.back()} disabled={sending}>
+        <Text style={styles.backButtonText}>Voltar</Text>
+      </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
