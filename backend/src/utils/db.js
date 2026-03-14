@@ -6,10 +6,10 @@ const numberFromEnv = (envName, fallback) => {
 };
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'gatothorbobao',
-  database: process.env.DB_NAME || 'dev_db',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   port: numberFromEnv('DB_PORT', 5432),
   max: numberFromEnv('DB_POOL_MAX', 20),
   idleTimeoutMillis: numberFromEnv('DB_IDLE_TIMEOUT_MS', 10000),
