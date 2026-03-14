@@ -805,3 +805,4 @@ exports.toggleCommentLike = async ({ postId, commentId, userId }) => {
     likes_count: likesCount.rows[0]?.likes_count || 0,
   };
 };
+}

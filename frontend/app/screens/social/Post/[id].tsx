@@ -539,3 +539,4 @@ function createStyles(theme: AppTheme) {
     },
   });
 }
+}

@@ -88,27 +88,7 @@ ON follow_requests(target_user_id, created_at DESC);
 CREATE INDEX idx_follow_requests_requester_created
 ON follow_requests(requester_id, created_at DESC);
 
--- Assinaturas por usuário (fonte da verdade do premium)
-CREATE TABLE user_subscriptions (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID NOT NULL,
-  provider TEXT NOT NULL,
-  provider_customer_id TEXT,
-  provider_subscription_id TEXT,
-  product_id TEXT,
-  status TEXT NOT NULL DEFAULT 'inactive',
-  current_period_ends_at TIMESTAMP WITH TIME ZONE,
-  raw_payload JSONB,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_subscription_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT uq_subscription_user_provider UNIQUE (user_id, provider),
-  CONSTRAINT chk_subscription_status CHECK (
-    status IN ('inactive', 'active', 'grace_period', 'canceled', 'expired', 'paused')
-  )
-);
-
+-- A
 CREATE TABLE account_change_verifications (
   user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   new_username TEXT,
