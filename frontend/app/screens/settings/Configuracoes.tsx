@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -66,85 +67,164 @@ export default function ConfiguracoesScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t("settings_title")}</Text>
-      <Text style={styles.subtitle}>{t("settings_subtitle")}</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator
+      >
+        <Text style={styles.title}>{t("settings_title")}</Text>
+        <Text style={styles.subtitle}>{t("settings_subtitle")}</Text>
 
-      <View style={styles.card}>
-        <View style={styles.themeRow}>
-          <Pressable
-            style={styles.themePressable}
-            onPress={() => router.push("/screens/settings/ThemeCustomization")}
-          >
-            <Text style={styles.optionText}>{t("settings_theme_title")}</Text>
-            <Text style={styles.optionHint}>{t("settings_open_theme")}</Text>
-          </Pressable>
+        <View style={styles.optionsList}>
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <View style={styles.cardInner}>
+            <View style={styles.themeRow}>
+              <Pressable
+                style={styles.themePressable}
+                onPress={() => router.push("/screens/settings/ThemeCustomization")}
+              >
+                <Text style={styles.optionText}>{t("settings_theme_title")}</Text>
+                <Text style={styles.optionHint}>{t("settings_open_theme")}</Text>
+              </Pressable>
 
-          <View style={styles.switchWrap}>
-            <Text style={styles.switchLabel}>{isDarkMode ? "Escuro" : "Claro"}</Text>
-            <Switch
-              value={isDarkMode}
-              onValueChange={(value) => setMode(value ? "dark" : "light")}
-              trackColor={{ false: theme.colors.border, true: theme.colors.button }}
-              thumbColor={theme.colors.buttonText}
-            />
+              <View style={styles.switchWrap}>
+                <Text style={styles.switchLabel}>{isDarkMode ? "Escuro" : "Claro"}</Text>
+                <Switch
+                  value={isDarkMode}
+                  onValueChange={(value) => setMode(value ? "dark" : "light")}
+                  trackColor={{ false: "rgba(124, 92, 255, 0.35)", true: "rgba(255, 75, 216, 0.6)" }}
+                  thumbColor="#F4F7FF"
+                />
+              </View>
+            </View>
           </View>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Notificacoes")}>
+            <View style={styles.optionTextWrap}>
+              <Text style={styles.optionText}>Notificacoes</Text>
+              {unreadNotificationsCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadNotificationsCount > 99 ? "99+" : String(unreadNotificationsCount)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.chevron}>{">"}</Text>
+          </Pressable>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Conta")}>
+            <Text style={styles.optionText}>Conta</Text>
+            <Text style={styles.chevron}>{">"}</Text>
+          </Pressable>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <Pressable style={styles.optionCard} onPress={goHome}>
+            <Text style={styles.optionText}>Suporte</Text>
+            <Text style={styles.chevron}>{">"}</Text>
+          </Pressable>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <Pressable style={styles.optionCard} onPress={() => setShowLanguageModal(true)}>
+            <View>
+              <Text style={styles.optionText}>{t("settings_language_title")}</Text>
+              <Text style={styles.optionHint}>
+                {language === "pt" ? t("settings_language_pt") : t("settings_language_en")}
+              </Text>
+            </View>
+            <Text style={styles.chevron}>{">"}</Text>
+          </Pressable>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Premium")}>
+            <Text style={styles.optionText}>Obter Premium</Text>
+            <Text style={styles.chevron}>{">"}</Text>
+          </Pressable>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/GerenciarPosts")}>
+            <Text style={styles.optionText}>Gerenciar posts</Text>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <Pressable style={styles.optionCard} onPress={goHome}>
+            <Text style={styles.optionText}>Sobre</Text>
+            <Text style={styles.chevron}>{">"}</Text>
+          </Pressable>
+        </LinearGradient>
         </View>
 
-        <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Notificacoes")}>
-          <View style={styles.optionTextWrap}>
-            <Text style={styles.optionText}>Notificacoes</Text>
-            {unreadNotificationsCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadNotificationsCount > 99 ? "99+" : String(unreadNotificationsCount)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.chevron}>{">"}</Text>
-        </Pressable>
-
-        <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Conta")}>
-          <Text style={styles.optionText}>Conta</Text>
-          <Text style={styles.chevron}>{">"}</Text>
-        </Pressable>
-
-        <Pressable style={styles.optionRow} onPress={goHome}>
-          <Text style={styles.optionText}>Suporte</Text>
-          <Text style={styles.chevron}>{">"}</Text>
-        </Pressable>
-
-        <Pressable style={styles.optionRow} onPress={() => setShowLanguageModal(true)}>
-          <Text style={styles.optionText}>{t("settings_language_title")}</Text>
-          <Text style={styles.optionHint}>
-            {language === "pt" ? t("settings_language_pt") : t("settings_language_en")}
-          </Text>
-          <Text style={styles.chevron}>{">"}</Text>
-        </Pressable>
-
-        <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/Premium")}>
-          <Text style={styles.optionText}>Obter Premium</Text>
-          <Text style={styles.chevron}>{">"}</Text>
-        </Pressable>
-
-        <Pressable style={styles.optionRow} onPress={() => router.push("/screens/settings/GerenciarPosts")}>
-          <Text style={styles.optionText}>Gerenciar posts</Text>
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
-
-        <Pressable style={styles.optionRow} onPress={goHome}>
-          <Text style={styles.optionText}>Sobre</Text>
-          <Text style={styles.chevron}>{">"}</Text>
-        </Pressable>
-      </View>
-
-      <Pressable style={styles.logoutButton} onPress={handleLogout} disabled={isLoggingOut}>
-        <Text style={styles.logoutButtonText}>{isLoggingOut ? "Saindo..." : "Logout"}</Text>
-      </Pressable>
+        <LinearGradient
+          colors={theme.colors.negativeGradient}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.negativeButtonBorder}
+        >
+          <Pressable style={styles.negativeButton} onPress={handleLogout} disabled={isLoggingOut}>
+            <Text style={styles.negativeButtonText}>{isLoggingOut ? "Saindo..." : "Logout"}</Text>
+          </Pressable>
+        </LinearGradient>
+      </ScrollView>
 
       <Modal visible={showLanguageModal} animationType="fade" transparent onRequestClose={() => setShowLanguageModal(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <LinearGradient
+            colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.modalBorder}
+          >
+            <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{t("settings_language_title")}</Text>
 
             <Pressable
@@ -172,7 +252,8 @@ export default function ConfiguracoesScreen() {
             <Pressable style={styles.modalCancel} onPress={() => setShowLanguageModal(false)}>
               <Text style={styles.modalCancelText}>Cancelar</Text>
             </Pressable>
-          </View>
+            </View>
+          </LinearGradient>
         </View>
       </Modal>
     </View>
@@ -183,29 +264,51 @@ function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "#0B0E18",
+    },
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
       padding: 16,
-      gap: 12,
+      gap: 14,
+      paddingBottom: 32,
     },
     title: {
-      fontSize: 24,
-      fontWeight: "700",
-      color: theme.colors.text,
+      fontSize: 28,
+      fontWeight: "800",
+      color: "#E0E0E0",
+      textShadowColor: "rgba(0, 255, 255, 0.75)",
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 12,
     },
     subtitle: {
-      color: theme.colors.mutedText,
+      color: "#7FE7FF",
+      textShadowColor: "rgba(0, 255, 255, 0.45)",
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 8,
     },
-    card: {
-      backgroundColor: theme.colors.surface,
-      borderColor: theme.colors.border,
-      borderWidth: 1,
-      borderRadius: 12,
+    optionsList: {
+      gap: 14,
+    },
+    cardBorder: {
+      borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#74D3FF",
+      shadowOpacity: 0.45,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+    },
+    cardInner: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       paddingVertical: 2,
     },
     themeRow: {
       minHeight: 56,
       borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      borderBottomColor: "rgba(124, 92, 255, 0.35)",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -222,21 +325,21 @@ function createStyles(theme: AppTheme) {
       gap: 4,
     },
     switchLabel: {
-      color: theme.colors.mutedText,
+      color: "#7FE7FF",
       fontSize: 12,
       fontWeight: "600",
     },
-    optionRow: {
-      minHeight: 54,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+    optionCard: {
+      minHeight: 64,
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: 14,
+      paddingHorizontal: 16,
     },
     optionText: {
-      color: theme.colors.text,
+      color: "#E0E0E0",
       fontSize: 16,
       fontWeight: "600",
     },
@@ -252,35 +355,64 @@ function createStyles(theme: AppTheme) {
       paddingHorizontal: 6,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(255, 75, 216, 0.7)",
     },
     badgeText: {
-      color: theme.colors.buttonText,
+      color: "#0B0E18",
       fontSize: 11,
       fontWeight: "800",
     },
     optionHint: {
-      color: theme.colors.mutedText,
+      color: "#7FE7FF",
       fontSize: 12,
     },
     chevron: {
-      color: theme.colors.mutedText,
+      color: "#7FE7FF",
       fontSize: 24,
       lineHeight: 24,
     },
-    logoutButton: {
-      marginTop: 8,
-      height: 48,
-      borderRadius: 10,
+    negativeButtonBorder: {
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#FF9500",
+      shadowOpacity: 0.45,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
+    },
+    negativeButton: {
+      height: 52,
+      borderRadius: 14,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+    },
+    negativeButtonText: {
+      color: "#FFF3C4",
+      fontWeight: "800",
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+    },
+    logoutBorder: {
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.4,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 7,
+    },
+    logoutButton: {
+      height: 52,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     logoutButtonText: {
-      color: theme.colors.error,
+      color: "#FF4BD8",
       fontWeight: "700",
+      letterSpacing: 0.3,
     },
     modalBackdrop: {
       flex: 1,
@@ -289,18 +421,25 @@ function createStyles(theme: AppTheme) {
       justifyContent: "center",
       padding: 20,
     },
-    modalCard: {
+    modalBorder: {
       width: "100%",
       maxWidth: 360,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.4,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+    },
+    modalCard: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.96)",
       padding: 14,
       gap: 8,
     },
     modalTitle: {
-      color: theme.colors.text,
+      color: "#E0E0E0",
       fontSize: 18,
       fontWeight: "700",
       marginBottom: 4,
@@ -309,20 +448,20 @@ function createStyles(theme: AppTheme) {
       minHeight: 44,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.inputBackground,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       paddingHorizontal: 12,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
     },
     modalOptionText: {
-      color: theme.colors.text,
+      color: "#E0E0E0",
       fontSize: 15,
       fontWeight: "600",
     },
     modalSelected: {
-      color: theme.colors.button,
+      color: "#7FE7FF",
       fontSize: 12,
       fontWeight: "700",
     },
@@ -331,15 +470,14 @@ function createStyles(theme: AppTheme) {
       minHeight: 42,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(124, 92, 255, 0.35)",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     modalCancelText: {
-      color: theme.colors.text,
+      color: "#E0E0E0",
       fontWeight: "700",
     },
   });
 }
-
