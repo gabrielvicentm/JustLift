@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
@@ -15,6 +16,7 @@ export default function DiarioScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [hasWorkoutDraft, setHasWorkoutDraft] = useState(false);
 
@@ -58,22 +60,31 @@ export default function DiarioScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t("diary_title")}</Text>
-      <Text style={styles.subtitle}>{t("diary_subtitle")}</Text>
-
-      <View style={styles.buttonsContainer}>
-        {hasWorkoutDraft ? (
-          <Pressable
-            style={[styles.buttonSecondary, styles.buttonWide]}
-            onPress={() => router.push("/screens/diario/AdicionarExercicios")}
+    <View style={[styles.container, { paddingBottom: 0, paddingTop: 28 + insets.top }]}>
+      {hasWorkoutDraft ? (
+        <Pressable
+          style={[styles.buttonSecondary, styles.buttonWide, styles.stickyButton]}
+          onPress={() => router.push("/screens/diario/AdicionarExercicios")}
+        >
+          <LinearGradient
+            colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.buttonSecondaryFill}
           >
             <View style={styles.buttonContent}>
               <MaterialCommunityIcons name="play-circle-outline" size={20} style={styles.icon} />
               <Text style={styles.buttonSecondaryText}>Continuar treino</Text>
             </View>
-          </Pressable>
-        ) : null}
+          </LinearGradient>
+        </Pressable>
+      ) : null}
+
+      <ScrollView
+        style={styles.buttonsScroll}
+        contentContainerStyle={styles.buttonsContainer}
+        showsVerticalScrollIndicator={false}
+      >
 
         <Pressable
           style={[styles.button, styles.buttonCard]}
@@ -169,7 +180,7 @@ export default function DiarioScreen() {
             </View>
           </LinearGradient>
         </Pressable>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -201,15 +212,18 @@ function createStyles(theme: AppTheme) {
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 8,
     },
+    buttonsScroll: {
+      flex: 1,
+    },
     buttonsContainer: {
       marginTop: 22,
       gap: 14,
-      flex: 1,
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "center",
-      alignItems: "center",
-      alignContent: "center",
+      justifyContent: "flex-start",
+      alignItems: "stretch",
+      alignContent: "flex-start",
+      paddingBottom: 64,
     },
     button: {
       height: 92,
@@ -244,25 +258,27 @@ function createStyles(theme: AppTheme) {
     buttonSecondary: {
       height: 52,
       borderRadius: 16,
-      backgroundColor: "#0F1323",
       alignItems: "center",
       justifyContent: "center",
-      borderColor: "rgba(123, 47, 247, 0.8)",
-      borderWidth: 1.2,
-      shadowColor: "#7B2FF7",
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 5,
+      paddingHorizontal: 14,
+      overflow: "hidden",
+    },
+    buttonSecondaryFill: {
+      height: "100%",
+      width: "100%",
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
       paddingHorizontal: 14,
     },
+    stickyButton: {
+      marginTop: 16,
+      marginBottom: 12,
+    },
     buttonSecondaryText: {
-      color: "#E0E0E0",
+      color: "#0B0E18",
       fontWeight: "700",
       letterSpacing: 0.2,
-      textShadowColor: "rgba(123, 47, 247, 0.6)",
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 6,
     },
     buttonContent: {
       flexDirection: "row",

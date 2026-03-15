@@ -15,7 +15,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { LinearGradient } from "expo-linear-gradient";
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { SvgXml } from "react-native-svg";
 
 type BackendResponse = {
   message?: string;
@@ -28,6 +30,11 @@ type GoogleConfigResponse = {
   googleClientId?: string;
   message?: string;
 };
+
+const GOOGLE_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path fill='#EA4335' d='M24 9.5c3.54 0 6.7 1.23 9.2 3.25l6.86-6.86C35.98 2.57 30.39 0 24 0 14.62 0 6.5 5.38 2.44 13.22l7.98 6.2C12.36 13.09 17.69 9.5 24 9.5z'/><path fill='#4285F4' d='M46.5 24.5c0-1.57-.14-3.07-.4-4.5H24v9h12.7c-.55 2.96-2.2 5.47-4.7 7.17l7.5 5.82C43.98 37.65 46.5 31.6 46.5 24.5z'/><path fill='#34A853' d='M10.42 28.97c-.62-1.85-.62-3.85 0-5.7l-7.98-6.2C.7 20.62 0 22.49 0 24.5c0 2.01.7 3.88 2.44 6.43l7.98-6.2z'/><path fill='#FBBC05' d='M24 48c6.39 0 11.98-2.1 15.98-5.71l-7.5-5.82c-2.08 1.4-4.74 2.23-8.48 2.23-6.31 0-11.64-3.59-13.58-8.92l-7.98 6.2C6.5 42.62 14.62 48 24 48z'/></svg>";
+
+const BACKGROUND_GRADIENT = ["#0B0E18", "#0B1022", "#120C2A"] as const;
 
 export default function Register() {
   const router = useRouter();
@@ -90,6 +97,10 @@ export default function Register() {
 
     if (!cleanUsername || !cleanEmail || !cleanSenha) {
       setError(t('register_error_required'));
+      return;
+    }
+    if (cleanSenha.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.');
       return;
     }
 
@@ -235,7 +246,18 @@ export default function Register() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.screen}>
+      <LinearGradient colors={BACKGROUND_GRADIENT} style={StyleSheet.absoluteFillObject} />
+      <View style={styles.orbPink} />
+      <View style={styles.orbBlue} />
+      <View style={styles.orbPurple} />
+      <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={styles.cardBorder}
+      >
       <View style={styles.card}>
         <Text style={styles.title}>{t('register_title')}</Text>
         <Text style={styles.subtitle}>{t('register_subtitle')}</Text>
@@ -273,23 +295,31 @@ export default function Register() {
               editable={!loading}
             />
 
-            <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={loading}
+            <LinearGradient
+              colors={theme.colors.buttonGradient}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.buttonBorder}
             >
-              {loading ? (
-                <ActivityIndicator color={theme.colors.buttonText} />
-              ) : (
-                <Text style={styles.buttonText}>Enviar codigo</Text>
-              )}
-            </Pressable>
+              <Pressable
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleRegister}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={theme.colors.buttonText} />
+                ) : (
+                  <Text style={styles.buttonText}>Cadastrar</Text>
+                )}
+              </Pressable>
+            </LinearGradient>
 
             <Pressable
               style={[styles.googleButton, loading && styles.buttonDisabled]}
               onPress={handleGoogleRegister}
               disabled={loading}
             >
+              <SvgXml xml={GOOGLE_SVG} width={18} height={18} />
               <Text style={styles.googleButtonText}>Cadastrar com Google</Text>
             </Pressable>
           </>
@@ -306,17 +336,24 @@ export default function Register() {
               editable={!loading}
             />
 
-            <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleVerifyCode}
-              disabled={loading}
+            <LinearGradient
+              colors={theme.colors.buttonGradient}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.buttonBorder}
             >
-              {loading ? (
-                <ActivityIndicator color={theme.colors.buttonText} />
-              ) : (
-                <Text style={styles.buttonText}>Confirmar codigo</Text>
-              )}
-            </Pressable>
+              <Pressable
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleVerifyCode}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={theme.colors.buttonText} />
+                ) : (
+                  <Text style={styles.buttonText}>Confirmar codigo</Text>
+                )}
+              </Pressable>
+            </LinearGradient>
 
             <Pressable
               style={[styles.secondaryButton, loading && styles.buttonDisabled]}
@@ -339,29 +376,64 @@ export default function Register() {
           <Text style={styles.link}>{t('register_has_account')}</Text>
         </Pressable>
       </View>
+      </LinearGradient>
     </SafeAreaView>
+    </View>
   );
 }
 
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    container: {
+    screen: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    container: {
+      flex: 1,
       justifyContent: 'center',
       padding: 20,
     },
+    orbPink: {
+      position: "absolute",
+      top: -80,
+      right: -50,
+      width: 220,
+      height: 220,
+      borderRadius: 110,
+      backgroundColor: "rgba(255, 75, 216, 0.25)",
+    },
+    orbBlue: {
+      position: "absolute",
+      bottom: -90,
+      left: -60,
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: "rgba(91, 231, 255, 0.22)",
+    },
+    orbPurple: {
+      position: "absolute",
+      top: 120,
+      left: -80,
+      width: 180,
+      height: 180,
+      borderRadius: 90,
+      backgroundColor: "rgba(124, 92, 255, 0.18)",
+    },
+    cardBorder: {
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
+    },
     card: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       borderRadius: 14,
       padding: 20,
       gap: 12,
-      shadowColor: theme.colors.shadow,
-      shadowOpacity: 0.12,
-      shadowRadius: 8,
-      elevation: 3,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
     },
     title: {
       fontSize: 28,
@@ -381,13 +453,22 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.inputBackground,
       color: theme.colors.text,
     },
+    buttonBorder: {
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+      marginTop: 6,
+    },
     button: {
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       borderRadius: 10,
       height: 46,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: 6,
     },
     secondaryButton: {
       backgroundColor: 'transparent',
@@ -411,6 +492,12 @@ function createStyles(theme: AppTheme) {
       borderColor: '#d9d9d9',
       alignItems: 'center',
       justifyContent: 'center',
+      flexDirection: "row",
+      gap: 10,
+    },
+    googleIcon: {
+      width: 18,
+      height: 18,
     },
     googleButtonText: {
       color: '#1f1f1f',

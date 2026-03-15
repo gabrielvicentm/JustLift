@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import type { PostSummary } from "@/app/features/social/types";
@@ -248,17 +249,24 @@ export default function PublicProfileScreen() {
 
           {!profile?.is_me ? (
             <View style={styles.actionsRow}>
-              <Pressable
-                style={[styles.button, updatingFollow && styles.disabled]}
-                onPress={handleFollowToggle}
-                disabled={updatingFollow}
+              <LinearGradient
+                colors={theme.colors.buttonGradient}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.buttonBorder}
               >
-                {updatingFollow ? (
-                  <ActivityIndicator color={theme.colors.buttonText} />
-                ) : (
-                  <Text style={styles.buttonText}>{profile?.is_following ? "Seguindo" : "Seguir"}</Text>
-                )}
-              </Pressable>
+                <Pressable
+                  style={[styles.button, updatingFollow && styles.disabled]}
+                  onPress={handleFollowToggle}
+                  disabled={updatingFollow}
+                >
+                  {updatingFollow ? (
+                    <ActivityIndicator color={theme.colors.buttonText} />
+                  ) : (
+                    <Text style={styles.buttonText}>{profile?.is_following ? "Seguindo" : "Seguir"}</Text>
+                  )}
+                </Pressable>
+              </LinearGradient>
             </View>
           ) : null}
         </View>
@@ -429,8 +437,18 @@ function createStyles(theme: AppTheme) {
       paddingHorizontal: 14,
       paddingBottom: 14,
     },
+    buttonBorder: {
+      flex: 1,
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
     button: {
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       borderRadius: 10,
       minHeight: 42,
       flex: 1,

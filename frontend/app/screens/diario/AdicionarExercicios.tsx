@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -116,6 +117,9 @@ type RepeatWorkoutTemplateResponse = {
 
 const WORKOUT_DRAFT_KEY = "current_workout_draft_v1";
 const LEGACY_WORKOUT_KEY = "current_workout_exercises_v1";
+
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 
 const FILTER_IMAGE_URL =
   "https://pub-0fb9b964942445dd91ff19d7779f2131.r2.dev/media/1772134869145-4dc40590-ed2f-4fc2-aed2-c5d7a380c273-perfil_1772134868620.jpg";
@@ -366,28 +370,45 @@ export default function AdicionarTreinoScreen() {
 
   const renderExerciseItem = ({ item }: { item: Exercicio }) => {
     const selected = selectedIds.has(item.exercise_id);
+    const muscleTags = item.musculos.length > 0 ? item.musculos.slice(0, 2) : ["Sem músculo"];
+    const equipmentTags = item.equipamentos.length > 0 ? item.equipamentos.slice(0, 2) : ["Sem equipamento"];
     return (
-      <Pressable
-        style={[styles.exerciseCard, selected && styles.exerciseCardSelected]}
-        onPress={() => toggleSelect(item)}
+      <LinearGradient
+        colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={[styles.exerciseCardBorder, selected && styles.exerciseCardBorderSelected]}
       >
-        {item.gif_url ? (
-          <Image source={{ uri: item.gif_url }} style={styles.exerciseImage} />
-        ) : (
-          <View style={[styles.exerciseImage, styles.exerciseImagePlaceholder]}>
-            <Text style={styles.exerciseImagePlaceholderText}>IMG</Text>
+        <Pressable
+          style={[styles.exerciseCard, selected && styles.exerciseCardSelected]}
+          onPress={() => toggleSelect(item)}
+        >
+          {item.gif_url ? (
+            <Image source={{ uri: item.gif_url }} style={styles.exerciseImage} />
+          ) : (
+            <View style={[styles.exerciseImage, styles.exerciseImagePlaceholder]}>
+              <Text style={styles.exerciseImagePlaceholderText}>IMG</Text>
+            </View>
+          )}
+          <View style={styles.exerciseInfo}>
+            <Text style={styles.exerciseName}>{item.nome}</Text>
+            <View style={styles.tagRow}>
+              {muscleTags.map((tag) => (
+                <View key={`m:${item.exercise_id}:${tag}`} style={styles.tagChip}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.tagRow}>
+              {equipmentTags.map((tag) => (
+                <View key={`e:${item.exercise_id}:${tag}`} style={[styles.tagChip, styles.tagChipAlt]}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-        )}
-        <View style={styles.exerciseInfo}>
-          <Text style={styles.exerciseName}>{item.nome}</Text>
-          <Text style={styles.exerciseMeta}>
-            {item.musculos.length > 0 ? item.musculos.join(", ") : "Sem músculo"}
-          </Text>
-          <Text style={styles.exerciseMeta}>
-            {item.equipamentos.length > 0 ? item.equipamentos.join(", ") : "Sem equipamento"}
-          </Text>
-        </View>
-      </Pressable>
+        </Pressable>
+      </LinearGradient>
     );
   };
 
@@ -611,61 +632,85 @@ export default function AdicionarTreinoScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.row}>
-          <Pressable style={styles.ghostButton} onPress={() => setShowCancelConfirmModal(true)}>
-            <Text style={styles.ghostButtonText}>{isEn ? "Cancel workout" : "Cancelar treino"}</Text>
-          </Pressable>
-          <Pressable style={styles.primaryButton} onPress={() => handleContinue().catch(() => undefined)}>
-            <Text style={styles.primaryButtonText}>{isEn ? "Continue" : "Continuar"}</Text>
-          </Pressable>
-        </View>
+      <LinearGradient
+        colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={styles.headerBorder}
+      >
+        <View style={styles.headerInner}>
+          <Image source={{ uri: NOISE_DATA_URI }} style={styles.headerNoise} />
+          <View style={styles.header}>
+            <View style={styles.row}>
+              <LinearGradient
+                colors={theme.colors.negativeGradient}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.cancelHeaderBorder}
+              >
+                <Pressable style={styles.cancelHeaderButton} onPress={() => setShowCancelConfirmModal(true)}>
+                  <Text style={styles.cancelHeaderText}>{isEn ? "Cancel workout" : "Cancelar treino"}</Text>
+                </Pressable>
+              </LinearGradient>
+              <LinearGradient
+                colors={theme.colors.buttonGradient}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.primaryButtonBorder}
+              >
+                <Pressable style={styles.primaryButton} onPress={() => handleContinue().catch(() => undefined)}>
+                  <Text style={styles.primaryButtonText}>{isEn ? "Continue" : "Continuar"}</Text>
+                </Pressable>
+              </LinearGradient>
+            </View>
 
-        <View style={styles.searchRow}>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={() => loadExercises().catch(() => undefined)}
-            placeholder={isEn ? "Search exercise..." : "Pesquisar exercício..."}
-            placeholderTextColor={theme.colors.mutedText}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-        </View>
+            <View style={styles.searchRow}>
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                onSubmitEditing={() => loadExercises().catch(() => undefined)}
+                placeholder={isEn ? "Search exercise..." : "Pesquisar exercício..."}
+                placeholderTextColor={theme.colors.mutedText}
+                style={styles.searchInput}
+                returnKeyType="search"
+              />
+            </View>
 
-        <View style={styles.row}>
-          <Pressable
-            style={styles.tabButton}
-            onPress={() => {
-              setShowCustomModal(true);
-              loadCustomExercises().catch(() => undefined);
-            }}
-          >
-            <Text style={styles.tabButtonText}>Personalizados</Text>
-          </Pressable>
-          <Pressable
-            style={styles.tabButton}
-            onPress={() => {
-              setShowRepeatWorkoutModal(true);
-              loadRepeatWorkouts().catch(() => undefined);
-            }}
-          >
-            <Text style={styles.tabButtonText}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
-          </Pressable>
-        </View>
+            <View style={styles.row}>
+              <Pressable
+                style={styles.tabButton}
+                onPress={() => {
+                  setShowCustomModal(true);
+                  loadCustomExercises().catch(() => undefined);
+                }}
+              >
+                <Text style={styles.tabButtonText}>Personalizados</Text>
+              </Pressable>
+              <Pressable
+                style={styles.tabButton}
+                onPress={() => {
+                  setShowRepeatWorkoutModal(true);
+                  loadRepeatWorkouts().catch(() => undefined);
+                }}
+              >
+                <Text style={styles.tabButtonText}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
+              </Pressable>
+            </View>
 
-        <View style={styles.rowThree}>
-          <Pressable style={styles.smallButton} onPress={() => setShowMuscleModal(true)}>
-            <Text style={styles.smallButtonText}>{selectedMuscleLabel}</Text>
-          </Pressable>
-          <Pressable style={styles.smallButton} onPress={() => setShowEquipmentModal(true)}>
-            <Text style={styles.smallButtonText}>{selectedEquipmentLabel}</Text>
-          </Pressable>
-          <Pressable style={styles.smallButton} onPress={() => router.push("/screens/diario/CriarExercicio")}>
-            <Text style={styles.smallButtonText}>{isEn ? "Create" : "Criar"}</Text>
-          </Pressable>
+            <View style={styles.rowThree}>
+              <Pressable style={styles.smallButton} onPress={() => setShowMuscleModal(true)}>
+                <Text style={styles.smallButtonText}>{selectedMuscleLabel}</Text>
+              </Pressable>
+              <Pressable style={styles.smallButton} onPress={() => setShowEquipmentModal(true)}>
+                <Text style={styles.smallButtonText}>{selectedEquipmentLabel}</Text>
+              </Pressable>
+              <Pressable style={styles.smallButton} onPress={() => router.push("/screens/diario/CriarExercicio")}>
+                <Text style={styles.smallButtonText}>{isEn ? "Create" : "Criar"}</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={styles.stateContainer}>
@@ -727,30 +772,41 @@ export default function AdicionarTreinoScreen() {
                 }
                 renderItem={({ item }) => {
                   const selected = selectedCustomIds.has(item.id_exercicio_customizado);
+                  const muscleTag = item.musculo_alvo || (isEn ? "No target muscle" : "Sem músculo alvo");
+                  const equipmentTag = item.equipamento || (isEn ? "No equipment" : "Sem equipamento");
                   return (
-                  <Pressable
-                    style={[styles.customRow, selected && styles.customRowSelected]}
-                    onPress={() => toggleSelectCustom(item)}
+                  <LinearGradient
+                    colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+                    start={{ x: 0, y: 0.2 }}
+                    end={{ x: 1, y: 0.8 }}
+                    style={[styles.exerciseCardBorder, selected && styles.exerciseCardBorderSelected]}
                   >
-                    {item.img_url ? (
-                      <Image source={{ uri: item.img_url }} style={styles.customImage} />
-                    ) : (
-                      <View style={[styles.customImage, styles.exerciseImagePlaceholder]}>
-                        <Text style={styles.exerciseImagePlaceholderText}>IMG</Text>
-                      </View>
+                    <Pressable
+                      style={[styles.customRow, selected && styles.customRowSelected]}
+                      onPress={() => toggleSelectCustom(item)}
+                    >
+                      {item.img_url ? (
+                        <Image source={{ uri: item.img_url }} style={styles.customImage} />
+                      ) : (
+                        <View style={[styles.customImage, styles.exerciseImagePlaceholder]}>
+                          <Text style={styles.exerciseImagePlaceholderText}>IMG</Text>
+                        </View>
                     )}
 
                     <View style={styles.customInfo}>
                       <Text style={styles.customName}>{item.nome}</Text>
-                      <Text style={styles.customMeta}>
-                        {item.musculo_alvo || (isEn ? "No target muscle" : "Sem músculo alvo")}
-                      </Text>
-                      <Text style={styles.customMeta}>
-                        {item.equipamento || (isEn ? "No equipment" : "Sem equipamento")}
-                      </Text>
+                      <View style={styles.tagRow}>
+                        <View style={styles.tagChip}>
+                          <Text style={styles.tagText}>{muscleTag}</Text>
+                        </View>
+                        <View style={[styles.tagChip, styles.tagChipAlt]}>
+                          <Text style={styles.tagText}>{equipmentTag}</Text>
+                        </View>
+                      </View>
                     </View>
                     {selected ? <Text style={styles.customSelectedMark}>✓</Text> : null}
                   </Pressable>
+                </LinearGradient>
                 )}}
               />
             )}
@@ -938,7 +994,7 @@ export default function AdicionarTreinoScreen() {
         onRequestClose={() => setShowCancelConfirmModal(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <View style={styles.cancelModalCard}>
             <Text style={styles.modalTitle}>Cancelar treino?</Text>
             <Text style={styles.cancelConfirmText}>
               {isEn
@@ -949,9 +1005,16 @@ export default function AdicionarTreinoScreen() {
               <Pressable style={styles.cancelNoButton} onPress={() => setShowCancelConfirmModal(false)}>
                 <Text style={styles.cancelNoText}>{isEn ? "No" : "Não"}</Text>
               </Pressable>
-              <Pressable style={styles.cancelYesButton} onPress={() => handleConfirmCancelWorkout().catch(() => undefined)}>
-                <Text style={styles.cancelYesText}>{isEn ? "Yes" : "Sim"}</Text>
-              </Pressable>
+              <LinearGradient
+                colors={theme.colors.negativeGradient}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.cancelYesBorder}
+              >
+                <Pressable style={styles.cancelYesButton} onPress={() => handleConfirmCancelWorkout().catch(() => undefined)}>
+                  <Text style={styles.cancelYesText}>{isEn ? "Yes" : "Sim"}</Text>
+                </Pressable>
+              </LinearGradient>
             </View>
           </View>
         </View>
@@ -973,13 +1036,30 @@ function createStyles(theme: AppTheme) {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
+    headerBorder: {
+      margin: 12,
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
+    },
+    headerInner: {
+      borderRadius: 14,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    headerNoise: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
+    },
     header: {
       paddingHorizontal: 12,
       paddingTop: 14,
       paddingBottom: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "transparent",
       gap: 10,
     },
     row: {
@@ -990,13 +1070,45 @@ function createStyles(theme: AppTheme) {
       flexDirection: "row",
       gap: 8,
     },
+    primaryButtonBorder: {
+      flex: 1,
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    cancelHeaderBorder: {
+      flex: 1,
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#FF9500",
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    cancelHeaderButton: {
+      height: 44,
+      borderRadius: 9,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+    },
+    cancelHeaderText: {
+      color: "#ffffff",
+      fontWeight: "800",
+      letterSpacing: 0.3,
+    },
     primaryButton: {
       flex: 1,
       height: 44,
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     primaryButtonText: {
       color: theme.colors.buttonText,
@@ -1065,18 +1177,28 @@ function createStyles(theme: AppTheme) {
       gap: 10,
       paddingBottom: 80,
     },
+    exerciseCardBorder: {
+      borderRadius: 13,
+      padding: 1.4,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+    },
+    exerciseCardBorderSelected: {
+      shadowOpacity: 0.45,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+    },
     exerciseCard: {
       flexDirection: "row",
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       borderRadius: 12,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       padding: 10,
       gap: 10,
     },
     exerciseCardSelected: {
-      borderColor: theme.colors.button,
-      backgroundColor: theme.mode === "dark" ? "#172640" : "#e8f1ff",
+      backgroundColor: "rgba(30, 27, 75, 0.4)",
     },
     exerciseImage: {
       width: 84,
@@ -1099,6 +1221,28 @@ function createStyles(theme: AppTheme) {
       flex: 1,
       justifyContent: "center",
       gap: 4,
+    },
+    tagRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    tagChip: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+      backgroundColor: "rgba(30, 27, 75, 0.35)",
+    },
+    tagChipAlt: {
+      borderColor: "rgba(91, 231, 255, 0.35)",
+      backgroundColor: "rgba(14, 116, 144, 0.25)",
+    },
+    tagText: {
+      color: "#E0E7FF",
+      fontSize: 11,
+      fontWeight: "700",
     },
     exerciseName: {
       color: theme.colors.text,
@@ -1152,6 +1296,17 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.surface,
       overflow: "hidden",
     },
+    cancelModalCard: {
+      width: "100%",
+      maxWidth: 420,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+      backgroundColor: "rgba(11, 14, 24, 0.96)",
+      padding: 16,
+      gap: 10,
+      alignSelf: "center",
+    },
     modalHeader: {
       height: 52,
       borderBottomWidth: 1,
@@ -1182,15 +1337,12 @@ function createStyles(theme: AppTheme) {
     customRow: {
       flexDirection: "row",
       gap: 10,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       borderRadius: 10,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       padding: 8,
     },
     customRowSelected: {
-      borderColor: theme.colors.button,
-      backgroundColor: theme.mode === "dark" ? "#172640" : "#e8f1ff",
+      backgroundColor: "rgba(30, 27, 75, 0.4)",
     },
     customImage: {
       width: 64,
@@ -1318,15 +1470,23 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
       fontWeight: "700",
     },
+    cancelYesBorder: {
+      flex: 1,
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#FF9500",
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
     cancelYesButton: {
       flex: 1,
       minHeight: 42,
       borderRadius: 10,
-      borderWidth: 1,
-      borderColor: theme.colors.error,
-      backgroundColor: theme.colors.error,
       alignItems: "center",
       justifyContent: "center",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     cancelYesText: {
       color: "#ffffff",
