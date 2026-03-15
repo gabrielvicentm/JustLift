@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import DraggableFlatList, { type RenderItemParams } from "react-native-draggable-flatlist";
@@ -102,6 +103,11 @@ type WorkoutDraft = {
 const WORKOUT_DRAFT_KEY = "current_workout_draft_v1";
 const LEGACY_WORKOUT_KEY = "current_workout_exercises_v1";
 
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
+
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -113,6 +119,16 @@ export default function AdicionarSeriesScreen() {
   const { theme } = useAppTheme();
   const { language } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const buttonGradient = (theme.colors.buttonGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
+    string,
+    string,
+    ...string[],
+  ];
+  const negativeGradient = theme.colors.negativeGradient as unknown as readonly [
+    string,
+    string,
+    ...string[],
+  ];
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -563,30 +579,49 @@ export default function AdicionarSeriesScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
     <View style={styles.screen}>
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.metricsCard}>
-        <View style={styles.metricsRow}>
-          <View style={styles.metricBlock}>
-            <Text style={styles.metricLabel}>{language === "en" ? "Duration" : "Duração"}</Text>
-            <Text style={styles.metricDuration}>{formatDuration(elapsedSeconds)}</Text>
-          </View>
-          <View style={styles.metricBlock}>
-            <Text style={styles.metricLabel}>{language === "en" ? "Total weight" : "Peso total"}</Text>
-            <Text style={styles.metricWeight}>{Math.round(metricas.pesoTotal)} kg</Text>
-          </View>
-          <View style={styles.metricBlock}>
-            <Text style={styles.metricLabel}>{language === "en" ? "Total sets" : "Total de séries"}</Text>
-            <Text style={styles.metricValue}>{metricas.seriesConcluidas}</Text>
+      <LinearGradient
+        colors={PROGRESS_GRADIENT}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={styles.cardBorder}
+      >
+        <View style={styles.cardInner}>
+          <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+          <View style={styles.metricsCard}>
+            <View style={styles.metricsRow}>
+              <View style={styles.metricBlock}>
+                <Text style={styles.metricLabel}>{language === "en" ? "Duration" : "Duração"}</Text>
+                <Text style={styles.metricDuration}>{formatDuration(elapsedSeconds)}</Text>
+              </View>
+              <View style={styles.metricBlock}>
+                <Text style={styles.metricLabel}>{language === "en" ? "Total weight" : "Peso total"}</Text>
+                <Text style={styles.metricWeight}>{Math.round(metricas.pesoTotal)} kg</Text>
+              </View>
+              <View style={styles.metricBlock}>
+                <Text style={styles.metricLabel}>{language === "en" ? "Total sets" : "Total de séries"}</Text>
+                <Text style={styles.metricValue}>{metricas.seriesConcluidas}</Text>
+              </View>
+            </View>
+            <Pressable style={styles.pauseButton} onPress={() => setPaused((prev) => !prev)}>
+              <Text style={styles.pauseButtonText}>
+                {paused ? (language === "en" ? "Resume" : "Retomar") : (language === "en" ? "Pause" : "Pausar")}
+              </Text>
+            </Pressable>
           </View>
         </View>
-        <Pressable style={styles.pauseButton} onPress={() => setPaused((prev) => !prev)}>
-          <Text style={styles.pauseButtonText}>
-            {paused ? (language === "en" ? "Resume" : "Retomar") : (language === "en" ? "Pause" : "Pausar")}
-          </Text>
-        </Pressable>
-      </View>
+      </LinearGradient>
 
       {exercicios.map((exercise) => (
-        <View key={exercise.uid} style={styles.exerciseCard}>
+        <LinearGradient
+          key={exercise.uid}
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+        <View style={styles.cardInner}>
+        <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+        <View style={styles.exerciseCard}>
           <View style={styles.exerciseHeader}>
             {exercise.gif_url ? (
               <Image source={{ uri: exercise.gif_url }} style={styles.exerciseImage} />
@@ -702,62 +737,103 @@ export default function AdicionarSeriesScreen() {
             <Text style={styles.noteCounter}>{exercise.anotacao.length}/255</Text>
           </View>
         </View>
+        </View>
+        </LinearGradient>
       ))}
 
-      <Pressable style={styles.addExercisesButton} onPress={() => router.push("/screens/diario/AdicionarExercicios")}>
-        <Text style={styles.addExercisesButtonText}>
-          {language === "en" ? "Choose more exercises" : "Escolher mais exercícios"}
-        </Text>
-      </Pressable>
+      <LinearGradient
+        colors={PROGRESS_GRADIENT}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={styles.actionButtonBorder}
+      >
+        <Pressable style={styles.addExercisesButton} onPress={() => router.push("/screens/diario/AdicionarExercicios")}>
+          <Text style={styles.addExercisesButtonText}>
+            {language === "en" ? "Choose more exercises" : "Escolher mais exercícios"}
+          </Text>
+        </Pressable>
+      </LinearGradient>
 
       <View style={styles.actionsRow}>
-        <Pressable style={styles.cancelButton} onPress={() => setShowCancelConfirmModal(true)}>
-          <Text style={styles.cancelButtonText}>{language === "en" ? "Cancel" : "Cancelar"}</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={() => handleSaveWorkout().catch(() => undefined)}
-          disabled={saving}
+        <LinearGradient
+          colors={negativeGradient}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.negativeButtonBorder}
         >
-          {saving ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.saveButtonText}>{language === "en" ? "Save workout" : "Salvar treino"}</Text>
-          )}
-        </Pressable>
+          <Pressable style={styles.cancelButton} onPress={() => setShowCancelConfirmModal(true)}>
+            <Text style={styles.cancelButtonText}>{language === "en" ? "Cancel" : "Cancelar"}</Text>
+          </Pressable>
+        </LinearGradient>
+        <LinearGradient
+          colors={buttonGradient}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.actionButtonBorder}
+        >
+          <Pressable
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={() => handleSaveWorkout().catch(() => undefined)}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.saveButtonText}>{language === "en" ? "Save workout" : "Salvar treino"}</Text>
+            )}
+          </Pressable>
+        </LinearGradient>
       </View>
       {saveError ? <Text style={styles.saveErrorText}>{saveError}</Text> : null}
     </ScrollView>
     <Modal visible={showExerciseMenu} transparent animationType="fade" onRequestClose={closeExerciseMenu}>
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>{language === "en" ? "Exercise options" : "Opções do exercício"}</Text>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <View style={styles.cardInner}>
+            <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{language === "en" ? "Exercise options" : "Opções do exercício"}</Text>
 
-          <Pressable style={styles.modalAction} onPress={openReorderModal}>
-            <Text style={styles.modalActionText}>{language === "en" ? "Change order" : "Alterar ordem"}</Text>
-          </Pressable>
+              <Pressable style={styles.modalAction} onPress={openReorderModal}>
+                <Text style={styles.modalActionText}>{language === "en" ? "Change order" : "Alterar ordem"}</Text>
+              </Pressable>
 
-          <Pressable style={[styles.modalAction, styles.modalDangerAction]} onPress={removeExercise}>
-            <Text style={styles.modalDangerText}>{language === "en" ? "Delete exercise" : "Excluir exercício"}</Text>
-          </Pressable>
+              <Pressable style={[styles.modalAction, styles.modalDangerAction]} onPress={removeExercise}>
+                <Text style={styles.modalDangerText}>{language === "en" ? "Delete exercise" : "Excluir exercício"}</Text>
+              </Pressable>
 
-          <Pressable style={styles.modalCancel} onPress={closeExerciseMenu}>
-            <Text style={styles.modalCancelText}>{language === "en" ? "Close" : "Fechar"}</Text>
-          </Pressable>
-        </View>
+              <Pressable style={styles.modalCancel} onPress={closeExerciseMenu}>
+                <Text style={styles.modalCancelText}>{language === "en" ? "Close" : "Fechar"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </LinearGradient>
       </View>
     </Modal>
     <Modal visible={showReorderModal} transparent animationType="fade" onRequestClose={closeReorderModal}>
       <View style={styles.modalBackdrop}>
-        <View style={styles.reorderModalCard}>
-          <Text style={styles.modalTitle}>
-            {language === "en" ? "Reorder exercises" : "Alterar ordem dos exercícios"}
-          </Text>
-          <Text style={styles.reorderHint}>
-            {language === "en"
-              ? "Hold and drag an item to move it."
-              : "Segure e arraste um exercício para mover."}
-          </Text>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <View style={styles.cardInner}>
+            <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+            <View style={styles.reorderModalCard}>
+              <Text style={styles.modalTitle}>
+                {language === "en" ? "Reorder exercises" : "Alterar ordem dos exercícios"}
+              </Text>
+              <Text style={styles.reorderHint}>
+                {language === "en"
+                  ? "Hold and drag an item to move it."
+                  : "Segure e arraste um exercício para mover."}
+              </Text>
 
           <DraggableFlatList
             data={reorderItems}
@@ -778,15 +854,24 @@ export default function AdicionarSeriesScreen() {
             )}
           />
 
-          <View style={styles.reorderActions}>
-            <Pressable style={styles.cancelNoButton} onPress={closeReorderModal}>
-              <Text style={styles.cancelNoText}>{language === "en" ? "Cancel" : "Cancelar"}</Text>
-            </Pressable>
-            <Pressable style={styles.saveButton} onPress={applyReorder}>
-              <Text style={styles.saveButtonText}>{language === "en" ? "Apply" : "Aplicar"}</Text>
-            </Pressable>
+              <View style={styles.reorderActions}>
+                <Pressable style={styles.cancelNoButton} onPress={closeReorderModal}>
+                  <Text style={styles.cancelNoText}>{language === "en" ? "Cancel" : "Cancelar"}</Text>
+                </Pressable>
+                <LinearGradient
+                  colors={buttonGradient}
+                  start={{ x: 0, y: 0.2 }}
+                  end={{ x: 1, y: 0.8 }}
+                  style={styles.actionButtonBorder}
+                >
+                  <Pressable style={styles.saveButton} onPress={applyReorder}>
+                    <Text style={styles.saveButtonText}>{language === "en" ? "Apply" : "Aplicar"}</Text>
+                  </Pressable>
+                </LinearGradient>
+              </View>
+            </View>
           </View>
-        </View>
+        </LinearGradient>
       </View>
     </Modal>
     <Modal
@@ -796,23 +881,40 @@ export default function AdicionarSeriesScreen() {
       onRequestClose={() => setShowCancelConfirmModal(false)}
     >
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>{language === "en" ? "Cancel workout?" : "Cancelar treino?"}</Text>
-          <Text style={styles.cancelConfirmText}>
-            {language === "en"
-              ? "If you continue, the current workout will be removed locally."
-              : "Se continuar, o treino atual será removido localmente."}
-          </Text>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <View style={styles.cardInner}>
+            <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{language === "en" ? "Cancel workout?" : "Cancelar treino?"}</Text>
+              <Text style={styles.cancelConfirmText}>
+                {language === "en"
+                  ? "If you continue, the current workout will be removed locally."
+                  : "Se continuar, o treino atual será removido localmente."}
+              </Text>
 
-          <View style={styles.cancelActionRow}>
-            <Pressable style={styles.cancelNoButton} onPress={() => setShowCancelConfirmModal(false)}>
-              <Text style={styles.cancelNoText}>{language === "en" ? "No" : "Não"}</Text>
-            </Pressable>
-            <Pressable style={styles.cancelYesButton} onPress={() => handleConfirmCancelWorkout().catch(() => undefined)}>
-              <Text style={styles.cancelYesText}>{language === "en" ? "Yes" : "Sim"}</Text>
-            </Pressable>
+              <View style={styles.cancelActionRow}>
+                <Pressable style={styles.cancelNoButton} onPress={() => setShowCancelConfirmModal(false)}>
+                  <Text style={styles.cancelNoText}>{language === "en" ? "No" : "Não"}</Text>
+                </Pressable>
+                <LinearGradient
+                  colors={negativeGradient}
+                  start={{ x: 0, y: 0.2 }}
+                  end={{ x: 1, y: 0.8 }}
+                  style={styles.negativeButtonBorder}
+                >
+                  <Pressable style={styles.cancelYesButton} onPress={() => handleConfirmCancelWorkout().catch(() => undefined)}>
+                    <Text style={styles.cancelYesText}>{language === "en" ? "Yes" : "Sim"}</Text>
+                  </Pressable>
+                </LinearGradient>
+              </View>
+            </View>
           </View>
-        </View>
+        </LinearGradient>
       </View>
     </Modal>
     </View>
@@ -837,6 +939,24 @@ function createStyles(theme: AppTheme) {
       paddingVertical: 18,
       gap: 14,
       paddingBottom: 28,
+    },
+    cardBorder: {
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+    },
+    cardInner: {
+      borderRadius: 14,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
     },
     stateContainer: {
       flex: 1,
@@ -866,11 +986,9 @@ function createStyles(theme: AppTheme) {
     },
     metricsCard: {
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
       padding: 12,
       gap: 10,
+      backgroundColor: "transparent",
     },
     metricsRow: {
       flexDirection: "row",
@@ -907,8 +1025,8 @@ function createStyles(theme: AppTheme) {
       height: 38,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+      backgroundColor: "rgba(11, 14, 24, 0.9)",
       paddingHorizontal: 14,
       alignItems: "center",
       justifyContent: "center",
@@ -919,11 +1037,9 @@ function createStyles(theme: AppTheme) {
     },
     exerciseCard: {
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
       padding: 12,
       gap: 10,
+      backgroundColor: "transparent",
     },
     exerciseHeader: {
       flexDirection: "row",
@@ -966,10 +1082,10 @@ function createStyles(theme: AppTheme) {
     },
     serieRow: {
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(148, 163, 184, 0.25)",
       borderRadius: 12,
       padding: 8,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "rgba(2, 6, 23, 0.6)",
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
@@ -999,7 +1115,7 @@ function createStyles(theme: AppTheme) {
     serieValue: {
       minHeight: 38,
       borderRadius: 10,
-      backgroundColor: theme.colors.inputBackground,
+      backgroundColor: "rgba(15, 23, 42, 0.9)",
       color: theme.colors.text,
       textAlign: "center",
       textAlignVertical: "center",
@@ -1011,9 +1127,9 @@ function createStyles(theme: AppTheme) {
     serieInput: {
       height: 38,
       borderRadius: 10,
-      backgroundColor: theme.colors.inputBackground,
+      backgroundColor: "rgba(15, 23, 42, 0.9)",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(148, 163, 184, 0.25)",
       color: theme.colors.text,
       textAlign: "center",
       fontWeight: "700",
@@ -1034,8 +1150,8 @@ function createStyles(theme: AppTheme) {
       height: 36,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.inputBackground,
+      borderColor: "rgba(148, 163, 184, 0.25)",
+      backgroundColor: "rgba(15, 23, 42, 0.9)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1073,21 +1189,21 @@ function createStyles(theme: AppTheme) {
       height: 46,
       borderRadius: 12,
       borderWidth: 1.5,
-      borderColor: "#3b82f6",
+      borderColor: "rgba(91, 231, 255, 0.6)",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.9)",
     },
     addSerieButtonText: {
-      color: "#3b82f6",
+      color: "#5BE7FF",
       fontSize: 24,
       fontWeight: "700",
     },
     noteCard: {
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
+      borderColor: "rgba(124, 92, 255, 0.25)",
+      backgroundColor: "rgba(2, 6, 23, 0.6)",
       padding: 10,
       gap: 6,
     },
@@ -1107,12 +1223,30 @@ function createStyles(theme: AppTheme) {
       gap: 10,
       marginTop: 4,
     },
+    actionButtonBorder: {
+      flex: 1,
+      borderRadius: 12,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    negativeButtonBorder: {
+      flex: 1,
+      borderRadius: 12,
+      padding: 1.5,
+      shadowColor: "#FF9500",
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
     addExercisesButton: {
       height: 46,
       borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1125,9 +1259,7 @@ function createStyles(theme: AppTheme) {
       flex: 1,
       height: 48,
       borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1140,9 +1272,7 @@ function createStyles(theme: AppTheme) {
       flex: 1,
       height: 48,
       borderRadius: 12,
-      borderWidth: 1,
-      borderColor: "#3b82f6",
-      backgroundColor: "#3b82f6",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1172,8 +1302,8 @@ function createStyles(theme: AppTheme) {
       maxWidth: 360,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+      backgroundColor: "rgba(11, 14, 24, 0.96)",
       padding: 12,
       gap: 8,
     },
@@ -1183,8 +1313,8 @@ function createStyles(theme: AppTheme) {
       maxHeight: "80%",
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+      backgroundColor: "rgba(11, 14, 24, 0.96)",
       padding: 12,
       gap: 8,
     },
@@ -1240,11 +1370,11 @@ function createStyles(theme: AppTheme) {
     modalAction: {
       minHeight: 44,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(148, 163, 184, 0.25)",
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.inputBackground,
+      backgroundColor: "rgba(15, 23, 42, 0.9)",
     },
     modalActionText: {
       color: theme.colors.text,
@@ -1262,11 +1392,11 @@ function createStyles(theme: AppTheme) {
     modalCancel: {
       minHeight: 42,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(148, 163, 184, 0.25)",
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       marginTop: 2,
     },
     modalCancelText: {
@@ -1287,8 +1417,8 @@ function createStyles(theme: AppTheme) {
       minHeight: 42,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      borderColor: "rgba(148, 163, 184, 0.25)",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
     },
