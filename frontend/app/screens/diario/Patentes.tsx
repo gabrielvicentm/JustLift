@@ -10,8 +10,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { api } from "@/app/config/api";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -252,105 +254,139 @@ export default function PatentesScreen() {
           </View>
         ) : activeTab === "current" ? (
           <ScrollView contentContainerStyle={styles.contentContainer}>
-            <View style={styles.heroCard}>
-              <View style={styles.heroGlowPrimary} />
-              <View style={styles.heroGlowSecondary} />
+            <LinearGradient
+              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.gradientBorder}
+            >
+              <View style={styles.gradientInner}>
+                <View style={styles.heroCard}>
+                  <View style={styles.heroGlowPrimary} />
+                  <View style={styles.heroGlowSecondary} />
 
-              <Text style={styles.heroBadge}>Temporada {current?.season?.seasonNumber ?? "--"}</Text>
-              <Text style={styles.heroTitle}>{current?.patente?.label ?? "--"}</Text>
-              <Text style={styles.heroSubtitle}>{`Seus pontos: ${formatPoints(current?.totalPoints ?? 0)} pts`}</Text>
-              <Text style={styles.heroSubtitle}>{`Sua posição global: #${current?.global_position ?? "--"}`}</Text>
+                  <Text style={styles.heroBadge}>Temporada {current?.season?.seasonNumber ?? "--"}</Text>
+                  <Text style={styles.heroTitle}>{current?.patente?.label ?? "--"}</Text>
+                  <Text style={styles.heroSubtitle}>{`Seus pontos: ${formatPoints(current?.totalPoints ?? 0)} pts`}</Text>
+                  <Text style={styles.heroSubtitle}>{`Sua posição global: #${current?.global_position ?? "--"}`}</Text>
 
-              <View style={styles.progressBlock}>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressBar, { width: `${progressToNext * 100}%` }]} />
-                </View>
-                <Text style={styles.progressText}>
-                  {current?.patente?.nextPatente
-                    ? `${formatPoints(current.patente.pointsToNext)} pts para ${current.patente.nextPatente.label}`
-                    : "Patente máxima atingida"}
-                </Text>
-              </View>
-
-              <Text style={styles.countdownText}>
-                {`Faltam ${formatRemainingTime(remainingMs)} para a Temporada ${current?.season?.seasonNumber ?? "--"} acabar`}
-              </Text>
-              <Text style={styles.seasonDateText}>{seasonDateLabel}</Text>
-            </View>
-
-            <View style={styles.listCard}>
-              <Text style={styles.sectionTitle}>Escada de Patentes</Text>
-              {(current?.patentes ?? []).map((item) => {
-                const badgeColor = PATENTE_COLORS[item.key] || theme.colors.button;
-                return (
-                  <View
-                    key={item.key}
-                    style={[
-                      styles.patenteRow,
-                      item.isCurrent && styles.patenteRowCurrent,
-                    ]}
-                  >
-                    <View style={[styles.patenteColorMark, { backgroundColor: badgeColor }]} />
-
-                    <View style={styles.patenteTextBlock}>
-                      <Text style={styles.patenteLabel}>{item.label}</Text>
-                      <Text style={styles.patenteThreshold}>{`A partir de ${formatPoints(item.minPoints)} pts`}</Text>
+                  <View style={styles.progressBlock}>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressBar, { width: `${progressToNext * 100}%` }]} />
                     </View>
-
-                    <Text style={styles.patenteStatus}>
-                      {item.isCurrent
-                        ? "ATUAL"
-                        : item.reached
-                          ? "ALCANÇADA"
-                          : `${formatPoints(item.pointsRemaining)} pts`}
+                    <Text style={styles.progressText}>
+                      {current?.patente?.nextPatente
+                        ? `${formatPoints(current.patente.pointsToNext)} pts para ${current.patente.nextPatente.label}`
+                        : "Patente máxima atingida"}
                     </Text>
                   </View>
-                );
-              })}
-            </View>
+
+                  <Text style={styles.countdownText}>
+                    {`Faltam ${formatRemainingTime(remainingMs)} para a Temporada ${current?.season?.seasonNumber ?? "--"} acabar`}
+                  </Text>
+                  <Text style={styles.seasonDateText}>{seasonDateLabel}</Text>
+                </View>
+              </View>
+            </LinearGradient>
+
+            <LinearGradient
+              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.gradientBorder}
+            >
+              <View style={styles.gradientInner}>
+                <View style={styles.listCard}>
+                  <Text style={styles.sectionTitle}>Escada de Patentes</Text>
+                  {(current?.patentes ?? []).map((item) => {
+                    const badgeColor = PATENTE_COLORS[item.key] || theme.colors.button;
+                    return (
+                      <View
+                        key={item.key}
+                        style={[
+                          styles.patenteRow,
+                          item.isCurrent && styles.patenteRowCurrent,
+                        ]}
+                      >
+                        <View style={[styles.patenteColorMark, { backgroundColor: badgeColor }]} />
+
+                        <MaterialCommunityIcons
+                          name="diamond-stone"
+                          size={22}
+                          color={badgeColor}
+                          style={styles.patenteIcon}
+                        />
+
+                        <View style={styles.patenteTextBlock}>
+                          <Text style={styles.patenteLabel}>{item.label}</Text>
+                          <Text style={styles.patenteThreshold}>{`A partir de ${formatPoints(item.minPoints)} pts`}</Text>
+                        </View>
+
+                        <Text style={styles.patenteStatus}>
+                          {item.isCurrent
+                            ? "ATUAL"
+                            : item.reached
+                              ? "ALCANÇADA"
+                              : `${formatPoints(item.pointsRemaining)} pts`}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            </LinearGradient>
           </ScrollView>
         ) : (
           <ScrollView contentContainerStyle={styles.contentContainer}>
-            <View style={styles.listCard}>
-              <Text style={styles.sectionTitle}>Resultados de Temporadas</Text>
-              {history.length === 0 ? (
-                <Text style={styles.emptyText}>Ainda não há temporadas finalizadas.</Text>
-              ) : (
-                history.map((season) => (
-                  <View key={season.temporadaId} style={styles.historyCard}>
-                    <Text style={styles.historyTitle}>{`Temporada ${season.seasonNumber}`}</Text>
-                    <Text style={styles.historyDates}>
-                      {`${new Date(season.startsAt).toLocaleDateString("pt-BR")} - ${new Date(season.endsAt).toLocaleDateString("pt-BR")}`}
-                    </Text>
+            <LinearGradient
+              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.gradientBorder}
+            >
+              <View style={styles.gradientInner}>
+                <View style={styles.listCard}>
+                  <Text style={styles.sectionTitle}>Resultados de Temporadas</Text>
+                  {history.length === 0 ? (
+                    <Text style={styles.emptyText}>Ainda não há temporadas finalizadas.</Text>
+                  ) : (
+                    history.map((season) => (
+                      <View key={season.temporadaId} style={styles.historyCard}>
+                        <Text style={styles.historyTitle}>{`Temporada ${season.seasonNumber}`}</Text>
+                        <Text style={styles.historyDates}>
+                          {`${new Date(season.startsAt).toLocaleDateString("pt-BR")} - ${new Date(season.endsAt).toLocaleDateString("pt-BR")}`}
+                        </Text>
 
-                    <Text style={styles.historyMyResult}>
-                      {season.myPosition
-                        ? `Seu resultado: #${season.myPosition} • ${formatPoints(season.myPoints)} pts`
-                        : "Você não pontuou nesta temporada"}
-                    </Text>
+                        <Text style={styles.historyMyResult}>
+                          {season.myPosition
+                            ? `Seu resultado: #${season.myPosition} • ${formatPoints(season.myPoints)} pts`
+                            : "Você não pontuou nesta temporada"}
+                        </Text>
 
-                    <View style={styles.top3Block}>
-                      {season.top3.map((entry) => (
-                        <View key={`${season.temporadaId}_${entry.posicao}`} style={styles.top3Row}>
-                          <Text style={styles.top3Position}>{`#${entry.posicao}`}</Text>
+                        <View style={styles.top3Block}>
+                          {season.top3.map((entry) => (
+                            <View key={`${season.temporadaId}_${entry.posicao}`} style={styles.top3Row}>
+                              <Text style={styles.top3Position}>{`#${entry.posicao}`}</Text>
 
-                          {entry.foto_perfil ? (
-                            <Image source={{ uri: entry.foto_perfil }} style={styles.top3Avatar} />
-                          ) : (
-                            <View style={[styles.top3Avatar, styles.top3AvatarPlaceholder]}>
-                              <Text style={styles.top3AvatarPlaceholderText}>{getInitial(entry.username)}</Text>
+                              {entry.foto_perfil ? (
+                                <Image source={{ uri: entry.foto_perfil }} style={styles.top3Avatar} />
+                              ) : (
+                                <View style={[styles.top3Avatar, styles.top3AvatarPlaceholder]}>
+                                  <Text style={styles.top3AvatarPlaceholderText}>{getInitial(entry.username)}</Text>
+                                </View>
+                              )}
+
+                              <Text style={styles.top3Username} numberOfLines={1}>{entry.username}</Text>
+                              <Text style={styles.top3Points}>{`${formatPoints(entry.total_points)} pts`}</Text>
                             </View>
-                          )}
-
-                          <Text style={styles.top3Username} numberOfLines={1}>{entry.username}</Text>
-                          <Text style={styles.top3Points}>{`${formatPoints(entry.total_points)} pts`}</Text>
+                          ))}
                         </View>
-                      ))}
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </View>
+            </LinearGradient>
           </ScrollView>
         )}
 
@@ -434,13 +470,23 @@ function createStyles(theme: AppTheme) {
       paddingBottom: 14,
       gap: 12,
     },
-    heroCard: {
-      backgroundColor: "#0F172A",
+    gradientBorder: {
       borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 0 },
+    },
+    gradientInner: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    heroCard: {
+      backgroundColor: "transparent",
       padding: 16,
       overflow: "hidden",
-      borderWidth: 1,
-      borderColor: "#1E293B",
       gap: 6,
     },
     heroGlowPrimary: {
@@ -514,10 +560,8 @@ function createStyles(theme: AppTheme) {
       fontWeight: "600",
     },
     listCard: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "transparent",
       borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       padding: 12,
       gap: 10,
     },
@@ -545,6 +589,9 @@ function createStyles(theme: AppTheme) {
       width: 6,
       alignSelf: "stretch",
       borderRadius: 999,
+    },
+    patenteIcon: {
+      marginLeft: 2,
     },
     patenteTextBlock: {
       flex: 1,
