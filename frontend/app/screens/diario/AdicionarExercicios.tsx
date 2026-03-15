@@ -652,9 +652,16 @@ export default function AdicionarTreinoScreen() {
                   <Text style={styles.cancelHeaderText}>{isEn ? "Cancel workout" : "Cancelar treino"}</Text>
                 </Pressable>
               </LinearGradient>
-              <Pressable style={styles.primaryButton} onPress={() => handleContinue().catch(() => undefined)}>
-                <Text style={styles.primaryButtonText}>{isEn ? "Continue" : "Continuar"}</Text>
-              </Pressable>
+              <LinearGradient
+                colors={theme.colors.buttonGradient}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.primaryButtonBorder}
+              >
+                <Pressable style={styles.primaryButton} onPress={() => handleContinue().catch(() => undefined)}>
+                  <Text style={styles.primaryButtonText}>{isEn ? "Continue" : "Continuar"}</Text>
+                </Pressable>
+              </LinearGradient>
             </View>
 
             <View style={styles.searchRow}>
@@ -1063,6 +1070,16 @@ function createStyles(theme: AppTheme) {
       flexDirection: "row",
       gap: 8,
     },
+    primaryButtonBorder: {
+      flex: 1,
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
     cancelHeaderBorder: {
       flex: 1,
       borderRadius: 10,
@@ -1091,7 +1108,7 @@ function createStyles(theme: AppTheme) {
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     primaryButtonText: {
       color: theme.colors.buttonText,

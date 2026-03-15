@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Calendar, DateData } from "react-native-calendars";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
 import { useI18n } from "@/providers/I18nProvider";
@@ -165,9 +166,16 @@ export default function MeusTreinosScreen() {
           {isEn ? "Day with saved workout" : "Dia com treino salvo"}
         </Text>
 
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>{t("common_back")}</Text>
-        </Pressable>
+        <LinearGradient
+          colors={theme.colors.buttonGradient}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.backButtonBorder}
+        >
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>{t("common_back")}</Text>
+          </Pressable>
+        </LinearGradient>
       </View>
     </SafeAreaView>
   );
@@ -262,7 +270,17 @@ function createStyles(theme: AppTheme) {
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+    },
+    backButtonBorder: {
+      marginTop: "auto",
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
     },
     backButtonText: {
       color: theme.colors.buttonText,

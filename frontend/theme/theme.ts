@@ -19,6 +19,7 @@ export type AppTheme = {
     inputBackground: string;
     button: string;
     buttonText: string;
+    buttonGradient: string[];
     negativeGradient: string[];
     negativeText: string;
     link: string;
@@ -40,6 +41,7 @@ const lightTheme: AppTheme = {
     inputBackground: "#0F1115",
     button: "#7C5CFF",
     buttonText: "#E5E7EB",
+    buttonGradient: ["#5BE7FF", "#7C5CFF", "#FF4BD8"],
     negativeGradient: ["#FF3B30", "#FF9500", "#FFD60A"],
     negativeText: "#1A0B0B",
     link: "#22D3EE",
@@ -61,6 +63,7 @@ const darkTheme: AppTheme = {
     inputBackground: "#0F1115",
     button: "#7C5CFF",
     buttonText: "#E5E7EB",
+    buttonGradient: ["#5BE7FF", "#7C5CFF", "#FF4BD8"],
     negativeGradient: ["#FF3B30", "#FF9500", "#FFD60A"],
     negativeText: "#1A0B0B",
     link: "#22D3EE",

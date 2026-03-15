@@ -138,9 +138,16 @@ export default function RankingScreen() {
         ) : error ? (
           <View style={styles.stateContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={() => loadRanking().catch(() => undefined)}>
-              <Text style={styles.retryButtonText}>Tentar novamente</Text>
-            </Pressable>
+            <LinearGradient
+              colors={theme.colors.buttonGradient}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.actionButtonBorder}
+            >
+              <Pressable style={styles.retryButton} onPress={() => loadRanking().catch(() => undefined)}>
+                <Text style={styles.retryButtonText}>Tentar novamente</Text>
+              </Pressable>
+            </LinearGradient>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.contentContainer}>
@@ -247,9 +254,16 @@ export default function RankingScreen() {
           </ScrollView>
         )}
 
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>{t("common_back")}</Text>
-        </Pressable>
+        <LinearGradient
+          colors={theme.colors.buttonGradient}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.actionButtonBorder}
+        >
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>{t("common_back")}</Text>
+          </Pressable>
+        </LinearGradient>
       </View>
     </SafeAreaView>
   );
@@ -539,11 +553,20 @@ function createStyles(theme: AppTheme) {
       textAlign: "center",
       fontWeight: "600",
     },
+    actionButtonBorder: {
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
     retryButton: {
       height: 42,
       paddingHorizontal: 14,
       borderRadius: 9,
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -557,7 +580,7 @@ function createStyles(theme: AppTheme) {
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     backButtonText: {
       color: theme.colors.buttonText,

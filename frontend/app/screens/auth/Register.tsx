@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { LinearGradient } from "expo-linear-gradient";
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 type BackendResponse = {
@@ -273,17 +274,24 @@ export default function Register() {
               editable={!loading}
             />
 
-            <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={loading}
+            <LinearGradient
+              colors={theme.colors.buttonGradient}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.buttonBorder}
             >
-              {loading ? (
-                <ActivityIndicator color={theme.colors.buttonText} />
-              ) : (
-                <Text style={styles.buttonText}>Enviar codigo</Text>
-              )}
-            </Pressable>
+              <Pressable
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleRegister}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={theme.colors.buttonText} />
+                ) : (
+                  <Text style={styles.buttonText}>Enviar codigo</Text>
+                )}
+              </Pressable>
+            </LinearGradient>
 
             <Pressable
               style={[styles.googleButton, loading && styles.buttonDisabled]}
@@ -306,17 +314,24 @@ export default function Register() {
               editable={!loading}
             />
 
-            <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleVerifyCode}
-              disabled={loading}
+            <LinearGradient
+              colors={theme.colors.buttonGradient}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.buttonBorder}
             >
-              {loading ? (
-                <ActivityIndicator color={theme.colors.buttonText} />
-              ) : (
-                <Text style={styles.buttonText}>Confirmar codigo</Text>
-              )}
-            </Pressable>
+              <Pressable
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleVerifyCode}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={theme.colors.buttonText} />
+                ) : (
+                  <Text style={styles.buttonText}>Confirmar codigo</Text>
+                )}
+              </Pressable>
+            </LinearGradient>
 
             <Pressable
               style={[styles.secondaryButton, loading && styles.buttonDisabled]}
@@ -381,13 +396,22 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.inputBackground,
       color: theme.colors.text,
     },
+    buttonBorder: {
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+      marginTop: 6,
+    },
     button: {
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       borderRadius: 10,
       height: 46,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: 6,
     },
     secondaryButton: {
       backgroundColor: 'transparent',
