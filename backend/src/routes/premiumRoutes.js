@@ -5,7 +5,6 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 router.get('/status', authMiddleware, premiumController.getStatus);
-router.post('/activate', authMiddleware, premiumController.activate);
-router.post('/deactivate', authMiddleware, premiumController.deactivate);
+router.post('/sync', authMiddleware, premiumController.sync);
 
 module.exports = router;

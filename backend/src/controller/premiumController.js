@@ -8,7 +8,7 @@ exports.getStatus = async (req, res) => {
   try {
     const userId = getUserId(req);
     if (!userId) {
-      return res.status(401).json({ message: 'Usuário não autenticado' });
+      return res.status(401).json({ message: 'Usuario nao autenticado' });
     }
 
     const status = await premiumService.getPremiumStatus(userId);
@@ -21,7 +21,7 @@ exports.getStatus = async (req, res) => {
     });
   } catch (err) {
     if (err.message === 'USER_NOT_FOUND') {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
+      return res.status(404).json({ message: 'Usuario nao encontrado' });
     }
 
     console.error('Erro ao buscar status premium:', err);
@@ -29,17 +29,16 @@ exports.getStatus = async (req, res) => {
   }
 };
 
-exports.activate = async (req, res) => {
+exports.sync = async (req, res) => {
   try {
     const userId = getUserId(req);
     if (!userId) {
-      return res.status(401).json({ message: 'Usuário não autenticado' });
+      return res.status(401).json({ message: 'Usuario nao autenticado' });
     }
 
-    const durationDays = Number(req.body?.durationDays || 30);
-    const status = await premiumService.activatePremiumFake(userId, durationDays);
+    const status = await premiumService.syncFromRevenueCat(userId);
     return res.status(200).json({
-      message: 'Premium ativado com sucesso',
+      message: 'Premium sincronizado com sucesso',
       isPremium: Boolean(status.is_premium),
       premiumStatus: status.premium_status,
       premiumSource: status.premium_source,
@@ -48,36 +47,22 @@ exports.activate = async (req, res) => {
     });
   } catch (err) {
     if (err.message === 'USER_NOT_FOUND') {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
+      return res.status(404).json({ message: 'Usuario nao encontrado' });
     }
 
-    console.error('Erro ao ativar premium:', err);
-    return res.status(500).json({ message: 'Erro ao ativar premium' });
-  }
-};
-
-exports.deactivate = async (req, res) => {
-  try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return res.status(401).json({ message: 'Usuário não autenticado' });
+    if (err.message === 'REVENUECAT_NOT_CONFIGURED') {
+      return res.status(500).json({ message: 'RevenueCat nao configurado' });
     }
 
-    const status = await premiumService.deactivatePremiumFake(userId);
-    return res.status(200).json({
-      message: 'Premium desativado com sucesso',
-      isPremium: Boolean(status.is_premium),
-      premiumStatus: status.premium_status,
-      premiumSource: status.premium_source,
-      premiumUntil: status.premium_until,
-      premiumUpdatedAt: status.premium_updated_at,
-    });
-  } catch (err) {
-    if (err.message === 'USER_NOT_FOUND') {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
+    if (err.message === 'REVENUECAT_SUBSCRIBER_NOT_FOUND') {
+      return res.status(404).json({ message: 'Assinatura nao encontrada' });
     }
 
-    console.error('Erro ao desativar premium:', err);
-    return res.status(500).json({ message: 'Erro ao desativar premium' });
+    if (typeof err.message === 'string' && err.message.startsWith('REVENUECAT_HTTP_')) {
+      return res.status(502).json({ message: 'Falha ao consultar RevenueCat' });
+    }
+
+    console.error('Erro ao sincronizar premium:', err);
+    return res.status(500).json({ message: 'Erro ao sincronizar premium' });
   }
 };
