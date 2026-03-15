@@ -1,4 +1,5 @@
 const db = require('../utils/db');
+const { requestRevenueCatSubscriber } = require('./revenuecatService');
 
 const ACTIVE_STATUSES = ['active', 'grace_period'];
 
@@ -19,8 +20,43 @@ function toPremiumModel(row) {
   };
 }
 
+function parseDate(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+function pickLaterDate(primary, secondary) {
+  if (!primary && !secondary) {
+    return null;
+  }
+  if (primary && !secondary) {
+    return primary;
+  }
+  if (!primary && secondary) {
+    return secondary;
+  }
+  return primary > secondary ? primary : secondary;
+}
+
+function computeStatus(expiresAt, gracePeriodEndsAt) {
+  const now = new Date();
+  if (gracePeriodEndsAt && gracePeriodEndsAt > now) {
+    return 'grace_period';
+  }
+  if (expiresAt && expiresAt > now) {
+    return 'active';
+  }
+  return 'inactive';
+}
+
 async function ensureUserExists(userId) {
-  const result = await db.query(`SELECT id FROM users WHERE id = $1`, [userId]);
+  const result = await db.query('SELECT id FROM users WHERE id = $1', [userId]);
   if (result.rows.length === 0) {
     throw new Error('USER_NOT_FOUND');
   }
@@ -34,6 +70,46 @@ async function syncPremiumCache(userId, isPremium) {
      WHERE id = $1`,
     [userId, isPremium],
   );
+}
+
+function getRevenueCatConfig() {
+  const apiKey = String(process.env.REVENUECAT_SECRET_API_KEY || '').trim();
+  const entitlementId = String(process.env.REVENUECAT_ENTITLEMENT_ID || '').trim();
+  const productId = String(process.env.REVENUECAT_PRODUCT_ID || '').trim();
+
+  if (!apiKey) {
+    throw new Error('REVENUECAT_NOT_CONFIGURED');
+  }
+
+  if (!entitlementId && !productId) {
+    throw new Error('REVENUECAT_NOT_CONFIGURED');
+  }
+
+  return {
+    apiKey,
+    entitlementId: entitlementId || null,
+    productId: productId || null,
+  };
+}
+
+function pickRevenueCatRecord(subscriber, entitlementId, productId) {
+  if (entitlementId && subscriber?.entitlements?.[entitlementId]) {
+    return {
+      source: 'entitlement',
+      record: subscriber.entitlements[entitlementId],
+      productId: subscriber.entitlements[entitlementId].product_identifier || null,
+    };
+  }
+
+  if (productId && subscriber?.subscriptions?.[productId]) {
+    return {
+      source: 'subscription',
+      record: subscriber.subscriptions[productId],
+      productId,
+    };
+  }
+
+  return null;
 }
 
 exports.getPremiumStatus = async (userId) => {
@@ -66,10 +142,27 @@ exports.getPremiumStatus = async (userId) => {
   return mapped;
 };
 
-exports.activatePremiumFake = async (userId, durationDays = 30) => {
+exports.syncFromRevenueCat = async (userId) => {
   await ensureUserExists(userId);
 
-  const normalizedDays = Math.max(1, Number(durationDays) || 30);
+  const { apiKey, entitlementId, productId } = getRevenueCatConfig();
+  const data = await requestRevenueCatSubscriber(userId, apiKey);
+
+  const subscriber = data?.subscriber;
+  if (!subscriber) {
+    throw new Error('REVENUECAT_SUBSCRIBER_NOT_FOUND');
+  }
+
+  const picked = pickRevenueCatRecord(subscriber, entitlementId, productId);
+  if (!picked) {
+    throw new Error('REVENUECAT_SUBSCRIBER_NOT_FOUND');
+  }
+
+  const expiresAt = parseDate(picked.record?.expires_date);
+  const gracePeriodEndsAt = parseDate(picked.record?.grace_period_expires_date);
+  const currentPeriodEndsAt = pickLaterDate(expiresAt, gracePeriodEndsAt);
+  const status = computeStatus(expiresAt, gracePeriodEndsAt);
+
   const result = await db.query(
     `INSERT INTO user_subscriptions (
        user_id,
@@ -82,11 +175,11 @@ exports.activatePremiumFake = async (userId, durationDays = 30) => {
      )
      VALUES (
        $1,
-       'manual_test',
-       'premium_test',
-       'active',
-       NOW() + ($2 || ' days')::INTERVAL,
-       jsonb_build_object('mode', 'manual_test', 'durationDays', $2::int),
+       'revenuecat',
+       $2,
+       $3,
+       $4,
+       $5,
        NOW()
      )
      ON CONFLICT (user_id, provider)
@@ -97,44 +190,18 @@ exports.activatePremiumFake = async (userId, durationDays = 30) => {
        raw_payload = EXCLUDED.raw_payload,
        updated_at = NOW()
      RETURNING user_id, provider, status, current_period_ends_at, updated_at`,
-    [userId, String(normalizedDays)],
-  );
-
-  const mapped = toPremiumModel(result.rows[0]);
-  await syncPremiumCache(userId, mapped.is_premium);
-  return mapped;
-};
-
-exports.deactivatePremiumFake = async (userId) => {
-  await ensureUserExists(userId);
-
-  const result = await db.query(
-    `INSERT INTO user_subscriptions (
-       user_id,
-       provider,
-       product_id,
-       status,
-       current_period_ends_at,
-       raw_payload,
-       updated_at
-     )
-     VALUES (
-       $1,
-       'manual_test',
-       'premium_test',
-       'inactive',
-       NULL,
-       jsonb_build_object('mode', 'manual_test'),
-       NOW()
-     )
-     ON CONFLICT (user_id, provider)
-     DO UPDATE SET
-       status = 'inactive',
-       current_period_ends_at = NULL,
-       raw_payload = EXCLUDED.raw_payload,
-       updated_at = NOW()
-     RETURNING user_id, provider, status, current_period_ends_at, updated_at`,
-    [userId],
+    [
+      userId,
+      picked.productId,
+      status,
+      currentPeriodEndsAt,
+      {
+        source: picked.source,
+        entitlementId,
+        productId,
+        subscriber,
+      },
+    ],
   );
 
   const mapped = toPremiumModel(result.rows[0]);

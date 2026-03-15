@@ -23,6 +23,22 @@ CREATE TABLE users (
   created_at TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE user_subscriptions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  product_id TEXT,
+  status TEXT NOT NULL,
+  current_period_ends_at TIMESTAMP WITH TIME ZONE,
+  raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  CONSTRAINT uq_user_sub_provider UNIQUE (user_id, provider)
+);
+
+CREATE INDEX idx_subscription_user_updated
+ON user_subscriptions(user_id, updated_at DESC);
+
 CREATE TABLE email_verifications (
   email TEXT PRIMARY KEY,
   username TEXT NOT NULL,
