@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AxiosError } from "axios";
 import { useRouter } from "expo-router";
@@ -33,6 +34,9 @@ type ExercisesResponse = {
     count: number;
   };
 };
+
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 
 function getApiErrorMessage(err: unknown) {
   const axiosError = err as AxiosError<{ message?: string } | string>;
@@ -110,9 +114,16 @@ export default function GraficoExerciciosScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.container}>
-        <Pressable style={styles.backIcon} onPress={() => router.back()}>
-          <Text style={styles.backIconText}>{"<"}</Text>
-        </Pressable>
+        <LinearGradient
+          colors={theme.colors.buttonGradient}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.backIconBorder}
+        >
+          <Pressable style={styles.backIcon} onPress={() => router.back()}>
+            <Text style={styles.backIconText}>{"<"}</Text>
+          </Pressable>
+        </LinearGradient>
 
         <Text style={styles.title}>Evolução por Exercício</Text>
         <Text style={styles.subtitle}>Selecione um exercício para ver o gráfico de peso máximo.</Text>
@@ -137,42 +148,52 @@ export default function GraficoExerciciosScreen() {
               }
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => (
-                <Pressable
-                  style={styles.itemCard}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/screens/diario/GraficoExercicioDetalhe",
-                      params: {
-                        source: item.source,
-                        exercise_id: item.exercise_id ?? "",
-                        custom_exercise_id: item.custom_exercise_id ? String(item.custom_exercise_id) : "",
-                        nome: item.nome,
-                      },
-                    })
-                  }
+                <LinearGradient
+                  colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+                  start={{ x: 0, y: 0.2 }}
+                  end={{ x: 1, y: 0.8 }}
+                  style={styles.cardBorder}
                 >
-                  <View style={styles.itemRow}>
-                    {item.imagem_url ? (
-                      <Image source={{ uri: item.imagem_url }} style={styles.itemImage} />
-                    ) : (
-                      <View style={[styles.itemImage, styles.itemImagePlaceholder]}>
-                        <Text style={styles.itemImagePlaceholderText}>IMG</Text>
-                      </View>
-                    )}
+                  <View style={styles.cardInner}>
+                    <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+                    <Pressable
+                      style={styles.itemCard}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/screens/diario/GraficoExercicioDetalhe",
+                          params: {
+                            source: item.source,
+                            exercise_id: item.exercise_id ?? "",
+                            custom_exercise_id: item.custom_exercise_id ? String(item.custom_exercise_id) : "",
+                            nome: item.nome,
+                          },
+                        })
+                      }
+                    >
+                      <View style={styles.itemRow}>
+                        {item.imagem_url ? (
+                          <Image source={{ uri: item.imagem_url }} style={styles.itemImage} />
+                        ) : (
+                          <View style={[styles.itemImage, styles.itemImagePlaceholder]}>
+                            <Text style={styles.itemImagePlaceholderText}>IMG</Text>
+                          </View>
+                        )}
 
-                    <View style={styles.itemInfo}>
-                      <View style={styles.itemHeader}>
-                        <Text style={styles.itemName}>{item.nome}</Text>
-                        <View style={[styles.badge, item.source === "custom" ? styles.badgeCustom : styles.badgeApi]}>
-                          <Text style={styles.badgeText}>{item.source === "custom" ? "Custom" : "API"}</Text>
+                        <View style={styles.itemInfo}>
+                          <View style={styles.itemHeader}>
+                            <Text style={styles.itemName}>{item.nome}</Text>
+                            <View style={[styles.badge, item.source === "custom" ? styles.badgeCustom : styles.badgeApi]}>
+                              <Text style={styles.badgeText}>{item.source === "custom" ? "Custom" : "API"}</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.itemMeta}>
+                            Treinos: {item.total_treinos} • Recorde: {Number(item.recorde_kg || 0).toFixed(1)} kg
+                          </Text>
                         </View>
                       </View>
-                      <Text style={styles.itemMeta}>
-                        Treinos: {item.total_treinos} • Recorde: {Number(item.recorde_kg || 0).toFixed(1)} kg
-                      </Text>
-                    </View>
+                    </Pressable>
                   </View>
-                </Pressable>
+                </LinearGradient>
               )}
             />
           )
@@ -194,16 +215,25 @@ function createStyles(theme: AppTheme) {
       paddingTop: 8,
       paddingBottom: 16,
     },
-    backIcon: {
+    backIconBorder: {
       width: 38,
       height: 38,
       borderRadius: 999,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+      marginBottom: 18,
+    },
+    backIcon: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 999,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      marginBottom: 18,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     backIconText: {
       color: theme.colors.text,
@@ -249,10 +279,26 @@ function createStyles(theme: AppTheme) {
       paddingBottom: 16,
       gap: 10,
     },
+    cardBorder: {
+      borderRadius: 14,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+    },
+    cardInner: {
+      borderRadius: 12,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
+    },
     itemCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "transparent",
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 11,

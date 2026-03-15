@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -122,7 +123,7 @@ export default function ConfiguracoesScreen() {
                 </View>
               ) : null}
             </View>
-            <Text style={styles.chevron}>{">"}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
           </Pressable>
         </LinearGradient>
 
@@ -134,7 +135,7 @@ export default function ConfiguracoesScreen() {
         >
           <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Conta")}>
             <Text style={styles.optionText}>Conta</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
           </Pressable>
         </LinearGradient>
 
@@ -146,7 +147,7 @@ export default function ConfiguracoesScreen() {
         >
           <Pressable style={styles.optionCard} onPress={goHome}>
             <Text style={styles.optionText}>Suporte</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
           </Pressable>
         </LinearGradient>
 
@@ -163,7 +164,7 @@ export default function ConfiguracoesScreen() {
                 {language === "pt" ? t("settings_language_pt") : t("settings_language_en")}
               </Text>
             </View>
-            <Text style={styles.chevron}>{">"}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
           </Pressable>
         </LinearGradient>
 
@@ -175,7 +176,7 @@ export default function ConfiguracoesScreen() {
         >
           <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Premium")}>
             <Text style={styles.optionText}>Obter Premium</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
           </Pressable>
         </LinearGradient>
 
@@ -187,7 +188,7 @@ export default function ConfiguracoesScreen() {
         >
           <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/GerenciarPosts")}>
             <Text style={styles.optionText}>Gerenciar posts</Text>
-            <Text style={styles.chevron}>›</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
           </Pressable>
         </LinearGradient>
 
@@ -199,7 +200,7 @@ export default function ConfiguracoesScreen() {
         >
           <Pressable style={styles.optionCard} onPress={goHome}>
             <Text style={styles.optionText}>Sobre</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
           </Pressable>
         </LinearGradient>
         </View>

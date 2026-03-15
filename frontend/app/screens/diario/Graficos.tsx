@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -16,19 +17,33 @@ export default function GraficosScreen() {
       <Text style={styles.title}>{t("diary_charts_title")}</Text>
       <Text style={styles.description}>{t("diary_charts_description")}</Text>
 
-      <Pressable
-        style={styles.primaryButton}
-        onPress={() => router.push("/screens/diario/GraficoExercicios")}
+      <LinearGradient
+        colors={theme.colors.buttonGradient}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={styles.primaryButtonBorder}
       >
-        <Text style={styles.primaryButtonText}>Gráfico de exercícios</Text>
-      </Pressable>
+        <Pressable
+          style={styles.primaryButton}
+          onPress={() => router.push("/screens/diario/GraficoExercicios")}
+        >
+          <Text style={styles.primaryButtonText}>Gráfico de exercícios</Text>
+        </Pressable>
+      </LinearGradient>
 
-      <Pressable
-        style={styles.primaryButton}
-        onPress={() => router.push("/screens/diario/GraficoVolumeTreino")}
+      <LinearGradient
+        colors={theme.colors.buttonGradient}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={styles.primaryButtonBorder}
       >
-        <Text style={styles.primaryButtonText}>Gráfico de volume de treino</Text>
-      </Pressable>
+        <Pressable
+          style={styles.primaryButton}
+          onPress={() => router.push("/screens/diario/GraficoVolumeTreino")}
+        >
+          <Text style={styles.primaryButtonText}>Gráfico de volume de treino</Text>
+        </Pressable>
+      </LinearGradient>
 
       <Pressable style={styles.backButton} onPress={() => router.back()}>
         <Text style={styles.backButtonText}>{t("common_back")}</Text>
@@ -66,13 +81,22 @@ function createStyles(theme: AppTheme) {
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
-    primaryButton: {
+    primaryButtonBorder: {
       marginTop: 8,
+      borderRadius: 10,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    primaryButton: {
       height: 46,
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     primaryButtonText: {
       color: theme.colors.buttonText,

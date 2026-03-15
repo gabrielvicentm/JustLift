@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AxiosError } from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -41,6 +43,11 @@ type EvolucaoResponse = {
     variacao_percentual: number;
   };
 };
+
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
+
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 
 function getApiErrorMessage(err: unknown) {
   const axiosError = err as AxiosError<{ message?: string } | string>;
@@ -194,9 +201,16 @@ export default function GraficoExercicioDetalheScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backIcon} onPress={() => router.back()}>
-          <Text style={styles.backIconText}>{"<"}</Text>
-        </Pressable>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.backIconBorder}
+        >
+          <Pressable style={styles.backIcon} onPress={() => router.back()}>
+            <Text style={styles.backIconText}>{"<"}</Text>
+          </Pressable>
+        </LinearGradient>
 
         <Text style={styles.title}>{data?.exercicio?.nome || exerciseName}</Text>
         <Text style={styles.subtitle}>Peso máximo por treino (evolução).</Text>
@@ -215,89 +229,129 @@ export default function GraficoExercicioDetalheScreen() {
             <Text style={styles.emptyText}>Sem séries concluídas para este exercício.</Text>
           ) : (
             <>
-              <View style={styles.chartCard}>
-                <Svg width={chartWidth} height={chartHeight}>
-                  <Line
-                    x1={padding.left}
-                    y1={padding.top + plotHeight}
-                    x2={padding.left + plotWidth}
-                    y2={padding.top + plotHeight}
-                    stroke={`${theme.colors.border}`}
-                    strokeWidth={1}
-                  />
-                  <Line
-                    x1={padding.left}
-                    y1={padding.top}
-                    x2={padding.left}
-                    y2={padding.top + plotHeight}
-                    stroke={`${theme.colors.border}`}
-                    strokeWidth={1}
-                  />
-
-                  <Path d={linePath} stroke={lineColor} strokeWidth={3} fill="none" />
-
-                  {pointsForSvg.map((p, index) => {
-                    const isSelected = selectedPointIndex === index;
-                    return (
-                      <Circle
-                        key={`${p.data.treino_id}-${index}`}
-                        cx={p.x}
-                        cy={p.y}
-                        r={isSelected ? 5.5 : 4}
-                        fill={isSelected ? lineColor : theme.colors.background}
-                        stroke={lineColor}
-                        strokeWidth={2}
-                        onPress={() => setSelectedPointIndex(index)}
-                      />
-                    );
-                  })}
-
-                  {selectedPoint ? (
-                    <>
+              <LinearGradient
+                colors={PROGRESS_GRADIENT}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.cardBorder}
+              >
+                <View style={styles.cardInner}>
+                  <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+                  <View style={styles.chartCard}>
+                    <Svg width={chartWidth} height={chartHeight}>
                       <Line
-                        x1={selectedPoint.x}
-                        y1={selectedPoint.y}
-                        x2={selectedPoint.x}
+                        x1={padding.left}
+                        y1={padding.top + plotHeight}
+                        x2={padding.left + plotWidth}
                         y2={padding.top + plotHeight}
-                        stroke={`${lineColor}55`}
+                        stroke="rgba(148, 163, 184, 0.35)"
                         strokeWidth={1}
                       />
-                      <SvgText
-                        x={selectedPoint.x}
-                        y={selectedPoint.y - 12}
-                        fontSize="12"
-                        fontWeight="700"
-                        fill={theme.colors.text}
-                        textAnchor="middle"
-                      >
-                        {selectedPoint.data.peso_maximo.toFixed(1)}kg
-                      </SvgText>
-                    </>
-                  ) : null}
-                </Svg>
-              </View>
+                      <Line
+                        x1={padding.left}
+                        y1={padding.top}
+                        x2={padding.left}
+                        y2={padding.top + plotHeight}
+                        stroke="rgba(148, 163, 184, 0.35)"
+                        strokeWidth={1}
+                      />
+
+                      <Path d={linePath} stroke={lineColor} strokeWidth={3} fill="none" />
+
+                      {pointsForSvg.map((p, index) => {
+                        const isSelected = selectedPointIndex === index;
+                        return (
+                          <Circle
+                            key={`${p.data.treino_id}-${index}`}
+                            cx={p.x}
+                            cy={p.y}
+                            r={isSelected ? 5.5 : 4}
+                            fill={isSelected ? lineColor : "rgba(11, 14, 24, 0.92)"}
+                            stroke={lineColor}
+                            strokeWidth={2}
+                            onPress={() => setSelectedPointIndex(index)}
+                          />
+                        );
+                      })}
+
+                      {selectedPoint ? (
+                        <>
+                          <Line
+                            x1={selectedPoint.x}
+                            y1={selectedPoint.y}
+                            x2={selectedPoint.x}
+                            y2={padding.top + plotHeight}
+                            stroke={`${lineColor}55`}
+                            strokeWidth={1}
+                          />
+                          <SvgText
+                            x={selectedPoint.x}
+                            y={selectedPoint.y - 12}
+                            fontSize="12"
+                            fontWeight="700"
+                            fill={theme.colors.text}
+                            textAnchor="middle"
+                          >
+                            {selectedPoint.data.peso_maximo.toFixed(1)}kg
+                          </SvgText>
+                        </>
+                      ) : null}
+                    </Svg>
+                  </View>
+                </View>
+              </LinearGradient>
 
               {selectedPoint ? (
-                <View style={styles.detailCard}>
-                  <Text style={styles.detailTitle}>Treino selecionado</Text>
-                  <Text style={styles.detailText}>Data: {formatDate(selectedPoint.data.data)}</Text>
-                  <Text style={styles.detailText}>
-                    Peso máximo: {Number(selectedPoint.data.peso_maximo || 0).toFixed(1)} kg
-                  </Text>
-                </View>
+                <LinearGradient
+                  colors={PROGRESS_GRADIENT}
+                  start={{ x: 0, y: 0.2 }}
+                  end={{ x: 1, y: 0.8 }}
+                  style={styles.cardBorder}
+                >
+                  <View style={styles.cardInner}>
+                    <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+                    <View style={styles.detailCard}>
+                      <Text style={styles.detailTitle}>Treino selecionado</Text>
+                      <Text style={styles.detailText}>Data: {formatDate(selectedPoint.data.data)}</Text>
+                      <Text style={styles.detailText}>
+                        Peso máximo: {Number(selectedPoint.data.peso_maximo || 0).toFixed(1)} kg
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
               ) : null}
 
               <View style={styles.metricsRow}>
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricLabel}>Recorde</Text>
-                  <Text style={styles.metricValue}>{Number(stats?.recorde_kg || 0).toFixed(1)}kg</Text>
-                </View>
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricLabel}>Variação</Text>
-                  <Text style={[styles.metricValue, { color: lineColor }]}>
-                    {Number(stats?.variacao_kg || 0).toFixed(1)}kg ({Number(stats?.variacao_percentual || 0).toFixed(1)}%)
-                  </Text>
-                </View>
+                <LinearGradient
+                  colors={PROGRESS_GRADIENT}
+                  start={{ x: 0, y: 0.2 }}
+                  end={{ x: 1, y: 0.8 }}
+                  style={[styles.cardBorder, styles.metricBorder]}
+                >
+                  <View style={styles.cardInner}>
+                    <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+                    <View style={styles.metricCard}>
+                      <Text style={styles.metricLabel}>Recorde</Text>
+                      <Text style={styles.metricValue}>{Number(stats?.recorde_kg || 0).toFixed(1)}kg</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+                <LinearGradient
+                  colors={PROGRESS_GRADIENT}
+                  start={{ x: 0, y: 0.2 }}
+                  end={{ x: 1, y: 0.8 }}
+                  style={[styles.cardBorder, styles.metricBorder]}
+                >
+                  <View style={styles.cardInner}>
+                    <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+                    <View style={styles.metricCard}>
+                      <Text style={styles.metricLabel}>Variação</Text>
+                      <Text style={[styles.metricValue, { color: lineColor }]}>
+                        {Number(stats?.variacao_kg || 0).toFixed(1)}kg ({Number(stats?.variacao_percentual || 0).toFixed(1)}%)
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
               </View>
             </>
           )
@@ -318,16 +372,25 @@ function createStyles(theme: AppTheme) {
       paddingTop: 8,
       paddingBottom: 28,
     },
-    backIcon: {
+    backIconBorder: {
       width: 38,
       height: 38,
       borderRadius: 999,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+      marginBottom: 18,
+    },
+    backIcon: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 999,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      marginBottom: 18,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     backIconText: {
       color: theme.colors.text,
@@ -369,23 +432,36 @@ function createStyles(theme: AppTheme) {
       fontSize: 14,
       fontWeight: "600",
     },
+    cardBorder: {
+      borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+      marginBottom: 12,
+    },
+    cardInner: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
+    },
     chartCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
       borderRadius: 14,
       paddingVertical: 8,
       alignItems: "center",
-      marginBottom: 12,
+      backgroundColor: "transparent",
     },
     detailCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      marginBottom: 12,
+      backgroundColor: "transparent",
     },
     detailTitle: {
       color: theme.colors.mutedText,
@@ -406,12 +482,14 @@ function createStyles(theme: AppTheme) {
       flex: 1,
       minHeight: 92,
       borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
       justifyContent: "center",
       alignItems: "center",
       padding: 12,
+      backgroundColor: "transparent",
+    },
+    metricBorder: {
+      flex: 1,
+      marginBottom: 0,
     },
     metricLabel: {
       color: theme.colors.mutedText,
