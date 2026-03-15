@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Image,
   Pressable,
   ScrollView,
@@ -97,6 +99,9 @@ const PATENTE_COLORS: Record<string, string> = {
   diamante: "#0EA5E9",
 };
 
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
+
 function formatPoints(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
@@ -133,6 +138,7 @@ export default function PatentesScreen() {
   const [current, setCurrent] = useState<PatentesResponse | null>(null);
   const [history, setHistory] = useState<SeasonHistoryEntry[]>([]);
   const [remainingMs, setRemainingMs] = useState(0);
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -208,6 +214,30 @@ export default function PatentesScreen() {
     return Math.min(Math.max(currentProgress / range, 0), 1);
   }, [current]);
 
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progressToNext,
+      duration: 900,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [progressAnim, progressToNext]);
+
+  const seasonProgress = useMemo(() => {
+    if (!current?.season?.startsAt || !current?.season?.endsAt) return 0;
+    const startMs = new Date(current.season.startsAt).getTime();
+    const endMs = new Date(current.season.endsAt).getTime();
+    const total = endMs - startMs;
+    if (total <= 0) return 0;
+    return Math.min(Math.max(1 - remainingMs / total, 0), 1);
+  }, [current?.season?.startsAt, current?.season?.endsAt, remainingMs]);
+
+  const seasonProgressColor = useMemo(() => {
+    if (seasonProgress >= 0.75) return "#22D3EE";
+    if (seasonProgress >= 0.4) return "#FBBF24";
+    return "#F43F5E";
+  }, [seasonProgress]);
+
   const seasonDateLabel = useMemo(() => {
     if (!current?.season) return "--";
 
@@ -261,24 +291,64 @@ export default function PatentesScreen() {
               style={styles.gradientBorder}
             >
               <View style={styles.gradientInner}>
+                <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
                 <View style={styles.heroCard}>
                   <View style={styles.heroGlowPrimary} />
                   <View style={styles.heroGlowSecondary} />
 
-                  <Text style={styles.heroBadge}>Temporada {current?.season?.seasonNumber ?? "--"}</Text>
-                  <Text style={styles.heroTitle}>{current?.patente?.label ?? "--"}</Text>
+                  <View style={styles.heroHeader}>
+                    <View style={styles.heroIconWrap}>
+                      <MaterialCommunityIcons
+                        name="diamond-stone"
+                        size={46}
+                        color={PATENTE_COLORS[current?.patente?.key ?? ""] ?? "#A78BFA"}
+                      />
+                    </View>
+                    <View style={styles.heroTitleBlock}>
+                      <Text style={styles.heroBadge}>Temporada {current?.season?.seasonNumber ?? "--"}</Text>
+                      <Text style={styles.heroTitle}>{current?.patente?.label ?? "--"}</Text>
+                    </View>
+                    <View style={styles.currentChip}>
+                      <Text style={styles.currentChipText}>ATUAL</Text>
+                    </View>
+                  </View>
                   <Text style={styles.heroSubtitle}>{`Seus pontos: ${formatPoints(current?.totalPoints ?? 0)} pts`}</Text>
                   <Text style={styles.heroSubtitle}>{`Sua posição global: #${current?.global_position ?? "--"}`}</Text>
 
                   <View style={styles.progressBlock}>
                     <View style={styles.progressTrack}>
-                      <View style={[styles.progressBar, { width: `${progressToNext * 100}%` }]} />
+                      <Animated.View
+                        style={[
+                          styles.progressBar,
+                          {
+                            width: progressAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ["0%", "100%"],
+                            }),
+                          },
+                        ]}
+                      />
                     </View>
                     <Text style={styles.progressText}>
                       {current?.patente?.nextPatente
                         ? `${formatPoints(current.patente.pointsToNext)} pts para ${current.patente.nextPatente.label}`
                         : "Patente máxima atingida"}
                     </Text>
+                  </View>
+
+                  <View style={styles.seasonBarBlock}>
+                    <View style={styles.seasonBarTrack}>
+                      <View
+                        style={[
+                          styles.seasonBarFill,
+                          {
+                            width: `${seasonProgress * 100}%`,
+                            backgroundColor: seasonProgressColor,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.seasonBarText}>Progresso da temporada</Text>
                   </View>
 
                   <Text style={styles.countdownText}>
@@ -296,6 +366,7 @@ export default function PatentesScreen() {
               style={styles.gradientBorder}
             >
               <View style={styles.gradientInner}>
+                <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
                 <View style={styles.listCard}>
                   <Text style={styles.sectionTitle}>Escada de Patentes</Text>
                   {(current?.patentes ?? []).map((item) => {
@@ -467,45 +538,74 @@ function createStyles(theme: AppTheme) {
       fontWeight: "700",
     },
     contentContainer: {
-      paddingBottom: 14,
-      gap: 12,
+      paddingBottom: 20,
+      gap: 18,
     },
     gradientBorder: {
-      borderRadius: 18,
-      padding: 1.5,
+      borderRadius: 20,
+      padding: 1.6,
       shadowColor: "#FF4BD8",
-      shadowOpacity: 0.35,
-      shadowRadius: 16,
+      shadowOpacity: 0.45,
+      shadowRadius: 18,
       shadowOffset: { width: 0, height: 0 },
     },
     gradientInner: {
-      borderRadius: 16,
+      borderRadius: 18,
       backgroundColor: "rgba(11, 14, 24, 0.92)",
       overflow: "hidden",
     },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
+    },
     heroCard: {
       backgroundColor: "transparent",
-      padding: 16,
+      padding: 20,
       overflow: "hidden",
       gap: 6,
     },
     heroGlowPrimary: {
       position: "absolute",
-      top: -24,
-      right: -26,
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      backgroundColor: "rgba(56, 189, 248, 0.35)",
+      top: -30,
+      right: -22,
+      width: 150,
+      height: 150,
+      borderRadius: 75,
+      backgroundColor: "rgba(124, 92, 255, 0.45)",
     },
     heroGlowSecondary: {
       position: "absolute",
-      bottom: -36,
+      bottom: -46,
       left: -24,
-      width: 140,
-      height: 140,
-      borderRadius: 70,
-      backgroundColor: "rgba(245, 158, 11, 0.25)",
+      width: 170,
+      height: 170,
+      borderRadius: 85,
+      backgroundColor: "rgba(91, 231, 255, 0.32)",
+    },
+    heroHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    heroIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 18,
+      backgroundColor: "rgba(15, 23, 42, 0.7)",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: "rgba(148, 163, 184, 0.2)",
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    heroTitleBlock: {
+      flex: 1,
+      gap: 4,
     },
     heroBadge: {
       alignSelf: "flex-start",
@@ -519,9 +619,24 @@ function createStyles(theme: AppTheme) {
     },
     heroTitle: {
       color: "#FFFFFF",
-      fontSize: 30,
+      fontSize: 32,
       fontWeight: "900",
       marginTop: 4,
+    },
+    currentChip: {
+      alignSelf: "flex-start",
+      backgroundColor: "rgba(124, 92, 255, 0.22)",
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.5)",
+    },
+    currentChipText: {
+      color: "#EDE9FE",
+      fontWeight: "800",
+      fontSize: 11,
+      letterSpacing: 0.6,
     },
     heroSubtitle: {
       color: "#CBD5E1",
@@ -533,7 +648,7 @@ function createStyles(theme: AppTheme) {
       gap: 6,
     },
     progressTrack: {
-      height: 9,
+      height: 10,
       borderRadius: 999,
       backgroundColor: "rgba(255,255,255,0.18)",
       overflow: "hidden",
@@ -541,10 +656,29 @@ function createStyles(theme: AppTheme) {
     progressBar: {
       height: "100%",
       borderRadius: 999,
-      backgroundColor: "#22D3EE",
+      backgroundColor: "#7C5CFF",
     },
     progressText: {
       color: "#E2E8F0",
+      fontWeight: "700",
+      fontSize: 12,
+    },
+    seasonBarBlock: {
+      marginTop: 10,
+      gap: 6,
+    },
+    seasonBarTrack: {
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: "rgba(148, 163, 184, 0.2)",
+      overflow: "hidden",
+    },
+    seasonBarFill: {
+      height: "100%",
+      borderRadius: 999,
+    },
+    seasonBarText: {
+      color: "#A5B4FC",
       fontWeight: "700",
       fontSize: 12,
     },
@@ -575,15 +709,20 @@ function createStyles(theme: AppTheme) {
       alignItems: "center",
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
+      borderColor: "rgba(148, 163, 184, 0.2)",
+      backgroundColor: "rgba(2, 6, 23, 0.7)",
       paddingVertical: 12,
       paddingHorizontal: 10,
       gap: 10,
     },
     patenteRowCurrent: {
-      borderColor: theme.colors.button,
+      borderColor: "rgba(124, 92, 255, 0.85)",
       borderWidth: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
     },
     patenteColorMark: {
       width: 6,
