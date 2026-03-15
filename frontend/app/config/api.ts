@@ -11,10 +11,10 @@ type RateLimitPayload = {
 type RateLimitHandler = (payload: RateLimitPayload) => void;
 */
 
-const devMachineHost = process.env.EXPO_PUBLIC_DEV_MACHINE_IP ?? "192.168.3.17";
+const devMachineHost = process.env.EXPO_PUBLIC_DEV_MACHINE_IP ?? "192.168.0.11";
 const fallbackBaseURL = Platform.select({
   // Dispositivo fisico (Android/iOS) precisa do IP da maquina na rede local.
-  android: `https://api.trenup.top/api`,
+  android: `http://${devMachineHost}:3000/api`,
   ios: `http://${devMachineHost}:3000/api`,
   default: "http://localhost:3000/api",
 });

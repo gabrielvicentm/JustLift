@@ -9,6 +9,8 @@ router.put('/updateProfile', authMiddleware, profileController.updateProfile);
 
 router.post('/account-change/request', authMiddleware, profileController.requestAccountChange);
 router.post('/account-change/confirm', authMiddleware, profileController.confirmAccountChange);
+router.post('/account-change/apply', authMiddleware, profileController.applyAccountChange);
+router.delete('/account', authMiddleware, profileController.deleteAccount);
 
 // REST routes
 router.get('/me', authMiddleware, profileController.getMe);
