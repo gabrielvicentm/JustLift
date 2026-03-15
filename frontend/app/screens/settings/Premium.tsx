@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AxiosError } from "axios";
 import { useRouter } from "expo-router";
+import Purchases, { LOG_LEVEL, PurchasesPackage } from "react-native-purchases";
 import { api } from "@/app/config/api";
+import { fetchMyProfile } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 
@@ -22,6 +24,7 @@ export default function PremiumScreen() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const productId = useMemo(() => null, []);
 
   const getAuthHeader = async () => {
     const token = await AsyncStorage.getItem("accessToken");
@@ -35,11 +38,11 @@ export default function PremiumScreen() {
     const axiosError = err as AxiosError<{ message?: string } | string>;
 
     if ((err as Error).message === "NOT_AUTHENTICATED") {
-      return "Faça login para testar o premium.";
+      return "Faca login para testar o premium.";
     }
 
     if (!axiosError.response) {
-      return `Sem conexão com o servidor (${api.defaults.baseURL}).`;
+      return `Sem conexao com o servidor (${api.defaults.baseURL}).`;
     }
 
     const { status, data } = axiosError.response;
@@ -53,6 +56,25 @@ export default function PremiumScreen() {
 
     return `Erro ${status} ao processar premium.`;
   };
+
+  const ensureRevenueCat = useCallback(async () => {
+    const iosKey = "test_AmyGfiVBsMOcTimVWsefmSIpecG";
+    const androidKey = "goog_hbNibBpVLOEEPcClyHueXOKyllM";
+    const apiKey = Platform.OS === "ios" ? iosKey : androidKey;
+    if (!apiKey) {
+      throw new Error("REVENUECAT_NOT_CONFIGURED");
+    }
+
+    const profile = await fetchMyProfile();
+    const profileUserId = String(profile.user_id || "").trim();
+    if (!profileUserId) {
+      throw new Error("USER_NOT_FOUND");
+    }
+
+    Purchases.setLogLevel(LOG_LEVEL.INFO);
+    Purchases.configure({ apiKey });
+    await Purchases.logIn(profileUserId);
+  }, []);
 
   const loadStatus = useCallback(async () => {
     setError("");
@@ -70,19 +92,68 @@ export default function PremiumScreen() {
     }
   }, []);
 
-  const updatePremium = async (activate: boolean) => {
+  const syncPremium = async () => {
     setError("");
     setMessage("");
     setLoading(true);
     try {
       const headers = await getAuthHeader();
-      const endpoint = activate ? "/premium/activate" : "/premium/deactivate";
-      const response = await api.post<PremiumStatusResponse>(endpoint, {}, { headers });
+      const response = await api.post<PremiumStatusResponse>("/premium/sync", {}, { headers });
 
       setIsPremium(Boolean(response.data.isPremium));
       setUpdatedAt(response.data.premiumUpdatedAt ?? null);
-      setMessage(response.data.message ?? (activate ? "Premium ativado." : "Premium desativado."));
+      setMessage(response.data.message ?? "Premium sincronizado.");
     } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const purchasePremium = async () => {
+    setError("");
+    setMessage("");
+    setLoading(true);
+    try {
+      await ensureRevenueCat();
+
+      const offerings = await Purchases.getOfferings();
+      const current = offerings.current;
+      if (!current) {
+        throw new Error("NO_OFFERINGS");
+      }
+
+      if (!current.availablePackages.length) {
+        throw new Error("NO_PACKAGES");
+      }
+
+      const matchPackage = productId
+        ? current.availablePackages.find(
+            (pkg: PurchasesPackage) => pkg.product.identifier === productId
+          )
+        : undefined;
+
+      const selectedPackage = matchPackage ?? current.availablePackages[0];
+
+      await Purchases.purchasePackage(selectedPackage);
+      await syncPremium();
+      setMessage("Compra concluida e premium sincronizado.");
+    } catch (err) {
+      if ((err as Error).message === "REVENUECAT_NOT_CONFIGURED") {
+        setError("RevenueCat nao configurado no app.");
+        return;
+      }
+
+      if ((err as Error).message === "NO_OFFERINGS") {
+        setError("Nenhuma oferta encontrada no RevenueCat.");
+        return;
+      }
+
+      if ((err as Error).message === "NO_PACKAGES") {
+        setError("Nenhum pacote disponivel na Offering atual.");
+        return;
+      }
+
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
@@ -95,15 +166,15 @@ export default function PremiumScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Premium (Teste)</Text>
-      <Text style={styles.subtitle}>Ative ou desative o premium fake para testar funcionalidades.</Text>
+      <Text style={styles.title}>Premium</Text>
+      <Text style={styles.subtitle}>Assine e sincronize seu status com o RevenueCat.</Text>
 
       <View style={styles.card}>
         <Text style={styles.statusLabel}>Status atual</Text>
         <Text style={[styles.statusValue, isPremium ? styles.premiumOn : styles.premiumOff]}>
           {isPremium ? "Premium ativo" : "Premium inativo"}
         </Text>
-        {updatedAt ? <Text style={styles.updatedAt}>Última atualização: {new Date(updatedAt).toLocaleString()}</Text> : null}
+        {updatedAt ? <Text style={styles.updatedAt}>Ultima atualizacao: {new Date(updatedAt).toLocaleString()}</Text> : null}
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -111,18 +182,18 @@ export default function PremiumScreen() {
 
       <Pressable
         style={[styles.primaryButton, loading && styles.buttonDisabled]}
-        onPress={() => updatePremium(true)}
+        onPress={purchasePremium}
         disabled={loading}
       >
-        {loading ? <ActivityIndicator color={theme.colors.buttonText} /> : <Text style={styles.primaryButtonText}>Virar Premium</Text>}
+        {loading ? <ActivityIndicator color={theme.colors.buttonText} /> : <Text style={styles.primaryButtonText}>Assinar Premium</Text>}
       </Pressable>
 
       <Pressable
         style={[styles.secondaryButton, loading && styles.buttonDisabled]}
-        onPress={() => updatePremium(false)}
+        onPress={syncPremium}
         disabled={loading}
       >
-        <Text style={styles.secondaryButtonText}>Deixar de ser Premium</Text>
+        <Text style={styles.secondaryButtonText}>Sincronizar Status</Text>
       </Pressable>
 
       <Pressable style={styles.backButton} onPress={() => router.back()} disabled={loading}>
@@ -224,3 +295,4 @@ function createStyles(theme: AppTheme) {
     },
   });
 }
+
