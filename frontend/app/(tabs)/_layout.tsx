@@ -13,8 +13,8 @@ export default function TabsLayout() {
   const screenOptions = useMemo(
     () => ({
       headerShown: false,
-      tabBarActiveTintColor: theme.colors.button,
-      tabBarInactiveTintColor: theme.colors.mutedText,
+      tabBarActiveTintColor: "#C96BFF",
+      tabBarInactiveTintColor: "#8E7BFF",
       sceneStyle: {
         backgroundColor: theme.colors.background,
         paddingTop: 12,
@@ -25,9 +25,10 @@ export default function TabsLayout() {
         paddingBottom: 8 + insets.bottom,
         paddingTop: 6,
         backgroundColor: theme.colors.safeArea,
-        borderTopColor: theme.colors.border,
+        borderTopColor: "rgba(201, 107, 255, 0.45)",
         borderTopWidth: 1,
       },
+      tabBarActiveBackgroundColor: "rgba(255, 0, 195, 0.12)",
     }),
     [insets.bottom, theme],
   );

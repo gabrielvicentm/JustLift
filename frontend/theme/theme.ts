@@ -19,6 +19,8 @@ export type AppTheme = {
     inputBackground: string;
     button: string;
     buttonText: string;
+    negativeGradient: string[];
+    negativeText: string;
     link: string;
     success: string;
     error: string;
@@ -29,18 +31,20 @@ export type AppTheme = {
 const lightTheme: AppTheme = {
   mode: "light",
   colors: {
-    background: "#f6f8fb",
-    safeArea: "#e9eef7",
-    surface: "#ffffff",
-    border: "#cbd5e1",
-    text: "#0f172a",
-    mutedText: "#475569",
-    inputBackground: "#ffffff",
-    button: "#2563eb",
-    buttonText: "#ffffff",
-    link: "#1d4ed8",
-    success: "#16a34a",
-    error: "#dc2626",
+    background: "#0D0D0D",
+    safeArea: "#070707",
+    surface: "#11131A",
+    border: "#8B5CF6",
+    text: "#E5E7EB",
+    mutedText: "#67E8F9",
+    inputBackground: "#0F1115",
+    button: "#0b0b0b",
+    buttonText: "#E5E7EB",
+    negativeGradient: ["#FF3B30", "#FF9500", "#FFD60A"],
+    negativeText: "#1A0B0B",
+    link: "#22D3EE",
+    success: "#22C55E",
+    error: "#F43F5E",
     shadow: "#000000",
   },
 };
@@ -48,18 +52,20 @@ const lightTheme: AppTheme = {
 const darkTheme: AppTheme = {
   mode: "dark",
   colors: {
-    background: "#0b1220",
-    safeArea: "#050a14",
-    surface: "#111b2e",
-    border: "#334155",
-    text: "#e2e8f0",
-    mutedText: "#94a3b8",
-    inputBackground: "#0f172a",
-    button: "#3b82f6",
-    buttonText: "#ffffff",
-    link: "#60a5fa",
-    success: "#4ade80",
-    error: "#f87171",
+    background: "#0D0D0D",
+    safeArea: "#070707",
+    surface: "#11131A",
+    border: "#8B5CF6",
+    text: "#E5E7EB",
+    mutedText: "#67E8F9",
+    inputBackground: "#0F1115",
+    button: "#0B0B0B",
+    buttonText: "#E5E7EB",
+    negativeGradient: ["#FF3B30", "#FF9500", "#FFD60A"],
+    negativeText: "#1A0B0B",
+    link: "#22D3EE",
+    success: "#22C55E",
+    error: "#F43F5E",
     shadow: "#000000",
   },
 };
