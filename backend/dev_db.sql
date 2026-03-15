@@ -111,6 +111,8 @@ CREATE TABLE account_change_verifications (
   new_email TEXT,
   new_password_hash TEXT,
   verification_code_hash TEXT NOT NULL,
+  is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  verified_at TIMESTAMP WITH TIME ZONE,
   attempts INT NOT NULL DEFAULT 0,
   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
   last_sent_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,

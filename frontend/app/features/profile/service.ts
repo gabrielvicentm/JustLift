@@ -68,19 +68,31 @@ export async function updateMyProfile(payload: UpdateMyProfilePayload) {
   return response.data;
 }
 
-export async function requestAccountChange(payload: {
+export async function requestAccountChangeCode() {
+  const headers = await getAuthHeader();
+  const response = await api.post("/profile/account-change/request", {}, { headers });
+  return response.data;
+}
+
+export async function confirmAccountChangeCode(code: string) {
+  const headers = await getAuthHeader();
+  const response = await api.post("/profile/account-change/confirm", { code }, { headers });
+  return response.data;
+}
+
+export async function applyAccountChange(payload: {
   newUsername?: string;
   newEmail?: string;
   newPassword?: string;
 }) {
   const headers = await getAuthHeader();
-  const response = await api.post("/profile/account-change/request", payload, { headers });
+  const response = await api.post("/profile/account-change/apply", payload, { headers });
   return response.data;
 }
 
-export async function confirmAccountChange(code: string) {
+export async function deleteAccount(password: string) {
   const headers = await getAuthHeader();
-  const response = await api.post("/profile/account-change/confirm", { code }, { headers });
+  const response = await api.delete("/profile/account", { headers, data: { password } });
   return response.data;
 }
 

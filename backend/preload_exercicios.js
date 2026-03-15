@@ -2,6 +2,9 @@
 // Rode com: node preload_exercicios.js
 
 const fs = require('fs');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
 const pool = require('./src/utils/db');
 
 const JSON_EN_PATH = './exercises_en.json';
