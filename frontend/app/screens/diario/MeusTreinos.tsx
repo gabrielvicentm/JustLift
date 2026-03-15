@@ -4,7 +4,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Calendar, DateData } from "react-native-calendars";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
@@ -15,6 +15,11 @@ import type { AppTheme } from "@/theme/theme";
 type DiasTreinoResponse = {
   dias: string[];
 };
+
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
+
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 
 export default function MeusTreinosScreen() {
   const router = useRouter();
@@ -134,32 +139,42 @@ export default function MeusTreinosScreen() {
         <Text style={styles.title}>{t("diary_my_workouts_title")}</Text>
         <Text style={styles.description}>{t("diary_my_workouts_description")}</Text>
 
-        <View style={styles.calendarCard}>
-          {loading ? (
-            <View style={styles.stateContainer}>
-              <ActivityIndicator color={theme.colors.button} />
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.cardBorder}
+        >
+          <View style={styles.cardInner}>
+            <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+            <View style={styles.calendarCard}>
+              {loading ? (
+                <View style={styles.stateContainer}>
+                  <ActivityIndicator color={theme.colors.button} />
+                </View>
+              ) : error ? (
+                <View style={styles.stateContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : (
+                <Calendar
+                  markedDates={diasMarcados}
+                  onDayPress={(day) => handleDayPress(day.dateString)}
+                  dayComponent={renderDay}
+                  enableSwipeMonths
+                  theme={{
+                    backgroundColor: "transparent",
+                    calendarBackground: "transparent",
+                    monthTextColor: theme.colors.text,
+                    textMonthFontWeight: "700",
+                    textSectionTitleColor: theme.colors.mutedText,
+                    arrowColor: theme.colors.button,
+                  }}
+                />
+              )}
             </View>
-          ) : error ? (
-            <View style={styles.stateContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : (
-            <Calendar
-              markedDates={diasMarcados}
-              onDayPress={(day) => handleDayPress(day.dateString)}
-              dayComponent={renderDay}
-              enableSwipeMonths
-              theme={{
-                backgroundColor: theme.colors.surface,
-                calendarBackground: theme.colors.surface,
-                monthTextColor: theme.colors.text,
-                textMonthFontWeight: "700",
-                textSectionTitleColor: theme.colors.mutedText,
-                arrowColor: theme.colors.button,
-              }}
-            />
-          )}
-        </View>
+          </View>
+        </LinearGradient>
 
         <Text style={styles.legend}>
           <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} /> {" "}
@@ -167,7 +182,7 @@ export default function MeusTreinosScreen() {
         </Text>
 
         <LinearGradient
-          colors={theme.colors.buttonGradient}
+          colors={PROGRESS_GRADIENT}
           start={{ x: 0, y: 0.2 }}
           end={{ x: 1, y: 0.8 }}
           style={styles.backButtonBorder}
@@ -193,6 +208,24 @@ function createStyles(theme: AppTheme) {
       padding: 16,
       gap: 10,
     },
+    cardBorder: {
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+    },
+    cardInner: {
+      borderRadius: 14,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
+    },
     title: {
       fontSize: 24,
       fontWeight: "700",
@@ -205,10 +238,8 @@ function createStyles(theme: AppTheme) {
       marginBottom: 4,
     },
     calendarCard: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "transparent",
       borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       padding: 8,
       minHeight: 380,
       justifyContent: "center",
@@ -237,8 +268,8 @@ function createStyles(theme: AppTheme) {
       borderWidth: 1,
     },
     dayCellSelected: {
-      backgroundColor: theme.colors.button,
-      borderColor: theme.colors.button,
+      backgroundColor: "rgba(124, 92, 255, 0.4)",
+      borderColor: "rgba(124, 92, 255, 0.8)",
     },
     dayText: {
       fontSize: 14,
@@ -256,7 +287,7 @@ function createStyles(theme: AppTheme) {
       position: "absolute",
       right: -2,
       bottom: -3,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       borderRadius: 999,
     },
     legend: {

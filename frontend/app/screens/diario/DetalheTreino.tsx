@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
 import { useI18n } from "@/providers/I18nProvider";
@@ -43,6 +44,11 @@ type DetalheTreinoResponse = {
   data: string;
   treinos: Treino[];
 };
+
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
+
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 
 function formatDate(date: string) {
   const [year, month, day] = date.split("-");
@@ -142,99 +148,117 @@ export default function DetalheTreinoScreen() {
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
             {treinos.map((treino, index) => (
-              <View key={treino.treino_id} style={styles.workoutCard}>
-                <View style={styles.workoutHeader}>
-                  <View style={styles.workoutHeaderLeft}>
-                    <Text style={styles.workoutTitle}>{isEn ? "Workout" : "Treino"} #{index + 1}</Text>
-                    <View style={[styles.statusBadge, treino.finalizado ? styles.statusDone : styles.statusDraft]}>
-                      <Text style={styles.statusBadgeText}>
-                        {treino.finalizado
-                          ? (isEn ? "Finished" : "Finalizado")
-                          : (isEn ? "Draft" : "Rascunho")}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Pressable
-                    style={styles.shareButton}
-                    onPress={() => router.push(`/screens/diario/CriarPostTreino?treinoId=${treino.treino_id}` as never)}
-                  >
-                    <Text style={styles.shareButtonText}>{isEn ? "Share" : "Compartilhar"}</Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.metricsRow}>
-                  <View style={styles.metricBlock}>
-                    <Text style={styles.metricLabel}>{isEn ? "Duration" : "Duração"}</Text>
-                    <Text style={styles.metricValue}>{formatDuration(treino.duracao)}</Text>
-                  </View>
-                  <View style={styles.metricBlock}>
-                    <Text style={styles.metricLabel}>{isEn ? "Total weight" : "Peso total"}</Text>
-                    <Text style={styles.metricValue}>{Number(treino.peso_total ?? 0).toFixed(1)}kg</Text>
-                  </View>
-                  <View style={styles.metricBlock}>
-                    <Text style={styles.metricLabel}>{isEn ? "Sets" : "Séries"}</Text>
-                    <Text style={styles.metricValue}>{treino.total_series ?? 0}</Text>
-                  </View>
-                </View>
-
-                {treino.exercicios.map((exercicio) => (
-                  <View key={exercicio.exercicio_treino_id} style={styles.exerciseCard}>
-                    <View style={styles.exerciseHeader}>
-                      {exercicio.imagem_url ? (
-                        <Image source={{ uri: exercicio.imagem_url }} style={styles.exerciseImage} />
-                      ) : (
-                        <View style={[styles.exerciseImage, styles.imagePlaceholder]}>
-                          <Text style={styles.imagePlaceholderText}>IMG</Text>
+              <LinearGradient
+                key={treino.treino_id}
+                colors={PROGRESS_GRADIENT}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.cardBorder}
+              >
+                <View style={styles.cardInner}>
+                  <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+                  <View style={styles.workoutCard}>
+                    <View style={styles.workoutHeader}>
+                      <View style={styles.workoutHeaderLeft}>
+                        <Text style={styles.workoutTitle}>{isEn ? "Workout" : "Treino"} #{index + 1}</Text>
+                        <View style={[styles.statusBadge, treino.finalizado ? styles.statusDone : styles.statusDraft]}>
+                          <Text style={styles.statusBadgeText}>
+                            {treino.finalizado
+                              ? (isEn ? "Finished" : "Finalizado")
+                              : (isEn ? "Draft" : "Rascunho")}
+                          </Text>
                         </View>
-                      )}
+                      </View>
 
-                      <View style={styles.exerciseHeaderText}>
-                        <Text style={styles.exerciseTitle}>{exercicio.nome}</Text>
-                        <Text style={styles.exerciseSubtitle}>
-                          {exercicio.source === "custom"
-                            ? (isEn ? "Custom exercise" : "Exercício personalizado")
-                            : (isEn ? "ExerciseDB" : "ExerciseDB")}
-                        </Text>
+                      <Pressable
+                        style={styles.shareButton}
+                        onPress={() => router.push(`/screens/diario/CriarPostTreino?treinoId=${treino.treino_id}` as never)}
+                      >
+                        <Text style={styles.shareButtonText}>{isEn ? "Share" : "Compartilhar"}</Text>
+                      </Pressable>
+                    </View>
+
+                    <View style={styles.metricsRow}>
+                      <View style={styles.metricBlock}>
+                        <Text style={styles.metricLabel}>{isEn ? "Duration" : "Duração"}</Text>
+                        <Text style={styles.metricValue}>{formatDuration(treino.duracao)}</Text>
+                      </View>
+                      <View style={styles.metricBlock}>
+                        <Text style={styles.metricLabel}>{isEn ? "Total weight" : "Peso total"}</Text>
+                        <Text style={styles.metricValue}>{Number(treino.peso_total ?? 0).toFixed(1)}kg</Text>
+                      </View>
+                      <View style={styles.metricBlock}>
+                        <Text style={styles.metricLabel}>{isEn ? "Sets" : "Séries"}</Text>
+                        <Text style={styles.metricValue}>{treino.total_series ?? 0}</Text>
                       </View>
                     </View>
 
-                    {exercicio.anotacoes ? (
-                      <View style={styles.noteCard}>
-                        <Text style={styles.noteLabel}>{isEn ? "Notes" : "Anotações"}</Text>
-                        <Text style={styles.noteText}>{exercicio.anotacoes}</Text>
-                      </View>
-                    ) : null}
+                    {treino.exercicios.map((exercicio) => (
+                      <View key={exercicio.exercicio_treino_id} style={styles.exerciseCard}>
+                        <View style={styles.exerciseHeader}>
+                          {exercicio.imagem_url ? (
+                            <Image source={{ uri: exercicio.imagem_url }} style={styles.exerciseImage} />
+                          ) : (
+                            <View style={[styles.exerciseImage, styles.imagePlaceholder]}>
+                              <Text style={styles.imagePlaceholderText}>IMG</Text>
+                            </View>
+                          )}
 
-                    <View style={styles.seriesHeader}>
-                      <Text style={[styles.seriesHeaderText, styles.seriesColSet]}>{isEn ? "SET" : "SÉRIE"}</Text>
-                      <Text style={[styles.seriesHeaderText, styles.seriesColKg]}>KG</Text>
-                      <Text style={[styles.seriesHeaderText, styles.seriesColReps]}>REPS</Text>
-                      <Text style={[styles.seriesHeaderText, styles.seriesColOk]}>OK</Text>
-                    </View>
-
-                    {exercicio.series.length === 0 ? (
-                      <Text style={styles.noSeriesText}>{isEn ? "No sets in this exercise." : "Sem séries neste exercício."}</Text>
-                    ) : (
-                      exercicio.series.map((serie) => (
-                        <View key={serie.serie_id} style={[styles.seriesRow, serie.concluido && styles.seriesRowDone]}>
-                          <Text style={[styles.seriesValue, styles.seriesColSet]}>{serie.numero}</Text>
-                          <Text style={[styles.seriesValue, styles.seriesColKg]}>{serie.kg}</Text>
-                          <Text style={[styles.seriesValue, styles.seriesColReps]}>{serie.repeticoes}</Text>
-                          <Text style={[styles.seriesValue, styles.seriesColOk]}>{serie.concluido ? "✓" : "-"}</Text>
+                          <View style={styles.exerciseHeaderText}>
+                            <Text style={styles.exerciseTitle}>{exercicio.nome}</Text>
+                            <Text style={styles.exerciseSubtitle}>
+                              {exercicio.source === "custom"
+                                ? (isEn ? "Custom exercise" : "Exercício personalizado")
+                                : (isEn ? "ExerciseDB" : "ExerciseDB")}
+                            </Text>
+                          </View>
                         </View>
-                      ))
-                    )}
+
+                        {exercicio.anotacoes ? (
+                          <View style={styles.noteCard}>
+                            <Text style={styles.noteLabel}>{isEn ? "Notes" : "Anotações"}</Text>
+                            <Text style={styles.noteText}>{exercicio.anotacoes}</Text>
+                          </View>
+                        ) : null}
+
+                        <View style={styles.seriesHeader}>
+                          <Text style={[styles.seriesHeaderText, styles.seriesColSet]}>{isEn ? "SET" : "SÉRIE"}</Text>
+                          <Text style={[styles.seriesHeaderText, styles.seriesColKg]}>KG</Text>
+                          <Text style={[styles.seriesHeaderText, styles.seriesColReps]}>REPS</Text>
+                          <Text style={[styles.seriesHeaderText, styles.seriesColOk]}>OK</Text>
+                        </View>
+
+                        {exercicio.series.length === 0 ? (
+                          <Text style={styles.noSeriesText}>{isEn ? "No sets in this exercise." : "Sem séries neste exercício."}</Text>
+                        ) : (
+                          exercicio.series.map((serie) => (
+                            <View key={serie.serie_id} style={[styles.seriesRow, serie.concluido && styles.seriesRowDone]}>
+                              <Text style={[styles.seriesValue, styles.seriesColSet]}>{serie.numero}</Text>
+                              <Text style={[styles.seriesValue, styles.seriesColKg]}>{serie.kg}</Text>
+                              <Text style={[styles.seriesValue, styles.seriesColReps]}>{serie.repeticoes}</Text>
+                              <Text style={[styles.seriesValue, styles.seriesColOk]}>{serie.concluido ? "✓" : "-"}</Text>
+                            </View>
+                          ))
+                        )}
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
+                </View>
+              </LinearGradient>
             ))}
           </ScrollView>
         )}
 
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>{isEn ? "Back" : "Voltar"}</Text>
-        </Pressable>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.backButtonBorder}
+        >
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>{isEn ? "Back" : "Voltar"}</Text>
+          </Pressable>
+        </LinearGradient>
       </View>
     </SafeAreaView>
   );
@@ -253,6 +277,24 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.mode === "dark" ? "#070b13" : theme.colors.background,
       paddingHorizontal: 14,
       gap: 10,
+    },
+    cardBorder: {
+      borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+    },
+    cardInner: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
     },
     header: {
       paddingTop: 4,
@@ -292,11 +334,9 @@ function createStyles(theme: AppTheme) {
     },
     workoutCard: {
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
       padding: 12,
       gap: 10,
+      backgroundColor: "transparent",
     },
     workoutHeader: {
       flexDirection: "row",
@@ -321,8 +361,8 @@ function createStyles(theme: AppTheme) {
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.inputBackground,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+      backgroundColor: "rgba(11, 14, 24, 0.9)",
     },
     shareButtonText: {
       color: theme.colors.text,
@@ -356,8 +396,8 @@ function createStyles(theme: AppTheme) {
       flex: 1,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
+      borderColor: "rgba(124, 92, 255, 0.25)",
+      backgroundColor: "rgba(2, 6, 23, 0.6)",
       paddingVertical: 8,
       paddingHorizontal: 6,
       alignItems: "center",
@@ -420,8 +460,8 @@ function createStyles(theme: AppTheme) {
     noteCard: {
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
+      borderColor: "rgba(124, 92, 255, 0.25)",
+      backgroundColor: "rgba(2, 6, 23, 0.6)",
       padding: 8,
       gap: 3,
     },
@@ -451,9 +491,9 @@ function createStyles(theme: AppTheme) {
       flexDirection: "row",
       alignItems: "center",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(148, 163, 184, 0.25)",
       borderRadius: 10,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "rgba(2, 6, 23, 0.6)",
       paddingVertical: 8,
       paddingHorizontal: 6,
       marginBottom: 6,
@@ -491,11 +531,20 @@ function createStyles(theme: AppTheme) {
     backButton: {
       height: 46,
       borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.button,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
+      marginTop: "auto",
+      marginBottom: 4,
+    },
+    backButtonBorder: {
+      borderRadius: 12,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
       marginTop: "auto",
       marginBottom: 4,
     },
