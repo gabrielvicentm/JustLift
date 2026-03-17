@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   View,
+  type ColorValue,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -33,17 +34,35 @@ const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 const PREMIUM_AD_PROFILE_FLAG_KEY = "show_premium_modal_after_profile_update";
 const GOLD_BORDER = ["#FDE68A", "#F8C84A", "#B45309"] as const;
 const GOLD_GLOW = ["rgba(253, 230, 138, 0.45)", "rgba(245, 158, 11, 0.15)", "transparent"] as const;
-const BANNER_PRESETS = [
-  { id: "color:#0B0E18", label: "Noite", type: "color" as const, color: "#0B0E18" },
-  { id: "color:#121826", label: "Azul", type: "color" as const, color: "#121826" },
-  { id: "color:#1C0F2E", label: "Roxo", type: "color" as const, color: "#1C0F2E" },
-  { id: "color:#122314", label: "Verde", type: "color" as const, color: "#122314" },
-  { id: "gradient:#5BE7FF,#7C5CFF", label: "Aurora", type: "gradient" as const, colors: ["#5BE7FF", "#7C5CFF"] },
-  { id: "gradient:#FF4BD8,#7C5CFF", label: "Neon", type: "gradient" as const, colors: ["#FF4BD8", "#7C5CFF"] },
-  { id: "gradient:#FDE68A,#F8C84A", label: "Dourado", type: "gradient" as const, colors: ["#FDE68A", "#F8C84A"] },
-  { id: "gradient:#0F172A,#1E3A8A", label: "Profundo", type: "gradient" as const, colors: ["#0F172A", "#1E3A8A"] },
-  { id: "gradient:#14B8A6,#0EA5E9", label: "Maresia", type: "gradient" as const, colors: ["#14B8A6", "#0EA5E9"] },
-];
+type BannerPreset =
+  | { id: `color:${string}`; label: string; type: "color"; color: string }
+  | { id: `gradient:${string}`; label: string; type: "gradient"; colors: readonly [ColorValue, ColorValue, ...ColorValue[]] };
+
+const BANNER_PRESETS: readonly BannerPreset[] = [
+  { id: "color:#0B0E18", label: "Noite", type: "color", color: "#0B0E18" },
+  { id: "color:#121826", label: "Azul", type: "color", color: "#121826" },
+  { id: "color:#1C0F2E", label: "Roxo", type: "color", color: "#1C0F2E" },
+  { id: "color:#122314", label: "Verde", type: "color", color: "#122314" },
+  { id: "gradient:#5BE7FF,#7C5CFF", label: "Aurora", type: "gradient", colors: ["#5BE7FF", "#7C5CFF"] as const },
+  { id: "gradient:#FF4BD8,#7C5CFF", label: "Neon", type: "gradient", colors: ["#FF4BD8", "#7C5CFF"] as const },
+  { id: "gradient:#FDE68A,#F8C84A", label: "Dourado", type: "gradient", colors: ["#FDE68A", "#F8C84A"] as const },
+  { id: "gradient:#0F172A,#1E3A8A", label: "Profundo", type: "gradient", colors: ["#0F172A", "#1E3A8A"] as const },
+  { id: "gradient:#14B8A6,#0EA5E9", label: "Maresia", type: "gradient", colors: ["#14B8A6", "#0EA5E9"] as const },
+] as const;
+
+const coerceGradientColors = (
+  colors: string[],
+  fallback: readonly [ColorValue, ColorValue, ...ColorValue[]] = PROGRESS_GRADIENT
+): readonly [ColorValue, ColorValue, ...ColorValue[]] => {
+  if (colors.length >= 2) {
+    const [first, second, ...rest] = colors;
+    return [first, second, ...rest] as readonly [ColorValue, ColorValue, ...ColorValue[]];
+  }
+  if (colors.length === 1) {
+    return [colors[0], colors[0]] as const;
+  }
+  return fallback;
+};
 
 type PremiumStatusResponse = {
   isPremium: boolean;
@@ -251,15 +270,6 @@ export default function EditarPerfilScreen() {
     }
     if (!isPremium) {
       setShowBannerPremiumModal(true);
-    if (!isPremium) {
-      Alert.alert(
-        "Banner Premium",
-        "Apenas usuários Premium podem fazer upload de banner. Escolha uma cor ou gradiente.",
-        [
-          { text: "Ver Premium", onPress: () => router.push("/screens/settings/Premium") },
-          { text: "Fechar", style: "cancel" },
-        ],
-      );
       return;
     }
     const hasBanner = Boolean(bannerUri || bannerUrl);
@@ -352,7 +362,13 @@ export default function EditarPerfilScreen() {
               <View style={[styles.bannerPreview, { backgroundColor: bannerUrl.replace("color:", "") }]} />
             ) : bannerUrl && bannerUrl.startsWith("gradient:") ? (
               <LinearGradient
-                colors={bannerUrl.replace("gradient:", "").split(",").map((color) => color.trim())}
+                colors={coerceGradientColors(
+                  bannerUrl
+                    .replace("gradient:", "")
+                    .split(",")
+                    .map((color) => color.trim())
+                    .filter(Boolean)
+                )}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.bannerPreview}
