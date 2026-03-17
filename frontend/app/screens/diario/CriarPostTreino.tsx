@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +21,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { createTreinoPost, fetchTreinoPostPreview, uploadMediaToR2 } from "@/app/features/social/service";
 import { getApiErrorMessage } from "@/app/features/profile/service";
+import { api } from "@/app/config/api";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { useI18n } from "@/providers/I18nProvider";
 import type { TreinoResumo } from "@/app/features/social/types";
@@ -30,6 +32,13 @@ const NOISE_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+const PREMIUM_AD_FLAG_KEY = "show_premium_modal_after_workout_post";
+
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
+};
 
 type PostMedia = {
   id: string;
@@ -214,9 +223,20 @@ export default function CriarPostTreinoScreen() {
       setDescricao("");
       setMidias([]);
       setSuccess("Post de treino publicado com sucesso.");
-      Alert.alert("Sucesso", "Seu treino foi compartilhado.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (accessToken) {
+        try {
+          const response = await api.get<PremiumStatusResponse>("/premium/status", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (!response.data?.isPremium) {
+            await AsyncStorage.setItem(PREMIUM_AD_FLAG_KEY, "1");
+          }
+        } catch {
+          await AsyncStorage.setItem(PREMIUM_AD_FLAG_KEY, "1");
+        }
+      }
+      router.replace("/(tabs)/perfil_tab");
     } finally {
       setSending(false);
     }

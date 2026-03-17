@@ -19,10 +19,17 @@ export default function GraficosScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <View style={[styles.container, { paddingTop: 24 + insets.top }]}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} style={styles.backIcon} />
-        </Pressable>
+      <View style={[styles.container, { paddingTop: 8 + insets.top }]}>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.backIconBorder}
+        >
+          <Pressable style={styles.backIcon} onPress={() => router.back()}>
+            <Text style={styles.backIconText}>{"<"}</Text>
+          </Pressable>
+        </LinearGradient>
 
         <Text style={styles.title}>{t("diary_charts_title")}</Text>
         <Text style={styles.description}>{t("diary_charts_description")}</Text>
@@ -91,22 +98,31 @@ function createStyles(_theme: AppTheme) {
     description: {
       color: "#7FE7FF",
     },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(11, 14, 24, 0.9)",
-      borderWidth: 1,
-      borderColor: "rgba(124, 92, 255, 0.35)",
-      position: "absolute",
-      top: 12,
-      left: 16,
-      zIndex: 2,
+    backIconBorder: {
+      width: 38,
+      height: 38,
+      borderRadius: 999,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+      marginBottom: 18,
+      alignSelf: "flex-start",
     },
     backIcon: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+    },
+    backIconText: {
       color: "#7FE7FF",
+      fontSize: 18,
+      fontWeight: "700",
     },
     button: {
       width: "100%",

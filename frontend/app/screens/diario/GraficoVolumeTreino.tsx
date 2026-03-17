@@ -356,18 +356,17 @@ export default function GraficoVolumeTreinoScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <LinearGradient
-        colors={buttonGradient}
-        start={{ x: 0, y: 0.2 }}
-        end={{ x: 1, y: 0.8 }}
-        style={[styles.backIconBorder, { top: insets.top + 10 }]}
-      >
-        <Pressable style={styles.backIcon} onPress={() => router.back()}>
-          <Text style={styles.backIconText}>{"←"}</Text>
-        </Pressable>
-      </LinearGradient>
-
       <ScrollView contentContainerStyle={contentContainerStyle}>
+        <LinearGradient
+          colors={buttonGradient}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.backIconBorder}
+        >
+          <Pressable style={styles.backIcon} onPress={() => router.back()}>
+            <Text style={styles.backIconText}>{"<"}</Text>
+          </Pressable>
+        </LinearGradient>
 
         <Text style={styles.title}>Distribuição de Volume</Text>
         <Text style={styles.subtitle}>Volume de séries por grupo muscular.</Text>
@@ -598,11 +597,8 @@ function createStyles(theme: AppTheme) {
       paddingHorizontal: 16,
     },
     backIconBorder: {
-      position: "absolute",
-      left: 16,
-      zIndex: 20,
-      width: 42,
-      height: 42,
+      width: 38,
+      height: 38,
       borderRadius: 999,
       padding: 1.5,
       shadowColor: "#7C5CFF",
@@ -610,6 +606,7 @@ function createStyles(theme: AppTheme) {
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 6 },
       elevation: 6,
+      marginBottom: 18,
     },
     backIcon: {
       width: "100%",
@@ -621,11 +618,9 @@ function createStyles(theme: AppTheme) {
     },
     backIconText: {
       color: theme.colors.text,
-      fontSize: 22,
-      lineHeight: 22,
-      fontWeight: "800",
+      fontSize: 18,
+      fontWeight: "700",
       textAlign: "center",
-      includeFontPadding: false,
     },
     title: {
       fontSize: 38,

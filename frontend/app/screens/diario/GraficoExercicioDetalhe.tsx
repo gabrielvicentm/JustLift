@@ -4,7 +4,6 @@ import {
   Dimensions,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +15,8 @@ import { AxiosError } from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 import * as d3Shape from "d3-shape";
+import { BlurView } from "expo-blur";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
@@ -48,6 +49,14 @@ const NOISE_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+const GOLD_BORDER = ["#FDE68A", "#F8C84A", "#B45309"] as const;
+const GOLD_GLOW = ["rgba(253, 230, 138, 0.45)", "rgba(245, 158, 11, 0.15)", "transparent"] as const;
+
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
+};
 
 function getApiErrorMessage(err: unknown) {
   const axiosError = err as AxiosError<{ message?: string } | string>;
@@ -76,11 +85,13 @@ function formatDate(date: string) {
 
 export default function GraficoExercicioDetalheScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     source?: string;
     exercise_id?: string;
     custom_exercise_id?: string;
     nome?: string;
+    premium_blocked?: string;
   }>();
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -89,11 +100,15 @@ export default function GraficoExercicioDetalheScreen() {
   const [error, setError] = useState("");
   const [data, setData] = useState<EvolucaoResponse | null>(null);
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  const [checkingPremium, setCheckingPremium] = useState(false);
+  const [showPremiumGate, setShowPremiumGate] = useState(false);
 
   const source = params.source === "custom" ? "custom" : "api";
   const exerciseId = typeof params.exercise_id === "string" ? params.exercise_id : "";
   const customExerciseId = Number(params.custom_exercise_id || 0);
   const exerciseName = typeof params.nome === "string" ? params.nome : "Exercício";
+  const blockedFromList = params.premium_blocked === "1";
 
   useEffect(() => {
     let active = true;
@@ -146,6 +161,55 @@ export default function GraficoExercicioDetalheScreen() {
       active = false;
     };
   }, [customExerciseId, exerciseId, source]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function resolvePremium() {
+      if (blockedFromList) {
+        setIsPremium(false);
+        setShowPremiumGate(true);
+        return;
+      }
+
+      if (isPremium !== null) {
+        setShowPremiumGate(!isPremium);
+        return;
+      }
+
+      setCheckingPremium(true);
+      try {
+        const token = await AsyncStorage.getItem("accessToken");
+        if (!token) {
+          if (active) {
+            setIsPremium(false);
+            setShowPremiumGate(true);
+          }
+          return;
+        }
+
+        const response = await api.get<PremiumStatusResponse>("/premium/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!active) return;
+        const premium = Boolean(response.data?.isPremium);
+        setIsPremium(premium);
+        setShowPremiumGate(!premium);
+      } catch {
+        if (active) {
+          setIsPremium(false);
+          setShowPremiumGate(true);
+        }
+      } finally {
+        if (active) setCheckingPremium(false);
+      }
+    }
+
+    resolvePremium();
+    return () => {
+      active = false;
+    };
+  }, [blockedFromList, isPremium]);
 
   const pontos = data?.pontos ?? [];
   const stats = data?.estatisticas;
@@ -200,7 +264,8 @@ export default function GraficoExercicioDetalheScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.flex}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + 8 }]}>
         <LinearGradient
           colors={PROGRESS_GRADIENT}
           start={{ x: 0, y: 0.2 }}
@@ -356,7 +421,48 @@ export default function GraficoExercicioDetalheScreen() {
             </>
           )
         ) : null}
-      </ScrollView>
+        </ScrollView>
+        {showPremiumGate ? (
+          <View style={styles.premiumOverlay} pointerEvents="auto">
+            <BlurView intensity={95} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <LinearGradient
+              colors={GOLD_BORDER}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.premiumBorder}
+            >
+              <View style={styles.premiumCard}>
+                <LinearGradient
+                  colors={GOLD_GLOW}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.premiumGlow}
+                />
+                <Text style={styles.premiumKicker}>PREMIUM</Text>
+                <Text style={styles.premiumTitle}>Somente Premium</Text>
+                <Text style={styles.premiumText}>
+                  Esta tela faz parte do plano Premium. Assine para desbloquear os gráficos completos.
+                </Text>
+                <View style={styles.premiumActions}>
+                  <LinearGradient
+                    colors={GOLD_BORDER}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.premiumPrimaryBorder}
+                  >
+                    <Pressable style={styles.premiumPrimary} onPress={() => router.push("/screens/settings/Premium")}>
+                      <Text style={styles.premiumPrimaryText}>Assinar Premium</Text>
+                    </Pressable>
+                  </LinearGradient>
+                  <Pressable style={styles.premiumGhost} onPress={() => router.back()}>
+                    <Text style={styles.premiumGhostText}>Voltar</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        ) : null}
+      </View>
     </SafeAreaView>
   );
 }
@@ -366,6 +472,9 @@ function createStyles(theme: AppTheme) {
     screen: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    flex: {
+      flex: 1,
     },
     container: {
       paddingHorizontal: 16,
@@ -502,6 +611,83 @@ function createStyles(theme: AppTheme) {
       fontWeight: "800",
       fontSize: 16,
       textAlign: "center",
+    },
+    premiumOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+      backgroundColor: "rgba(5, 5, 8, 0.78)",
+    },
+    premiumBorder: {
+      width: "100%",
+      borderRadius: 22,
+      padding: 2,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.55,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 12,
+    },
+    premiumCard: {
+      borderRadius: 20,
+      backgroundColor: "#120804",
+      padding: 20,
+      gap: 12,
+      overflow: "hidden",
+    },
+    premiumGlow: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.9,
+    },
+    premiumKicker: {
+      color: "#FDE68A",
+      letterSpacing: 2.5,
+      fontWeight: "800",
+      fontSize: 12,
+    },
+    premiumTitle: {
+      color: "#FFF7E0",
+      fontSize: 22,
+      fontWeight: "800",
+    },
+    premiumText: {
+      color: "#F8D37A",
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    premiumActions: {
+      gap: 10,
+      marginTop: 6,
+    },
+    premiumPrimaryBorder: {
+      borderRadius: 14,
+      padding: 1.5,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+    },
+    premiumPrimary: {
+      borderRadius: 12,
+      backgroundColor: "#2B1404",
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    premiumPrimaryText: {
+      color: "#FDE68A",
+      fontWeight: "800",
+    },
+    premiumGhost: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: "rgba(253, 230, 138, 0.45)",
+      paddingVertical: 11,
+      alignItems: "center",
+    },
+    premiumGhostText: {
+      color: "#FDE68A",
+      fontWeight: "700",
     },
   });
 }
