@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ColorValue,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,6 +27,20 @@ import PremiumAdModal from "@/app/components/PremiumAdModal";
 
 const PREMIUM_AD_FLAG_KEY = "show_premium_modal_after_workout_post";
 const PREMIUM_AD_PROFILE_FLAG_KEY = "show_premium_modal_after_profile_update";
+
+const coerceGradientColors = (
+  colors: string[],
+  fallback: readonly [ColorValue, ColorValue, ...ColorValue[]] = ["#5BE7FF", "#7C5CFF"] as const
+): readonly [ColorValue, ColorValue, ...ColorValue[]] => {
+  if (colors.length >= 2) {
+    const [first, second, ...rest] = colors;
+    return [first, second, ...rest] as readonly [ColorValue, ColorValue, ...ColorValue[]];
+  }
+  if (colors.length === 1) {
+    return [colors[0], colors[0]] as const;
+  }
+  return fallback;
+};
 
 export default function PerfilScreen() {
   const { theme } = useAppTheme();
@@ -159,7 +174,13 @@ export default function PerfilScreen() {
               <View style={[styles.bannerImage, { backgroundColor: profile.banner.replace("color:", "") }]} />
             ) : profile?.banner?.startsWith("gradient:") ? (
               <LinearGradient
-                colors={profile.banner.replace("gradient:", "").split(",").map((color) => color.trim())}
+                colors={coerceGradientColors(
+                  profile.banner
+                    .replace("gradient:", "")
+                    .split(",")
+                    .map((color) => color.trim())
+                    .filter(Boolean)
+                )}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.bannerImage}
