@@ -20,7 +20,7 @@ export type TreinoResumo = {
   total_series: number | null;
   total_exercicios: number | null;
   finalizado: boolean;
-  exercicios?: { exercicio_treino_id: number; nome: string }[];
+  exercicios?: { exercicio_treino_id: number; nome: string; imagem_url?: string | null }[];
 };
 
 export type PostCommentItem = {

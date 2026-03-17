@@ -17,6 +17,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { createTreinoPost, fetchTreinoPostPreview, uploadMediaToR2 } from "@/app/features/social/service";
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -25,6 +26,10 @@ import type { TreinoResumo } from "@/app/features/social/types";
 import type { AppTheme } from "@/theme/theme";
 
 const MAX_MIDIAS = 9;
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
+
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 
 type PostMedia = {
   id: string;
@@ -248,44 +253,63 @@ export default function CriarPostTreinoScreen() {
             <Text style={styles.stateText}>Carregando resumo...</Text>
           </View>
         ) : resumo ? (
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryHeader}>
-              <Text style={styles.summaryTitle}>Resumo do treino</Text>
-              <Text style={styles.summaryDate}>{formatDate(resumo.data)}</Text>
-            </View>
+          <LinearGradient
+            colors={PROGRESS_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.summaryBorder}
+          >
+            <View style={styles.summaryInner}>
+              <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryHeader}>
+                  <Text style={styles.summaryTitle}>Resumo do treino</Text>
+                  <Text style={styles.summaryDate}>{formatDate(resumo.data)}</Text>
+                </View>
 
-            <View style={styles.summaryMetrics}>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Duracao</Text>
-                <Text style={styles.metricValue}>{formatDuration(resumo.duracao ?? 0)}</Text>
-              </View>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Peso total</Text>
-                <Text style={styles.metricValue}>{Number(resumo.peso_total ?? 0).toFixed(1)}kg</Text>
-              </View>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Series</Text>
-                <Text style={styles.metricValue}>{resumo.total_series ?? 0}</Text>
-              </View>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Exercicios</Text>
-                <Text style={styles.metricValue}>{resumo.total_exercicios ?? resumo.exercicios?.length ?? 0}</Text>
-              </View>
-            </View>
+                <View style={styles.summaryMetrics}>
+                  <View style={styles.metricItem}>
+                    <Text style={styles.metricLabel}>Duracao</Text>
+                    <Text style={styles.metricValue}>{formatDuration(resumo.duracao ?? 0)}</Text>
+                  </View>
+                  <View style={styles.metricItem}>
+                    <Text style={styles.metricLabel}>Peso total</Text>
+                    <Text style={styles.metricValue}>{Number(resumo.peso_total ?? 0).toFixed(1)}kg</Text>
+                  </View>
+                  <View style={styles.metricItem}>
+                    <Text style={styles.metricLabel}>Series</Text>
+                    <Text style={styles.metricValue}>{resumo.total_series ?? 0}</Text>
+                  </View>
+                  <View style={styles.metricItem}>
+                    <Text style={styles.metricLabel}>Exercicios</Text>
+                    <Text style={styles.metricValue}>{resumo.total_exercicios ?? resumo.exercicios?.length ?? 0}</Text>
+                  </View>
+                </View>
 
-            {resumo.exercicios && resumo.exercicios.length > 0 ? (
-              <View style={styles.exerciseList}>
-                {resumo.exercicios.slice(0, 4).map((exercicio) => (
-                  <Text key={exercicio.exercicio_treino_id} style={styles.exerciseItem}>
-                    {exercicio.nome}
-                  </Text>
-                ))}
-                {resumo.exercicios.length > 4 ? (
-                  <Text style={styles.exerciseMore}>+{resumo.exercicios.length - 4} exercicios</Text>
+                {resumo.exercicios && resumo.exercicios.length > 0 ? (
+                  <View style={styles.exerciseList}>
+                    {resumo.exercicios.slice(0, 4).map((exercicio) => (
+                      <View key={exercicio.exercicio_treino_id} style={styles.exerciseRow}>
+                        {exercicio.imagem_url ? (
+                          <Image source={{ uri: exercicio.imagem_url }} style={styles.exerciseImage} />
+                        ) : (
+                          <View style={[styles.exerciseImage, styles.imagePlaceholder]}>
+                            <Text style={styles.imagePlaceholderText}>IMG</Text>
+                          </View>
+                        )}
+                        <Text style={styles.exerciseItem} numberOfLines={2}>
+                          {exercicio.nome}
+                        </Text>
+                      </View>
+                    ))}
+                    {resumo.exercicios.length > 4 ? (
+                      <Text style={styles.exerciseMore}>+{resumo.exercicios.length - 4} exercicios</Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
-            ) : null}
-          </View>
+            </View>
+          </LinearGradient>
         ) : (
           <View style={styles.stateContainer}>
             <Text style={styles.errorText}>{error || "Treino nao encontrado."}</Text>
@@ -392,13 +416,29 @@ function createStyles(theme: AppTheme) {
     stateText: {
       color: theme.colors.mutedText,
     },
+    summaryBorder: {
+      borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#FF4BD8",
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+    },
+    summaryInner: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+    },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.035,
+    },
     summaryCard: {
-      borderRadius: 14,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderRadius: 16,
       padding: 16,
       gap: 12,
+      backgroundColor: "transparent",
     },
     summaryHeader: {
       flexDirection: "row",
@@ -421,11 +461,11 @@ function createStyles(theme: AppTheme) {
     },
     metricItem: {
       minWidth: "45%",
-      backgroundColor: theme.colors.inputBackground,
+      backgroundColor: "rgba(2, 6, 23, 0.6)",
       borderRadius: 10,
       padding: 10,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(124, 92, 255, 0.25)",
     },
     metricLabel: {
       fontSize: 12,
@@ -433,15 +473,39 @@ function createStyles(theme: AppTheme) {
     },
     metricValue: {
       fontSize: 16,
-      fontWeight: "600",
+      fontWeight: "700",
       color: theme.colors.text,
     },
     exerciseList: {
-      gap: 4,
+      gap: 8,
+    },
+    exerciseRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    exerciseImage: {
+      width: 46,
+      height: 46,
+      borderRadius: 10,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    imagePlaceholder: {
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.25)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    imagePlaceholderText: {
+      color: theme.colors.mutedText,
+      fontWeight: "700",
+      fontSize: 11,
     },
     exerciseItem: {
       color: theme.colors.text,
       fontSize: 13,
+      fontWeight: "600",
+      flex: 1,
     },
     exerciseMore: {
       color: theme.colors.mutedText,
