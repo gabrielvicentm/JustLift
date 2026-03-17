@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AxiosError } from "axios";
 import { useRouter } from "expo-router";
 import Purchases, { LOG_LEVEL, PurchasesPackage } from "react-native-purchases";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
 import { fetchMyProfile } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -15,10 +18,27 @@ type PremiumStatusResponse = {
   message?: string;
 };
 
+const GOLD_BORDER = ["#FDE68A", "#F8C84A", "#B45309"] as const;
+const GOLD_GLOW = ["rgba(253, 230, 138, 0.45)", "rgba(245, 158, 11, 0.15)", "transparent"] as const;
+const DARK_PANEL = ["#120804", "#1B0C03", "#090401"] as const;
+const NOISE_DATA_URI =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
+const BENEFITS = [
+  "Sem anúncios",
+  "Banners exclusivos",
+  "Mudar a cor do seu perfil",
+  "Mudar a cor do app localmente (fundo, botões, bordas)",
+  "Treinos ilimitados (grátis: 3x por semana)",
+  "Boost de pontos 2x",
+  "Retrospectiva semanal, mensal e anual",
+];
+
 export default function PremiumScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const ctaPulse = useRef(new Animated.Value(1)).current;
   const [loading, setLoading] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -164,42 +184,106 @@ export default function PremiumScreen() {
     loadStatus().catch(() => undefined);
   }, [loadStatus]);
 
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ctaPulse, {
+          toValue: 1.03,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(ctaPulse, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [ctaPulse]);
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Premium</Text>
-      <Text style={styles.subtitle}>Assine e sincronize seu status com o RevenueCat.</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.statusLabel}>Status atual</Text>
-        <Text style={[styles.statusValue, isPremium ? styles.premiumOn : styles.premiumOff]}>
-          {isPremium ? "Premium ativo" : "Premium inativo"}
-        </Text>
-        {updatedAt ? <Text style={styles.updatedAt}>Ultima atualizacao: {new Date(updatedAt).toLocaleString()}</Text> : null}
-      </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {message ? <Text style={styles.success}>{message}</Text> : null}
-
-      <Pressable
-        style={[styles.primaryButton, loading && styles.buttonDisabled]}
-        onPress={purchasePremium}
-        disabled={loading}
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
       >
-        {loading ? <ActivityIndicator color={theme.colors.buttonText} /> : <Text style={styles.primaryButtonText}>Assinar Premium</Text>}
-      </Pressable>
+        <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroBorder}>
+          <View style={styles.heroCard}>
+            <LinearGradient colors={GOLD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glow} />
 
-      <Pressable
-        style={[styles.secondaryButton, loading && styles.buttonDisabled]}
-        onPress={syncPremium}
-        disabled={loading}
-      >
-        <Text style={styles.secondaryButtonText}>Sincronizar Status</Text>
-      </Pressable>
+            <Text style={styles.kicker}>PREMIUM</Text>
+            <Text style={styles.title}>Viva o auge dos seus treinos</Text>
+            <Text style={styles.subtitle}>O pacote completo para evoluir mais rápido.</Text>
 
-      <Pressable style={styles.backButton} onPress={() => router.back()} disabled={loading}>
-        <Text style={styles.backButtonText}>Voltar</Text>
-      </Pressable>
-    </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.price}>R$ 12,89</Text>
+              <Text style={styles.priceSuffix}>/mês</Text>
+            </View>
+            <Text style={styles.priceNote}>Plano mensal único • Cancele quando quiser</Text>
+          </View>
+        </LinearGradient>
+
+        <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.benefitsBorder}>
+          <LinearGradient colors={DARK_PANEL} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.benefitsCard}>
+            <Text style={styles.sectionTitle}>Benefícios Premium</Text>
+            <View style={styles.benefitsList}>
+              {BENEFITS.map((benefit) => (
+                <View key={benefit} style={styles.benefitRow}>
+                  <Ionicons name="sparkles" size={16} color="#FDE68A" />
+                  <Text style={styles.benefitText}>{benefit}</Text>
+                </View>
+              ))}
+            </View>
+          </LinearGradient>
+        </LinearGradient>
+
+        <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.statusBorder}>
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Status atual</Text>
+            <Text style={[styles.statusValue, isPremium ? styles.premiumOn : styles.premiumOff]}>
+              {isPremium ? "Premium ativo" : "Premium inativo"}
+            </Text>
+            {updatedAt ? (
+              <Text style={styles.updatedAt}>Ultima atualizacao: {new Date(updatedAt).toLocaleString()}</Text>
+            ) : null}
+          </View>
+        </LinearGradient>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {message ? <Text style={styles.success}>{message}</Text> : null}
+
+        <Animated.View style={[styles.ctaPulse, { transform: [{ scale: ctaPulse }] }]}>
+          <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaBorder}>
+            <Pressable
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
+              onPress={purchasePremium}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#0B0B0B" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Assinar Premium</Text>
+              )}
+            </Pressable>
+          </LinearGradient>
+        </Animated.View>
+
+        <Pressable
+          style={[styles.secondaryButton, loading && styles.buttonDisabled]}
+          onPress={syncPremium}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>Sincronizar Status</Text>
+        </Pressable>
+
+        <Pressable style={styles.backButton} onPress={() => router.back()} disabled={loading}>
+          <Text style={styles.backButtonText}>Voltar</Text>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -207,92 +291,210 @@ function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "#070506",
+    },
+    noiseOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.06,
+      pointerEvents: "none",
+    },
+    scrollContent: {
+      padding: 16,
+      gap: 16,
+      paddingBottom: 32,
+    },
+    heroBorder: {
+      borderRadius: 24,
+      padding: 2,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.45,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10,
+    },
+    heroCard: {
+      borderRadius: 22,
+      padding: 20,
+      overflow: "hidden",
+      backgroundColor: "#120804",
+    },
+    glow: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.85,
+    },
+    kicker: {
+      color: "#FDE68A",
+      letterSpacing: 3,
+      fontWeight: "800",
+      fontSize: 12,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: "#FFF7E0",
+      marginTop: 8,
+    },
+    subtitle: {
+      color: "#F8D37A",
+      fontSize: 15,
+      fontWeight: "600",
+      marginTop: 4,
+    },
+    priceRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 6,
+      marginTop: 16,
+    },
+    price: {
+      color: "#FDE68A",
+      fontSize: 36,
+      fontWeight: "800",
+    },
+    priceSuffix: {
+      color: "#FDE68A",
+      fontSize: 16,
+      fontWeight: "700",
+      marginBottom: 6,
+    },
+    priceNote: {
+      color: "rgba(253, 230, 138, 0.75)",
+      fontSize: 12,
+      marginTop: 4,
+    },
+    benefitsBorder: {
+      borderRadius: 20,
+      padding: 1.5,
+    },
+    benefitsCard: {
+      borderRadius: 18,
       padding: 16,
       gap: 12,
     },
-    title: {
-      fontSize: 24,
-      fontWeight: "700",
-      color: theme.colors.text,
+    sectionTitle: {
+      color: "#FDE68A",
+      fontSize: 16,
+      fontWeight: "800",
+      letterSpacing: 1,
     },
-    subtitle: {
-      color: theme.colors.mutedText,
+    benefitsList: {
+      gap: 10,
     },
-    card: {
-      backgroundColor: theme.colors.surface,
-      borderColor: theme.colors.border,
+    benefitRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      backgroundColor: "rgba(253, 230, 138, 0.06)",
       borderWidth: 1,
-      borderRadius: 12,
+      borderColor: "rgba(253, 230, 138, 0.2)",
+    },
+    benefitText: {
+      color: "#FFF7E0",
+      fontSize: 14,
+      fontWeight: "600",
+      flex: 1,
+    },
+    statusBorder: {
+      borderRadius: 16,
+      padding: 1.5,
+    },
+    statusCard: {
+      borderRadius: 14,
       padding: 14,
+      backgroundColor: "rgba(18, 8, 4, 0.95)",
+      borderWidth: 1,
+      borderColor: "rgba(253, 230, 138, 0.25)",
       gap: 6,
     },
     statusLabel: {
-      color: theme.colors.mutedText,
-      fontWeight: "600",
+      color: "rgba(253, 230, 138, 0.75)",
+      fontWeight: "700",
+      fontSize: 12,
     },
     statusValue: {
       fontSize: 18,
-      fontWeight: "700",
+      fontWeight: "800",
+      color: "#FFF7E0",
     },
     premiumOn: {
-      color: theme.colors.success,
+      color: "#34d399",
     },
     premiumOff: {
-      color: theme.colors.error,
+      color: "#f87171",
     },
     updatedAt: {
-      color: theme.colors.mutedText,
+      color: "rgba(253, 230, 138, 0.65)",
       fontSize: 12,
     },
+    ctaBorder: {
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10,
+      marginTop: 4,
+    },
+    ctaPulse: {
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.4,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10,
+    },
     primaryButton: {
-      height: 46,
-      borderRadius: 10,
+      height: 52,
+      borderRadius: 14,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "#FDE68A",
     },
     primaryButtonText: {
-      color: theme.colors.buttonText,
+      color: "#120804",
       fontWeight: "700",
       fontSize: 16,
     },
     secondaryButton: {
-      height: 46,
-      borderRadius: 10,
+      height: 48,
+      borderRadius: 12,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(253, 230, 138, 0.08)",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(253, 230, 138, 0.25)",
     },
     secondaryButtonText: {
-      color: theme.colors.text,
+      color: "#FDE68A",
       fontWeight: "700",
       fontSize: 15,
     },
     backButton: {
       marginTop: 6,
-      height: 44,
+      height: 42,
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
     },
     backButtonText: {
-      color: theme.colors.link,
+      color: "rgba(253, 230, 138, 0.7)",
       fontWeight: "600",
     },
     buttonDisabled: {
       opacity: 0.7,
     },
     error: {
-      color: theme.colors.error,
+      color: "#f87171",
       fontWeight: "600",
+      textAlign: "center",
     },
     success: {
-      color: theme.colors.success,
+      color: "#34d399",
       fontWeight: "600",
+      textAlign: "center",
     },
   });
 }
-

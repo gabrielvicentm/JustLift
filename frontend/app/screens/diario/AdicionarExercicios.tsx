@@ -15,6 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
@@ -142,12 +143,24 @@ const EQUIPMENT_FILTER_OPTIONS = [
   { key: "band", label: "Elástico" },
 ];
 
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+
 export default function AdicionarTreinoScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { language } = useI18n();
   const isEn = language === "en";
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const buttonGradient = (theme.colors.buttonGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
+    string,
+    string,
+    ...string[],
+  ];
+  const negativeGradient = (theme.colors.negativeGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
+    string,
+    string,
+    ...string[],
+  ];
   const [query, setQuery] = useState("");
   const [exercicios, setExercicios] = useState<Exercicio[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -374,7 +387,7 @@ export default function AdicionarTreinoScreen() {
     const equipmentTags = item.equipamentos.length > 0 ? item.equipamentos.slice(0, 2) : ["Sem equipamento"];
     return (
       <LinearGradient
-        colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+        colors={PROGRESS_GRADIENT}
         start={{ x: 0, y: 0.2 }}
         end={{ x: 1, y: 0.8 }}
         style={[styles.exerciseCardBorder, selected && styles.exerciseCardBorderSelected]}
@@ -633,7 +646,7 @@ export default function AdicionarTreinoScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
     <View style={styles.container}>
       <LinearGradient
-        colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+        colors={PROGRESS_GRADIENT}
         start={{ x: 0, y: 0.2 }}
         end={{ x: 1, y: 0.8 }}
         style={styles.headerBorder}
@@ -643,7 +656,7 @@ export default function AdicionarTreinoScreen() {
           <View style={styles.header}>
             <View style={styles.row}>
               <LinearGradient
-                colors={theme.colors.negativeGradient}
+                colors={negativeGradient}
                 start={{ x: 0, y: 0.2 }}
                 end={{ x: 1, y: 0.8 }}
                 style={styles.cancelHeaderBorder}
@@ -653,7 +666,7 @@ export default function AdicionarTreinoScreen() {
                 </Pressable>
               </LinearGradient>
               <LinearGradient
-                colors={theme.colors.buttonGradient}
+                colors={buttonGradient}
                 start={{ x: 0, y: 0.2 }}
                 end={{ x: 1, y: 0.8 }}
                 style={styles.primaryButtonBorder}
@@ -684,7 +697,10 @@ export default function AdicionarTreinoScreen() {
                   loadCustomExercises().catch(() => undefined);
                 }}
               >
-                <Text style={styles.tabButtonText}>Personalizados</Text>
+                <View style={styles.buttonContent}>
+                  <Ionicons name="person-circle-outline" size={16} color={theme.colors.text} />
+                  <Text style={styles.tabButtonText}>Personalizados</Text>
+                </View>
               </Pressable>
               <Pressable
                 style={styles.tabButton}
@@ -693,19 +709,31 @@ export default function AdicionarTreinoScreen() {
                   loadRepeatWorkouts().catch(() => undefined);
                 }}
               >
-                <Text style={styles.tabButtonText}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
+                <View style={styles.buttonContent}>
+                  <Ionicons name="repeat" size={16} color={theme.colors.text} />
+                  <Text style={styles.tabButtonText}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
+                </View>
               </Pressable>
             </View>
 
             <View style={styles.rowThree}>
               <Pressable style={styles.smallButton} onPress={() => setShowMuscleModal(true)}>
-                <Text style={styles.smallButtonText}>{selectedMuscleLabel}</Text>
+                <View style={styles.buttonContentSmall}>
+                  <Ionicons name="body-outline" size={14} color={theme.colors.text} />
+                  <Text style={styles.smallButtonText}>{selectedMuscleLabel}</Text>
+                </View>
               </Pressable>
               <Pressable style={styles.smallButton} onPress={() => setShowEquipmentModal(true)}>
-                <Text style={styles.smallButtonText}>{selectedEquipmentLabel}</Text>
+                <View style={styles.buttonContentSmall}>
+                  <Ionicons name="barbell-outline" size={14} color={theme.colors.text} />
+                  <Text style={styles.smallButtonText}>{selectedEquipmentLabel}</Text>
+                </View>
               </Pressable>
               <Pressable style={styles.smallButton} onPress={() => router.push("/screens/diario/CriarExercicio")}>
-                <Text style={styles.smallButtonText}>{isEn ? "Create" : "Criar"}</Text>
+                <View style={styles.buttonContentSmall}>
+                  <Ionicons name="add-circle-outline" size={14} color={theme.colors.text} />
+                  <Text style={styles.smallButtonText}>{isEn ? "Create" : "Criar"}</Text>
+                </View>
               </Pressable>
             </View>
           </View>
@@ -776,7 +804,7 @@ export default function AdicionarTreinoScreen() {
                   const equipmentTag = item.equipamento || (isEn ? "No equipment" : "Sem equipamento");
                   return (
                   <LinearGradient
-                    colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+                    colors={PROGRESS_GRADIENT}
                     start={{ x: 0, y: 0.2 }}
                     end={{ x: 1, y: 0.8 }}
                     style={[styles.exerciseCardBorder, selected && styles.exerciseCardBorderSelected]}
@@ -1006,7 +1034,7 @@ export default function AdicionarTreinoScreen() {
                 <Text style={styles.cancelNoText}>{isEn ? "No" : "Não"}</Text>
               </Pressable>
               <LinearGradient
-                colors={theme.colors.negativeGradient}
+                colors={negativeGradient}
                 start={{ x: 0, y: 0.2 }}
                 end={{ x: 1, y: 0.8 }}
                 style={styles.cancelYesBorder}
@@ -1156,6 +1184,11 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
       fontWeight: "600",
     },
+    buttonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
     smallButton: {
       flex: 1,
       height: 38,
@@ -1170,6 +1203,11 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
       fontWeight: "600",
       fontSize: 12,
+    },
+    buttonContentSmall: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
     },
     listContent: {
       paddingHorizontal: 12,
