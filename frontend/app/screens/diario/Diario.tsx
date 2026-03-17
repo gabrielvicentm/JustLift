@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
@@ -11,6 +11,7 @@ import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 
 const WORKOUT_DRAFT_KEY = "current_workout_draft_v1";
+const GOLD_GRADIENT = ["#FDE68A", "#F8C84A", "#B45309"] as const;
 
 export default function DiarioScreen() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function DiarioScreen() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const premiumPulse = useRef(new Animated.Value(1)).current;
   const [hasWorkoutDraft, setHasWorkoutDraft] = useState(false);
 
   useFocusEffect(
@@ -59,6 +61,25 @@ export default function DiarioScreen() {
     }, []),
   );
 
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(premiumPulse, {
+          toValue: 1.03,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(premiumPulse, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [premiumPulse]);
+
   return (
     <View style={[styles.container, { paddingBottom: 0, paddingTop: 28 + insets.top }]}>
       {hasWorkoutDraft ? (
@@ -85,6 +106,26 @@ export default function DiarioScreen() {
         contentContainerStyle={styles.buttonsContainer}
         showsVerticalScrollIndicator={false}
       >
+
+        <Animated.View style={[styles.premiumWrapper, { transform: [{ scale: premiumPulse }] }]}>
+          <LinearGradient
+            colors={GOLD_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.premiumBorder}
+          >
+            <Pressable style={styles.premiumCard} onPress={() => router.push("/screens/diario/Retrospectiva")}>
+              <View>
+                <Text style={styles.premiumTitle}>Retrospectiva</Text>
+                <Text style={styles.premiumHint}>Semanal e mensal Premium</Text>
+              </View>
+              <View style={styles.premiumBadge}>
+                <MaterialCommunityIcons name="crown" size={18} style={styles.premiumBadgeIcon} />
+                <Text style={styles.premiumBadgeText}>VIP</Text>
+              </View>
+              </Pressable>
+            </LinearGradient>
+          </Animated.View>
 
         <Pressable
           style={[styles.button, styles.buttonCard]}
@@ -214,6 +255,7 @@ function createStyles(theme: AppTheme) {
     },
     buttonsScroll: {
       flex: 1,
+      overflow: "visible",
     },
     buttonsContainer: {
       marginTop: 22,
@@ -224,6 +266,7 @@ function createStyles(theme: AppTheme) {
       alignItems: "stretch",
       alignContent: "flex-start",
       paddingBottom: 64,
+      overflow: "visible",
     },
     button: {
       height: 92,
@@ -274,11 +317,69 @@ function createStyles(theme: AppTheme) {
     stickyButton: {
       marginTop: 16,
       marginBottom: 12,
+      zIndex: 5,
+      elevation: 6,
     },
     buttonSecondaryText: {
       color: "#0B0E18",
       fontWeight: "700",
       letterSpacing: 0.2,
+    },
+    premiumBorder: {
+      borderRadius: 18,
+      padding: 2,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.55,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10,
+    },
+    premiumWrapper: {
+      width: "100%",
+      overflow: "visible",
+      paddingHorizontal: 2,
+    },
+    premiumCard: {
+      minHeight: 92,
+      borderRadius: 16,
+      backgroundColor: "rgba(18, 8, 4, 0.96)",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    premiumTitle: {
+      color: "#FFF7E0",
+      fontSize: 16,
+      fontWeight: "800",
+      letterSpacing: 0.3,
+    },
+    premiumHint: {
+      color: "rgba(253, 230, 138, 0.85)",
+      fontSize: 12,
+      marginTop: 2,
+      fontWeight: "600",
+    },
+    premiumBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: "rgba(253, 230, 138, 0.15)",
+      borderWidth: 1,
+      borderColor: "rgba(253, 230, 138, 0.6)",
+    },
+    premiumBadgeIcon: {
+      color: "#FDE68A",
+    },
+    premiumBadgeText: {
+      color: "#FDE68A",
+      fontWeight: "800",
+      fontSize: 12,
+      letterSpacing: 0.8,
     },
     buttonContent: {
       flexDirection: "row",

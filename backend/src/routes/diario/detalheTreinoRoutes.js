@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get('/dias', authMiddleware, detalheTreinoController.buscarDiasComTreino);
 router.get('/detalhe', authMiddleware, detalheTreinoController.buscarDetalheTreinoPorData);
+router.get('/retrospectiva', authMiddleware, detalheTreinoController.buscarRetrospectiva);
 
 module.exports = router;
 

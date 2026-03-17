@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,6 +31,19 @@ import type { AppTheme } from "@/theme/theme";
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 const PREMIUM_AD_PROFILE_FLAG_KEY = "show_premium_modal_after_profile_update";
+const GOLD_BORDER = ["#FDE68A", "#F8C84A", "#B45309"] as const;
+const GOLD_GLOW = ["rgba(253, 230, 138, 0.45)", "rgba(245, 158, 11, 0.15)", "transparent"] as const;
+const BANNER_PRESETS = [
+  { id: "color:#0B0E18", label: "Noite", type: "color" as const, color: "#0B0E18" },
+  { id: "color:#121826", label: "Azul", type: "color" as const, color: "#121826" },
+  { id: "color:#1C0F2E", label: "Roxo", type: "color" as const, color: "#1C0F2E" },
+  { id: "color:#122314", label: "Verde", type: "color" as const, color: "#122314" },
+  { id: "gradient:#5BE7FF,#7C5CFF", label: "Aurora", type: "gradient" as const, colors: ["#5BE7FF", "#7C5CFF"] },
+  { id: "gradient:#FF4BD8,#7C5CFF", label: "Neon", type: "gradient" as const, colors: ["#FF4BD8", "#7C5CFF"] },
+  { id: "gradient:#FDE68A,#F8C84A", label: "Dourado", type: "gradient" as const, colors: ["#FDE68A", "#F8C84A"] },
+  { id: "gradient:#0F172A,#1E3A8A", label: "Profundo", type: "gradient" as const, colors: ["#0F172A", "#1E3A8A"] },
+  { id: "gradient:#14B8A6,#0EA5E9", label: "Maresia", type: "gradient" as const, colors: ["#14B8A6", "#0EA5E9"] },
+];
 
 type PremiumStatusResponse = {
   isPremium: boolean;
@@ -50,9 +64,13 @@ export default function EditarPerfilScreen() {
   const [fotoPerfilUrl, setFotoPerfilUrl] = useState<string | null>(null);
   const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [selectedBannerPreset, setSelectedBannerPreset] = useState<string | null>(null);
   const [formHydrated, setFormHydrated] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  const [checkingPremium, setCheckingPremium] = useState(false);
+  const [showBannerPremiumModal, setShowBannerPremiumModal] = useState(false);
 
   const profileQuery = useMyProfileQuery();
 
@@ -62,6 +80,9 @@ export default function EditarPerfilScreen() {
       setBiografia(profileQuery.data.biografia ?? "");
       setFotoPerfilUrl(profileQuery.data.foto_perfil ?? null);
       setBannerUrl(profileQuery.data.banner ?? null);
+      if (profileQuery.data.banner?.startsWith("color:") || profileQuery.data.banner?.startsWith("gradient:")) {
+        setSelectedBannerPreset(profileQuery.data.banner);
+      }
       setFormHydrated(true);
     }
   }, [formHydrated, profileQuery.data]);
@@ -71,6 +92,32 @@ export default function EditarPerfilScreen() {
       setError(getApiErrorMessage(profileQuery.error, "carregar perfil"));
     }
   }, [profileQuery.error]);
+
+  useEffect(() => {
+    let active = true;
+    const loadPremium = async () => {
+      setCheckingPremium(true);
+      try {
+        const accessToken = await AsyncStorage.getItem("accessToken");
+        if (!accessToken) {
+          if (active) setIsPremium(false);
+          return;
+        }
+        const response = await api.get<PremiumStatusResponse>("/premium/status", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (active) setIsPremium(Boolean(response.data?.isPremium));
+      } catch {
+        if (active) setIsPremium(false);
+      } finally {
+        if (active) setCheckingPremium(false);
+      }
+    };
+    loadPremium().catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -82,7 +129,7 @@ export default function EditarPerfilScreen() {
         finalFotoPerfilUrl = await uploadImageToR2(fotoPerfilUri, `perfil_${Date.now()}.jpg`);
       }
 
-      if (bannerUri) {
+      if (bannerUri && isPremium) {
         setSuccess("Enviando banner...");
         finalBannerUrl = await uploadImageToR2(bannerUri, `banner_${Date.now()}.jpg`);
       }
@@ -199,6 +246,13 @@ export default function EditarPerfilScreen() {
   };
 
   const handleBannerAction = () => {
+    if (checkingPremium) {
+      return;
+    }
+    if (!isPremium) {
+      setShowBannerPremiumModal(true);
+      return;
+    }
     const hasBanner = Boolean(bannerUri || bannerUrl);
     Alert.alert("Banner", "O que deseja fazer?", [
       { text: "Selecionar imagem", onPress: handleSelectBanner },
@@ -285,6 +339,15 @@ export default function EditarPerfilScreen() {
             <Text style={styles.sectionTitle}>Banner</Text>
             {bannerUri ? (
               <Image source={{ uri: bannerUri }} style={styles.bannerPreview} />
+            ) : bannerUrl && bannerUrl.startsWith("color:") ? (
+              <View style={[styles.bannerPreview, { backgroundColor: bannerUrl.replace("color:", "") }]} />
+            ) : bannerUrl && bannerUrl.startsWith("gradient:") ? (
+              <LinearGradient
+                colors={bannerUrl.replace("gradient:", "").split(",").map((color) => color.trim())}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.bannerPreview}
+              />
             ) : bannerUrl ? (
               <Image source={{ uri: bannerUrl }} style={styles.bannerPreview} />
             ) : (
@@ -295,11 +358,46 @@ export default function EditarPerfilScreen() {
             <Pressable
               style={[styles.button, styles.buttonSecondary, loading && styles.buttonDisabled]}
               onPress={handleBannerAction}
-              disabled={loading}
+              disabled={loading || checkingPremium}
             >
               <Ionicons name="images-outline" size={18} color="#7FE7FF" />
               <Text style={styles.buttonSecondaryText}>Selecionar banner</Text>
             </Pressable>
+
+            <View style={styles.presetSection}>
+              <Text style={styles.presetTitle}>Cores e gradientes</Text>
+              <View style={styles.presetGrid}>
+                {BANNER_PRESETS.map((preset) => {
+                  const selected = selectedBannerPreset === preset.id;
+                  return (
+                    <Pressable
+                      key={preset.id}
+                      style={[styles.presetItem, selected && styles.presetItemSelected]}
+                      onPress={() => {
+                        setSelectedBannerPreset(preset.id);
+                        setBannerUrl(preset.id);
+                        setBannerUri(null);
+                      }}
+                    >
+                      {preset.type === "color" ? (
+                        <View style={[styles.presetSwatch, { backgroundColor: preset.color }]} />
+                      ) : (
+                        <LinearGradient
+                          colors={preset.colors}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.presetSwatch}
+                        />
+                      )}
+                      <Text style={styles.presetLabel}>{preset.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {!isPremium ? (
+                <Text style={styles.presetHint}>Usuários gratuitos só podem escolher cores/gradientes.</Text>
+              ) : null}
+            </View>
           </View>
         </LinearGradient>
 
@@ -372,6 +470,56 @@ export default function EditarPerfilScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <Modal
+        visible={showBannerPremiumModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBannerPremiumModal(false)}
+      >
+        <View style={styles.premiumBackdrop}>
+          <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.premiumBorder}>
+            <View style={styles.premiumCard}>
+              <LinearGradient
+                colors={GOLD_GLOW}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.premiumGlow}
+              />
+
+              <Pressable onPress={() => setShowBannerPremiumModal(false)} style={styles.premiumCloseButton}>
+                <Text style={styles.premiumCloseText}>×</Text>
+              </Pressable>
+
+              <Text style={styles.premiumKicker}>PREMIUM</Text>
+              <Text style={styles.premiumTitle}>Banner exclusivo</Text>
+              <Text style={styles.premiumSubtitle}>
+                Apenas usuários Premium podem fazer upload de banner. Escolha uma cor ou gradiente, ou assine Premium.
+              </Text>
+
+              <LinearGradient
+                colors={GOLD_BORDER}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.premiumCtaBorder}
+              >
+                <Pressable
+                  style={styles.premiumCtaButton}
+                  onPress={() => {
+                    setShowBannerPremiumModal(false);
+                    router.push("/screens/settings/Premium");
+                  }}
+                >
+                  <Text style={styles.premiumCtaText}>Ver Premium</Text>
+                </Pressable>
+              </LinearGradient>
+
+              <Pressable style={styles.premiumGhostButton} onPress={() => setShowBannerPremiumModal(false)}>
+                <Text style={styles.premiumGhostText}>Continuar com cores</Text>
+              </Pressable>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -516,11 +664,163 @@ function createStyles(theme: AppTheme) {
     buttonDisabled: {
       opacity: 0.6,
     },
+    presetSection: {
+      marginTop: 6,
+      gap: 8,
+    },
+    presetTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: "#7FE7FF",
+      letterSpacing: 0.2,
+    },
+    presetGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      justifyContent: "space-between",
+    },
+    presetItem: {
+      width: "30%",
+      borderRadius: 10,
+      padding: 8,
+      borderWidth: 1,
+      borderColor: "rgba(127, 231, 255, 0.25)",
+      backgroundColor: "rgba(9, 12, 20, 0.75)",
+      gap: 6,
+      alignItems: "center",
+    },
+    presetItemSelected: {
+      borderColor: "#7FE7FF",
+      shadowColor: "#7FE7FF",
+      shadowOpacity: 0.35,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    presetSwatch: {
+      width: "100%",
+      height: 44,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.12)",
+      overflow: "hidden",
+    },
+    presetLabel: {
+      color: "#E0E0E0",
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    presetHint: {
+      fontSize: 12,
+      color: "rgba(127, 231, 255, 0.75)",
+    },
     actionButtons: {
       flexDirection: "row",
       gap: 10,
       marginTop: 16,
       marginBottom: 20,
+    },
+    premiumBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(5, 5, 8, 0.78)",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+    },
+    premiumBorder: {
+      width: "90%",
+      borderRadius: 24,
+      padding: 2,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.55,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 12,
+    },
+    premiumCard: {
+      borderRadius: 22,
+      padding: 20,
+      overflow: "hidden",
+      backgroundColor: "#120804",
+      gap: 12,
+    },
+    premiumGlow: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.9,
+    },
+    premiumCloseButton: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: "rgba(253, 230, 138, 0.18)",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: "rgba(253, 230, 138, 0.4)",
+      zIndex: 2,
+    },
+    premiumCloseText: {
+      color: "#FDE68A",
+      fontSize: 24,
+      fontWeight: "800",
+      marginTop: -2,
+    },
+    premiumKicker: {
+      color: "#FDE68A",
+      letterSpacing: 2.5,
+      fontWeight: "800",
+      fontSize: 12,
+    },
+    premiumTitle: {
+      color: "#FFF7E0",
+      fontSize: 24,
+      fontWeight: "800",
+    },
+    premiumSubtitle: {
+      color: "#F8D37A",
+      fontSize: 14,
+      fontWeight: "600",
+      lineHeight: 20,
+    },
+    premiumCtaBorder: {
+      marginTop: 6,
+      borderRadius: 16,
+      padding: 1.5,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+    },
+    premiumCtaButton: {
+      borderRadius: 14,
+      backgroundColor: "#2B1404",
+      paddingVertical: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    premiumCtaText: {
+      color: "#FDE68A",
+      fontSize: 16,
+      fontWeight: "800",
+      letterSpacing: 0.4,
+    },
+    premiumGhostButton: {
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(253, 230, 138, 0.08)",
+      borderWidth: 1,
+      borderColor: "rgba(253, 230, 138, 0.25)",
+    },
+    premiumGhostText: {
+      color: "#FDE68A",
+      fontWeight: "700",
+      fontSize: 14,
     },
     error: {
       backgroundColor: `${theme.colors.error}20`,
