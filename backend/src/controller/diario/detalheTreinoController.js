@@ -54,3 +54,36 @@ exports.buscarDetalheTreinoPorData = async (req, res) => {
     return res.status(500).json({ message: 'Erro ao buscar detalhes do treino' });
   }
 };
+
+exports.buscarRetrospectiva = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id || null;
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuário não autenticado' });
+    }
+
+    const periodInput = typeof req.query.period === 'string' ? req.query.period.trim().toLowerCase() : 'yearly';
+    const period = ['weekly', 'monthly', 'yearly'].includes(periodInput) ? periodInput : 'yearly';
+
+    const langInput = typeof req.query.lang === 'string' ? req.query.lang.trim().toLowerCase() : 'pt';
+    const lang = langInput === 'en' ? 'en' : 'pt';
+
+    if (period !== 'yearly') {
+      const isPremium = await detalheTreinoService.getIsPremium({ userId });
+      if (!isPremium) {
+        return res.status(403).json({ message: 'Retrospectiva disponível apenas para usuários Premium.' });
+      }
+    }
+
+    const retrospectiva = await detalheTreinoService.buscarRetrospectiva({
+      userId,
+      period,
+      lang,
+    });
+
+    return res.status(200).json(retrospectiva);
+  } catch (err) {
+    console.error('Erro ao buscar retrospectiva:', err);
+    return res.status(500).json({ message: 'Erro ao buscar retrospectiva' });
+  }
+};
