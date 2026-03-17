@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import type { PostSummary } from "@/app/features/social/types";
@@ -38,6 +38,10 @@ export default function PublicProfileScreen() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
+  const [activeTab, setActiveTab] = useState<"posts" | "treinos">("posts");
+  const postsCount = posts.length;
+  const treinoPosts = posts.filter((item) => item.tipo === "treino");
+  const visiblePosts = activeTab === "treinos" ? treinoPosts : posts;
 
   const loadProfile = useCallback(async () => {
     const safeUsername = String(username || "").trim();
@@ -207,66 +211,88 @@ export default function PublicProfileScreen() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        <View style={styles.headerRow}>
+        <View style={styles.headerTop}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Voltar</Text>
+            <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
           </Pressable>
         </View>
 
-        <View style={styles.profileCard}>
-          {profile?.banner ? <Image source={{ uri: profile.banner }} style={styles.banner} /> : null}
+        <View style={styles.profileSection}>
+          <View style={styles.bannerWrapper}>
+            {profile?.banner ? (
+              <Image source={{ uri: profile.banner }} style={styles.bannerImage} />
+            ) : (
+              <View style={styles.bannerPlaceholder} />
+            )}
+          </View>
 
-          <View style={styles.profileBody}>
-            <Pressable
-              style={[
-                styles.avatarRing,
-                hasActiveDaily && (hasUnseenDaily ? styles.avatarRingUnseen : styles.avatarRingSeen),
-              ]}
-              onPress={handleOpenDaily}
-              disabled={!hasActiveDaily}
-            >
-              {profile?.foto_perfil ? (
-                <Image source={{ uri: profile.foto_perfil }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarPlaceholderText}>Sem foto</Text>
+          <View style={styles.profileTopRow}>
+            <View style={styles.avatarOverlap}>
+              <Pressable style={styles.avatarRing} onPress={handleOpenDaily} disabled={!hasActiveDaily}>
+                {profile?.foto_perfil ? (
+                  <Image source={{ uri: profile.foto_perfil }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarPlaceholderText}>Sem foto</Text>
+                  </View>
+                )}
+                {hasActiveDaily ? (
+                  <View style={[styles.ringOverlay, hasUnseenDaily ? styles.ringUnseen : styles.ringSeen]} />
+                ) : null}
+              </Pressable>
+            </View>
+
+            <View style={styles.profileInfo}>
+              <View style={styles.nameBlock}>
+                <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Perfil"}</Text>
+                {profile?.username ? <Text style={styles.userText}>@{profile.username}</Text> : null}
+              </View>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{profile?.followers_count ?? 0}</Text>
+                  <Text style={styles.statLabel}>seguidores</Text>
                 </View>
-              )}
-            </Pressable>
-
-            <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Perfil"}</Text>
-            {profile?.biografia ? <Text style={styles.bioText}>{profile.biografia}</Text> : null}
-
-            <View style={styles.socialSummary}>
-              <Text style={styles.socialSummaryText}>
-                <Text style={styles.socialSummaryNumber}>{profile?.followers_count ?? 0}</Text> seguidores
-              </Text>
-              <Text style={styles.socialSummaryText}>
-                <Text style={styles.socialSummaryNumber}>{profile?.following_count ?? 0}</Text> seguindo
-              </Text>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{profile?.following_count ?? 0}</Text>
+                  <Text style={styles.statLabel}>seguindo</Text>
+                </View>
+              </View>
             </View>
           </View>
 
+          {profile?.biografia ? <Text style={styles.bioText}>{profile.biografia}</Text> : null}
+
           {!profile?.is_me ? (
-            <View style={styles.actionsRow}>
-              <LinearGradient
-                colors={theme.colors.buttonGradient}
-                start={{ x: 0, y: 0.2 }}
-                end={{ x: 1, y: 0.8 }}
-                style={styles.buttonBorder}
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.primaryButton, updatingFollow && styles.disabled]}
+                onPress={handleFollowToggle}
+                disabled={updatingFollow}
               >
-                <Pressable
-                  style={[styles.button, updatingFollow && styles.disabled]}
-                  onPress={handleFollowToggle}
-                  disabled={updatingFollow}
-                >
-                  {updatingFollow ? (
-                    <ActivityIndicator color={theme.colors.buttonText} />
+                {updatingFollow ? (
+                  <ActivityIndicator color={theme.colors.buttonText} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {profile?.is_following ? "Seguindo" : "Seguir"}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          ) : null}
+
+          {hasActiveDaily ? (
+            <View style={styles.highlightsRow}>
+              <Pressable style={styles.highlightItem} onPress={handleOpenDaily}>
+                <View style={[styles.highlightCircle, hasUnseenDaily ? styles.highlightUnseen : styles.highlightSeen]}>
+                  {profile?.foto_perfil ? (
+                    <Image source={{ uri: profile.foto_perfil }} style={styles.highlightImage} />
                   ) : (
-                    <Text style={styles.buttonText}>{profile?.is_following ? "Seguindo" : "Seguir"}</Text>
+                    <View style={[styles.highlightImage, styles.highlightPlaceholder]} />
                   )}
-                </Pressable>
-              </LinearGradient>
+                </View>
+                <Text style={styles.highlightLabel}>Daily</Text>
+              </Pressable>
             </View>
           ) : null}
         </View>
@@ -274,7 +300,30 @@ export default function PublicProfileScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.postsSection}>
-          <Text style={styles.postsTitle}>Posts</Text>
+          <View style={styles.postsTabs}>
+            <Pressable
+              style={[styles.tabItem, activeTab === "posts" && styles.tabItemActive]}
+              onPress={() => setActiveTab("posts")}
+            >
+              <Ionicons
+                name="grid-outline"
+                size={20}
+                color={activeTab === "posts" ? theme.colors.text : theme.colors.mutedText}
+              />
+              <Text style={[styles.tabText, activeTab === "posts" && styles.tabTextActive]}>Posts</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.tabItem, activeTab === "treinos" && styles.tabItemActive]}
+              onPress={() => setActiveTab("treinos")}
+            >
+              <Ionicons
+                name="barbell-outline"
+                size={20}
+                color={activeTab === "treinos" ? theme.colors.text : theme.colors.mutedText}
+              />
+              <Text style={[styles.tabText, activeTab === "treinos" && styles.tabTextActive]}>Treinos</Text>
+            </Pressable>
+          </View>
 
           {loadingPosts ? (
             <View style={styles.postsLoading}>
@@ -283,12 +332,20 @@ export default function PublicProfileScreen() {
             </View>
           ) : null}
 
-          {!loadingPosts && posts.length === 0 ? (
-            <Text style={styles.emptyPosts}>Este usuario ainda nao publicou posts.</Text>
+          {!loadingPosts && visiblePosts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="images-outline" size={22} color={theme.colors.mutedText} />
+              <Text style={styles.emptyPosts}>
+                {activeTab === "treinos"
+                  ? "Ainda nao ha treinos publicados."
+                  : "Este usuario ainda nao publicou posts."}
+              </Text>
+            </View>
           ) : null}
 
-          {posts.map((item) => {
+          {visiblePosts.map((item) => {
             const firstMedia = item.midias?.[0];
+            const isTreino = item.tipo === "treino" && item.treino;
             return (
               <Pressable
                 key={item.id}
@@ -300,14 +357,38 @@ export default function PublicProfileScreen() {
                     <Image source={{ uri: firstMedia.url }} style={styles.postPreview} />
                   ) : (
                     <View style={[styles.postPreview, styles.videoPreview]}>
+                      <Ionicons name="videocam" size={20} color={theme.colors.buttonText} />
                       <Text style={styles.videoPreviewText}>Video</Text>
                     </View>
                   )
                 ) : null}
+                {isTreino ? (
+                  <View style={styles.treinoResumo}>
+                    <Text style={styles.treinoBadge}>Treino compartilhado</Text>
+                    <View style={styles.treinoMetrics}>
+                      <Text style={styles.treinoMetricText}>
+                        Duracao {item.treino?.duracao ? Math.round(item.treino.duracao / 60) : 0} min
+                      </Text>
+                      <Text style={styles.treinoMetricText}>
+                        Peso {Number(item.treino?.peso_total ?? 0).toFixed(1)}kg
+                      </Text>
+                      <Text style={styles.treinoMetricText}>Series {item.treino?.total_series ?? 0}</Text>
+                      <Text style={styles.treinoMetricText}>
+                        Exercicios {item.treino?.total_exercicios ?? 0}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
                 {item.descricao ? <Text style={styles.postDescription}>{item.descricao}</Text> : null}
                 <View style={styles.postMetaRow}>
-                  <Text style={styles.postMetaText}>Curtidas: {item.likes_count}</Text>
-                  <Text style={styles.postMetaText}>Comentarios: {item.comments_count}</Text>
+                  <View style={styles.metaItem}>
+                    <Ionicons name="heart-outline" size={14} color={theme.colors.mutedText} />
+                    <Text style={styles.postMetaText}>{item.likes_count}</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Ionicons name="chatbubble-outline" size={14} color={theme.colors.mutedText} />
+                    <Text style={styles.postMetaText}>{item.comments_count}</Text>
+                  </View>
                 </View>
               </Pressable>
             );
@@ -323,9 +404,6 @@ function createStyles(theme: AppTheme) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      gap: 10,
     },
     containerCentered: {
       flex: 1,
@@ -340,61 +418,90 @@ function createStyles(theme: AppTheme) {
       fontWeight: "500",
     },
     contentContainer: {
-      gap: 10,
-      paddingBottom: 24,
+      padding: 16,
+      gap: 16,
+      paddingBottom: 30,
     },
-    headerRow: {
+    headerTop: {
       flexDirection: "row",
+      alignItems: "center",
       justifyContent: "flex-start",
     },
     backButton: {
-      alignSelf: "flex-start",
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    profileSection: {
+      gap: 10,
+      borderRadius: 16,
       backgroundColor: theme.colors.surface,
+      padding: 14,
     },
-    backButtonText: {
-      color: theme.colors.text,
-      fontWeight: "600",
-    },
-    profileCard: {
+    bannerWrapper: {
       width: "100%",
-      backgroundColor: theme.colors.surface,
-      borderColor: theme.colors.border,
-      borderWidth: 1,
+      height: 90,
       borderRadius: 12,
       overflow: "hidden",
+      backgroundColor: theme.colors.inputBackground,
     },
-    banner: {
+    bannerImage: {
       width: "100%",
-      height: 120,
+      height: "100%",
+    },
+    bannerPlaceholder: {
+      flex: 1,
       backgroundColor: theme.colors.inputBackground,
     },
-    profileBody: {
-      alignItems: "center",
-      padding: 14,
-      gap: 8,
+    profileTopRow: {
+      flexDirection: "row",
+      gap: 14,
+      alignItems: "flex-end",
+      marginTop: 6,
     },
-    avatar: {
-      width: 88,
-      height: 88,
-      borderRadius: 44,
-      backgroundColor: theme.colors.inputBackground,
+    avatarOverlap: {
+      marginTop: -72,
+      zIndex: 2,
+    },
+    profileInfo: {
+      flex: 1,
+      minHeight: 104,
+      justifyContent: "space-between",
+      paddingBottom: 4,
+      gap: 6,
+    },
+    nameBlock: {
+      gap: 2,
     },
     avatarRing: {
-      borderRadius: 50,
-      padding: 3,
-      borderWidth: 2,
-      borderColor: "transparent",
+      width: 104,
+      height: 104,
+      borderRadius: 52,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.inputBackground,
+      position: "relative",
     },
-    avatarRingUnseen: {
+    ringOverlay: {
+      position: "absolute",
+      width: 104,
+      height: 104,
+      borderRadius: 52,
+      borderWidth: 2.5,
+    },
+    ringUnseen: {
       borderColor: theme.colors.button,
     },
-    avatarRingSeen: {
+    ringSeen: {
       borderColor: theme.colors.border,
+    },
+    avatar: {
+      width: 94,
+      height: 94,
+      borderRadius: 47,
+      backgroundColor: theme.colors.inputBackground,
     },
     avatarPlaceholder: {
       alignItems: "center",
@@ -404,77 +511,136 @@ function createStyles(theme: AppTheme) {
     },
     avatarPlaceholderText: {
       color: theme.colors.mutedText,
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: "600",
+    },
+    statsRow: {
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      gap: 20,
+      marginTop: 2,
+    },
+    statItem: {
+      alignItems: "center",
+      gap: 2,
+      minWidth: 72,
+    },
+    statValue: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: "800",
+    },
+    statLabel: {
+      color: theme.colors.mutedText,
+      fontSize: 11,
+      fontWeight: "600",
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
     },
     nameText: {
       color: theme.colors.text,
-      fontSize: 20,
+      fontSize: 17,
       fontWeight: "700",
-      textAlign: "center",
+    },
+    userText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
     },
     bioText: {
-      color: theme.colors.mutedText,
-      fontSize: 14,
-      textAlign: "center",
-    },
-    socialSummary: {
-      marginTop: 8,
-      flexDirection: "row",
-      gap: 16,
-    },
-    socialSummaryText: {
       color: theme.colors.text,
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 2,
     },
-    socialSummaryNumber: {
-      fontWeight: "800",
-    },
-    actionsRow: {
+    actionRow: {
       flexDirection: "row",
       gap: 8,
-      paddingHorizontal: 14,
-      paddingBottom: 14,
+      marginTop: 4,
     },
-    buttonBorder: {
+    primaryButton: {
       flex: 1,
       borderRadius: 10,
-      padding: 1.5,
-      shadowColor: "#7C5CFF",
-      shadowOpacity: 0.35,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 6,
-    },
-    button: {
-      backgroundColor: "rgba(11, 14, 24, 0.92)",
-      borderRadius: 10,
-      minHeight: 42,
-      flex: 1,
+      backgroundColor: theme.colors.button,
+      minHeight: 38,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 12,
     },
-    buttonText: {
+    primaryButtonText: {
       color: theme.colors.buttonText,
       fontWeight: "700",
-      fontSize: 14,
+      fontSize: 12,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
     },
     disabled: {
       opacity: 0.7,
+    },
+    highlightsRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 6,
+    },
+    highlightItem: {
+      alignItems: "center",
+      gap: 6,
+    },
+    highlightCircle: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+    },
+    highlightUnseen: {
+      borderColor: theme.colors.button,
+    },
+    highlightSeen: {
+      borderColor: theme.colors.border,
+    },
+    highlightImage: {
+      width: 54,
+      height: 54,
+      borderRadius: 27,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    highlightPlaceholder: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    highlightLabel: {
+      color: theme.colors.mutedText,
+      fontSize: 11,
     },
     error: {
       color: theme.colors.error,
       fontWeight: "500",
     },
     postsSection: {
-      gap: 8,
+      gap: 12,
     },
-    postsTitle: {
+    postsTabs: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      paddingVertical: 12,
+    },
+    tabItem: {
+      flexDirection: "row",
+      gap: 8,
+      alignItems: "center",
+      paddingBottom: 6,
+    },
+    tabItemActive: {
+      borderBottomWidth: 2,
+      borderBottomColor: theme.colors.text,
+    },
+    tabText: {
+      color: theme.colors.mutedText,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    tabTextActive: {
       color: theme.colors.text,
-      fontSize: 18,
-      fontWeight: "700",
     },
     postsLoading: {
       flexDirection: "row",
@@ -484,19 +650,25 @@ function createStyles(theme: AppTheme) {
     emptyPosts: {
       color: theme.colors.mutedText,
       fontSize: 13,
+      textAlign: "center",
+    },
+    emptyState: {
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 10,
     },
     postCard: {
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: 12,
+      borderRadius: 14,
       backgroundColor: theme.colors.surface,
       overflow: "hidden",
-      padding: 10,
-      gap: 8,
+      padding: 12,
+      gap: 10,
     },
     postPreview: {
       width: "100%",
-      height: 180,
+      height: 190,
       borderRadius: 10,
       backgroundColor: theme.colors.inputBackground,
     },
@@ -504,10 +676,34 @@ function createStyles(theme: AppTheme) {
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.colors.button,
+      gap: 4,
     },
     videoPreviewText: {
       color: theme.colors.buttonText,
       fontWeight: "700",
+    },
+    treinoResumo: {
+      gap: 6,
+      padding: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    treinoBadge: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.colors.text,
+    },
+    treinoMetrics: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    treinoMetricText: {
+      fontSize: 11,
+      color: theme.colors.mutedText,
+      fontWeight: "600",
     },
     postDescription: {
       color: theme.colors.text,
@@ -516,6 +712,12 @@ function createStyles(theme: AppTheme) {
     postMetaRow: {
       flexDirection: "row",
       gap: 12,
+      alignItems: "center",
+    },
+    metaItem: {
+      flexDirection: "row",
+      gap: 6,
+      alignItems: "center",
     },
     postMetaText: {
       color: theme.colors.mutedText,
