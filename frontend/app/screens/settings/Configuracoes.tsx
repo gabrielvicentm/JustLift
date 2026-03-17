@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
@@ -19,6 +19,7 @@ export default function ConfiguracoesScreen() {
   const { theme } = useAppTheme();
   const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const premiumPulse = useRef(new Animated.Value(1)).current;
   const negativeGradient = (theme.colors.negativeGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
     string,
     string,
@@ -72,6 +73,25 @@ export default function ConfiguracoesScreen() {
     }, []),
   );
 
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(premiumPulse, {
+          toValue: 1.03,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(premiumPulse, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [premiumPulse]);
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -83,23 +103,25 @@ export default function ConfiguracoesScreen() {
         <Text style={styles.subtitle}>{t("settings_subtitle")}</Text>
 
         <View style={styles.optionsList}>
-          <LinearGradient
-            colors={GOLD_GRADIENT}
-            start={{ x: 0, y: 0.2 }}
-            end={{ x: 1, y: 0.8 }}
-            style={styles.premiumBorder}
-          >
-            <Pressable style={styles.premiumCard} onPress={() => router.push("/screens/settings/Premium")}>
-              <View>
-                <Text style={styles.premiumTitle}>Obter Premium</Text>
-                <Text style={styles.premiumHint}>Desbloqueie benefícios épicos</Text>
-              </View>
-              <View style={styles.premiumBadge}>
-                <MaterialCommunityIcons name="crown" size={18} style={styles.premiumBadgeIcon} />
-                <Text style={styles.premiumBadgeText}>VIP</Text>
-              </View>
-            </Pressable>
-          </LinearGradient>
+          <Animated.View style={{ transform: [{ scale: premiumPulse }] }}>
+            <LinearGradient
+              colors={GOLD_GRADIENT}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.premiumBorder}
+            >
+              <Pressable style={styles.premiumCard} onPress={() => router.push("/screens/settings/Premium")}>
+                <View>
+                  <Text style={styles.premiumTitle}>Obter Premium</Text>
+                  <Text style={styles.premiumHint}>Desbloqueie benefícios épicos</Text>
+                </View>
+                <View style={styles.premiumBadge}>
+                  <MaterialCommunityIcons name="crown" size={18} style={styles.premiumBadgeIcon} />
+                  <Text style={styles.premiumBadgeText}>VIP</Text>
+                </View>
+              </Pressable>
+            </LinearGradient>
+          </Animated.View>
 
           <LinearGradient
             colors={PROGRESS_GRADIENT}

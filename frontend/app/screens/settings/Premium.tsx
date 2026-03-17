@@ -27,7 +27,7 @@ const BENEFITS = [
   "Sem anúncios",
   "Banners exclusivos",
   "Mudar a cor do seu perfil",
-  "Mudar a cor do app localmente (fundo, botões, bordas)",
+  "Exercícios personalizados ilimitados",
   "Treinos ilimitados (grátis: 3x por semana)",
   "Boost de pontos 2x",
   "Retrospectiva semanal, mensal e anual",
@@ -123,6 +123,27 @@ export default function PremiumScreen() {
       setIsPremium(Boolean(response.data.isPremium));
       setUpdatedAt(response.data.premiumUpdatedAt ?? null);
       setMessage(response.data.message ?? "Premium sincronizado.");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleFakePremium = async () => {
+    setError("");
+    setMessage("");
+    setLoading(true);
+    try {
+      const headers = await getAuthHeader();
+      const response = await api.post<PremiumStatusResponse>(
+        "/premium/fake",
+        { enabled: !isPremium },
+        { headers },
+      );
+      setIsPremium(Boolean(response.data.isPremium));
+      setUpdatedAt(response.data.premiumUpdatedAt ?? null);
+      setMessage(response.data.message ?? "Status atualizado.");
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -231,10 +252,20 @@ export default function PremiumScreen() {
             <Text style={styles.sectionTitle}>Benefícios Premium</Text>
             <View style={styles.benefitsList}>
               {BENEFITS.map((benefit) => (
-                <View key={benefit} style={styles.benefitRow}>
-                  <Ionicons name="sparkles" size={16} color="#FDE68A" />
-                  <Text style={styles.benefitText}>{benefit}</Text>
-                </View>
+                <LinearGradient
+                  key={benefit}
+                  colors={GOLD_BORDER}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.benefitBorder}
+                >
+                  <View style={styles.benefitRow}>
+                    <View style={styles.benefitIconWrap}>
+                      <Ionicons name="sparkles" size={16} color="#1B0C03" />
+                    </View>
+                    <Text style={styles.benefitText}>{benefit}</Text>
+                  </View>
+                </LinearGradient>
               ))}
             </View>
           </LinearGradient>
@@ -277,6 +308,16 @@ export default function PremiumScreen() {
           disabled={loading}
         >
           <Text style={styles.secondaryButtonText}>Sincronizar Status</Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.ghostButton, loading && styles.buttonDisabled]}
+          onPress={toggleFakePremium}
+          disabled={loading}
+        >
+          <Text style={styles.ghostButtonText}>
+            {isPremium ? "Desativar premium falso" : "Virar premium falso"}
+          </Text>
         </Pressable>
 
         <Pressable style={styles.backButton} onPress={() => router.back()} disabled={loading}>
@@ -380,21 +421,36 @@ function createStyles(theme: AppTheme) {
     benefitsList: {
       gap: 10,
     },
+    benefitBorder: {
+      borderRadius: 14,
+      padding: 1.2,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
     benefitRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      paddingVertical: 6,
-      paddingHorizontal: 8,
-      borderRadius: 10,
-      backgroundColor: "rgba(253, 230, 138, 0.06)",
-      borderWidth: 1,
-      borderColor: "rgba(253, 230, 138, 0.2)",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      backgroundColor: "rgba(18, 8, 4, 0.95)",
+    },
+    benefitIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: "#FDE68A",
+      alignItems: "center",
+      justifyContent: "center",
     },
     benefitText: {
       color: "#FFF7E0",
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: 15,
+      fontWeight: "700",
       flex: 1,
     },
     statusBorder: {
@@ -469,6 +525,20 @@ function createStyles(theme: AppTheme) {
     },
     secondaryButtonText: {
       color: "#FDE68A",
+      fontWeight: "700",
+      fontSize: 15,
+    },
+    ghostButton: {
+      height: 48,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(127, 231, 255, 0.08)",
+      borderWidth: 1,
+      borderColor: "rgba(127, 231, 255, 0.28)",
+    },
+    ghostButtonText: {
+      color: "#7FE7FF",
       fontWeight: "700",
       fontSize: 15,
     },

@@ -6,6 +6,7 @@ import {
   Animated,
   Easing,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -138,6 +139,7 @@ export default function PatentesScreen() {
   const [current, setCurrent] = useState<PatentesResponse | null>(null);
   const [history, setHistory] = useState<SeasonHistoryEntry[]>([]);
   const [remainingMs, setRemainingMs] = useState(0);
+  const [showInfo, setShowInfo] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   const loadData = useCallback(async () => {
@@ -249,7 +251,12 @@ export default function PatentesScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.container}>
-        <Text style={styles.title}>{t("diary_patents_title")}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{t("diary_patents_title")}</Text>
+          <Pressable style={styles.infoButton} onPress={() => setShowInfo(true)}>
+            <MaterialCommunityIcons name="information" size={18} color="#7FE7FF" />
+          </Pressable>
+        </View>
 
         <View style={styles.tabsRow}>
           <Pressable
@@ -479,6 +486,22 @@ export default function PatentesScreen() {
           </Pressable>
         </LinearGradient>
       </View>
+      <Modal transparent visible={showInfo} animationType="fade" onRequestClose={() => setShowInfo(false)}>
+        <View style={styles.infoBackdrop}>
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Regras de Pontos</Text>
+            <Text style={styles.infoText}>Cada treino soma pontos pelo volume total.</Text>
+            <Text style={styles.infoText}>Regra base: 1 ponto a cada 100 de volume.</Text>
+            <Text style={styles.infoText}>Teto por treino: 300 pontos.</Text>
+            <Text style={styles.infoText}>Premium: 2x pontos e teto de 600 por treino.</Text>
+            <Text style={styles.infoText}>As patentes são definidas pela soma total de pontos.</Text>
+            <Text style={styles.infoText}>As temporadas reiniciam o ranking no fim do período.</Text>
+            <Pressable style={styles.infoClose} onPress={() => setShowInfo(false)}>
+              <Text style={styles.infoCloseText}>Fechar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -500,6 +523,22 @@ function createStyles(theme: AppTheme) {
       fontWeight: "800",
       color: theme.colors.text,
       textAlign: "center",
+    },
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+    },
+    infoButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(11, 14, 24, 0.9)",
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.35)",
     },
     tabsRow: {
       flexDirection: "row",
@@ -837,6 +876,45 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
       fontWeight: "700",
       fontSize: 13,
+    },
+    infoBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(5, 5, 8, 0.8)",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+    },
+    infoCard: {
+      width: "100%",
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.95)",
+      padding: 16,
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.4)",
+      gap: 8,
+    },
+    infoTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: "800",
+      marginBottom: 4,
+    },
+    infoText: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    infoClose: {
+      marginTop: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    infoCloseText: {
+      color: theme.colors.text,
+      fontWeight: "700",
     },
     top3Points: {
       color: theme.colors.text,

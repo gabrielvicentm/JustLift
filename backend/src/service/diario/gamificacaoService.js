@@ -2,6 +2,7 @@ const db = require('../../utils/db');
 
 const WORKOUT_SOURCE_TYPE = 'workout_save';
 const MAX_WORKOUT_POINTS = 300;
+const MAX_WORKOUT_POINTS_PREMIUM = 600;
 const SEASON_DURATION_MONTHS = 6;
 const SEASON_ANCHOR_START_ISO = '2026-01-01T00:00:00.000Z';
 const SEASON_LOCK_KEY = 987654321;
@@ -138,10 +139,19 @@ const getClient = async (providedClient) => {
   return { client, shouldRelease: true };
 };
 
-const computeWorkoutPoints = (volumeTotal) => {
+const computeWorkoutPoints = (volumeTotal, { isPremium = false } = {}) => {
   const safeVolume = Number.isFinite(Number(volumeTotal)) ? Number(volumeTotal) : 0;
   const rawPoints = Math.floor(safeVolume / 100);
-  return Math.max(0, Math.min(rawPoints, MAX_WORKOUT_POINTS));
+  const multiplier = isPremium ? 2 : 1;
+  const maxPoints = isPremium ? MAX_WORKOUT_POINTS_PREMIUM : MAX_WORKOUT_POINTS;
+  return Math.max(0, Math.min(rawPoints * multiplier, maxPoints));
+};
+
+const getIsPremium = async ({ userId, client } = {}) => {
+  const result = client
+    ? await client.query('SELECT is_premium FROM users WHERE id = $1', [userId])
+    : await db.query('SELECT is_premium FROM users WHERE id = $1', [userId]);
+  return Boolean(result.rows[0]?.is_premium);
 };
 
 const getTotalPoints = async ({ userId, client }) => {
@@ -456,15 +466,17 @@ exports.grantWorkoutPoints = async ({
     }
   }
 
-  const points = computeWorkoutPoints(volumeTotal);
+  const isPremium = await getIsPremium({ userId });
+  const points = computeWorkoutPoints(volumeTotal, { isPremium });
   return exports.grantPoints({
     userId,
     points,
     sourceType: WORKOUT_SOURCE_TYPE,
     sourceId: workoutId ? String(workoutId) : null,
     metadata: {
-      rule: 'volume_total_div_100_capped_300',
+      rule: isPremium ? 'volume_total_div_100_x2_capped_600' : 'volume_total_div_100_capped_300',
       volume_total: Number.isFinite(Number(volumeTotal)) ? Number(volumeTotal) : 0,
+      is_premium: isPremium,
     },
     client,
   });
@@ -499,6 +511,7 @@ exports.getMyGamificacaoPatentes = async ({ userId }) => {
     const { season } = await ensureCurrentSeason({ client });
     const totalPoints = await getTotalPoints({ userId, client });
     const globalPosition = await getGlobalPosition({ userId, client });
+    const isPremium = await getIsPremium({ userId, client });
     await client.query('COMMIT');
 
     return {
@@ -507,7 +520,7 @@ exports.getMyGamificacaoPatentes = async ({ userId }) => {
       season,
       patente: enrichPatenteProgress(totalPoints),
       patentes: getPatentesRoadmap(totalPoints),
-      maxPointsPerWorkout: MAX_WORKOUT_POINTS,
+      maxPointsPerWorkout: isPremium ? MAX_WORKOUT_POINTS_PREMIUM : MAX_WORKOUT_POINTS,
       seasonDurationMonths: SEASON_DURATION_MONTHS,
     };
   } catch (err) {
@@ -716,6 +729,7 @@ exports._internal = {
   ensureCurrentSeason,
   WORKOUT_SOURCE_TYPE,
   MAX_WORKOUT_POINTS,
+  MAX_WORKOUT_POINTS_PREMIUM,
   SEASON_DURATION_MONTHS,
   SEASON_ANCHOR_START_ISO,
 };

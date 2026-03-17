@@ -109,6 +109,12 @@ const NOISE_DATA_URI =
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 const PREMIUM_AD_FLAG_KEY = "show_premium_modal_after_workout";
 
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
+};
+
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -466,6 +472,19 @@ export default function AdicionarSeriesScreen() {
     closeExerciseMenu();
   };
 
+  const shouldShowPremiumAd = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (!accessToken) return false;
+      const response = await api.get<PremiumStatusResponse>("/premium/status", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      return !Boolean(response.data?.isPremium);
+    } catch {
+      return true;
+    }
+  };
+
   const handleConfirmCancelWorkout = async () => {
     isFinalizingRef.current = true;
     await AsyncStorage.multiRemove([WORKOUT_DRAFT_KEY, LEGACY_WORKOUT_KEY]);
@@ -520,7 +539,9 @@ export default function AdicionarSeriesScreen() {
       setExercicios([]);
       setElapsedSeconds(0);
       setPaused(false);
-      await AsyncStorage.setItem(PREMIUM_AD_FLAG_KEY, "1");
+      if (await shouldShowPremiumAd()) {
+        await AsyncStorage.setItem(PREMIUM_AD_FLAG_KEY, "1");
+      }
       router.replace("/screens/diario/MeusTreinos");
     } catch (err) {
       console.error("Erro ao salvar treino:", err);

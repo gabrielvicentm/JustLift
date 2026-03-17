@@ -20,6 +20,7 @@ import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 import { api } from "@/app/config/api";
+import PremiumAdModal from "@/app/components/PremiumAdModal";
 
 type Exercicio = {
   exercise_id: string;
@@ -144,6 +145,13 @@ const EQUIPMENT_FILTER_OPTIONS = [
 ];
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+const MAX_FREE_WORKOUTS_PER_WEEK = 3;
+
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
+};
 
 export default function AdicionarTreinoScreen() {
   const router = useRouter();
@@ -182,6 +190,9 @@ export default function AdicionarTreinoScreen() {
   const [loadingRepeatTemplateId, setLoadingRepeatTemplateId] = useState<number | null>(null);
   const [loadingCustom, setLoadingCustom] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
+  const [showPremiumLimitModal, setShowPremiumLimitModal] = useState(false);
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  const [checkingPremium, setCheckingPremium] = useState(false);
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const [equipmentFilter, setEquipmentFilter] = useState<string | null>(null);
   const isFirstDebounceRun = useRef(true);
@@ -220,6 +231,71 @@ export default function AdicionarTreinoScreen() {
       setLoading(false);
     }
   }, [equipmentFilter, isEn, language, muscleFilter, query]);
+
+  const fetchPremiumStatus = useCallback(async () => {
+    if (isPremium !== null) return isPremium;
+    if (checkingPremium) return false;
+    setCheckingPremium(true);
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (!accessToken) {
+        setIsPremium(false);
+        return false;
+      }
+      const response = await api.get<PremiumStatusResponse>("/premium/status", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const premium = Boolean(response.data?.isPremium);
+      setIsPremium(premium);
+      return premium;
+    } catch {
+      setIsPremium(false);
+      return false;
+    } finally {
+      setCheckingPremium(false);
+    }
+  }, [checkingPremium, isPremium]);
+
+  const getWeeklyWorkoutCount = useCallback(async () => {
+    const accessToken = await AsyncStorage.getItem("accessToken");
+    if (!accessToken) {
+      setError(isEn ? "Sign in to start a workout." : "Faça login para iniciar um treino.");
+      return null;
+    }
+
+    const response = await api.get<RepeatWorkoutListResponse>("/diario/repetir-treino/lista", {
+      params: { limit: 50 },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const treinos = response.data?.treinos ?? [];
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+
+    return treinos.filter((treino) => {
+      const treinoDate = new Date(`${treino.data}T00:00:00`);
+      return treinoDate >= start && treinoDate <= now;
+    }).length;
+  }, [isEn]);
+
+  const canStartWorkout = useCallback(async () => {
+    const premium = await fetchPremiumStatus();
+    if (premium) return true;
+
+    try {
+      const count = await getWeeklyWorkoutCount();
+      if (count === null) return false;
+      if (count >= MAX_FREE_WORKOUTS_PER_WEEK) {
+        setShowPremiumLimitModal(true);
+        return false;
+      }
+    } catch {
+      setError(isEn ? "Could not verify workout limit." : "Não foi possível verificar o limite de treinos.");
+      return false;
+    }
+    return true;
+  }, [fetchPremiumStatus, getWeeklyWorkoutCount, isEn]);
 
   useEffect(() => {
     loadExercises("").catch(() => undefined);
@@ -493,6 +569,8 @@ export default function AdicionarTreinoScreen() {
   };
 
   const handleSelectRepeatWorkout = useCallback(async (treinoId: number) => {
+    const allowed = await canStartWorkout();
+    if (!allowed) return;
     setLoadingRepeatTemplateId(treinoId);
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
@@ -584,7 +662,7 @@ export default function AdicionarTreinoScreen() {
     } finally {
       setLoadingRepeatTemplateId(null);
     }
-  }, [isEn, language, router]);
+  }, [canStartWorkout, isEn, language, router]);
 
   const selectedMuscleLabel =
     MUSCLE_FILTER_OPTIONS.find((option) => option.key === muscleFilter)?.label ?? (isEn ? "Muscles" : "Músculos");
@@ -619,6 +697,9 @@ export default function AdicionarTreinoScreen() {
       return;
     }
 
+    const allowed = await canStartWorkout();
+    if (!allowed) return;
+
     const rawDraft = await AsyncStorage.getItem(WORKOUT_DRAFT_KEY);
     const previousDraft: WorkoutDraft = rawDraft ? JSON.parse(rawDraft) : {};
     const nextDraft: WorkoutDraft = {
@@ -643,8 +724,9 @@ export default function AdicionarTreinoScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-    <View style={styles.container}>
+    <>
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <View style={styles.container}>
       <LinearGradient
         colors={PROGRESS_GRADIENT}
         start={{ x: 0, y: 0.2 }}
@@ -1048,7 +1130,16 @@ export default function AdicionarTreinoScreen() {
         </View>
       </Modal>
     </View>
-    </SafeAreaView>
+      </SafeAreaView>
+      <PremiumAdModal
+        visible={showPremiumLimitModal}
+        onClose={() => setShowPremiumLimitModal(false)}
+        onUpgrade={() => {
+          setShowPremiumLimitModal(false);
+          router.push("/screens/settings/Premium");
+        }}
+      />
+    </>
   );
 }
 
