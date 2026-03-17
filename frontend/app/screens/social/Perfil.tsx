@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useMyProfileQuery } from "@/app/features/profile/hooks";
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { fetchPostsByUser } from "@/app/features/social/service";
@@ -154,7 +155,16 @@ export default function PerfilScreen() {
 
         <View style={styles.profileSection}>
           <View style={styles.bannerWrapper}>
-            {profile?.banner ? (
+            {profile?.banner?.startsWith("color:") ? (
+              <View style={[styles.bannerImage, { backgroundColor: profile.banner.replace("color:", "") }]} />
+            ) : profile?.banner?.startsWith("gradient:") ? (
+              <LinearGradient
+                colors={profile.banner.replace("gradient:", "").split(",").map((color) => color.trim())}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.bannerImage}
+              />
+            ) : profile?.banner ? (
               <Image source={{ uri: profile.banner }} style={styles.bannerImage} />
             ) : (
               <View style={styles.bannerPlaceholder} />

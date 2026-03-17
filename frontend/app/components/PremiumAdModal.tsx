@@ -13,7 +13,6 @@ const GOLD_GLOW = ["rgba(253, 230, 138, 0.45)", "rgba(245, 158, 11, 0.15)", "tra
 const BENEFITS = [
   "Sem anúncios",
   "Banners exclusivos",
-  "Mudar a cor do seu perfil",
   "Exercícios personalizados ilimitados",
   "Treinos ilimitados (grátis: 3x por semana)",
   "Boost de pontos 2x",
