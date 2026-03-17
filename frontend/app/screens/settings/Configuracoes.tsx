@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
@@ -11,13 +11,19 @@ import { useAppTheme } from "@/providers/ThemeProvider";
 import { useI18n } from "@/providers/I18nProvider";
 import type { AppTheme } from "@/theme/theme";
 
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+const GOLD_GRADIENT = ["#FDE68A", "#F8C84A", "#B45309"] as const;
+
 export default function ConfiguracoesScreen() {
   const router = useRouter();
-  const { theme, mode, setMode } = useAppTheme();
-  const { language, setLanguage, t } = useI18n();
+  const { theme } = useAppTheme();
+  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const isDarkMode = mode === "dark";
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const negativeGradient = (theme.colors.negativeGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
+    string,
+    string,
+    ...string[],
+  ];
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
@@ -77,136 +83,96 @@ export default function ConfiguracoesScreen() {
         <Text style={styles.subtitle}>{t("settings_subtitle")}</Text>
 
         <View style={styles.optionsList}>
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <View style={styles.cardInner}>
-            <View style={styles.themeRow}>
-              <Pressable
-                style={styles.themePressable}
-                onPress={() => router.push("/screens/settings/ThemeCustomization")}
-              >
-                <Text style={styles.optionText}>{t("settings_theme_title")}</Text>
-                <Text style={styles.optionHint}>{t("settings_open_theme")}</Text>
-              </Pressable>
-
-              <View style={styles.switchWrap}>
-                <Text style={styles.switchLabel}>{isDarkMode ? "Escuro" : "Claro"}</Text>
-                <Switch
-                  value={isDarkMode}
-                  onValueChange={(value) => setMode(value ? "dark" : "light")}
-                  trackColor={{ false: "rgba(124, 92, 255, 0.35)", true: "rgba(255, 75, 216, 0.6)" }}
-                  thumbColor="#F4F7FF"
-                />
+          <LinearGradient
+            colors={GOLD_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.premiumBorder}
+          >
+            <Pressable style={styles.premiumCard} onPress={() => router.push("/screens/settings/Premium")}>
+              <View>
+                <Text style={styles.premiumTitle}>Obter Premium</Text>
+                <Text style={styles.premiumHint}>Desbloqueie benefícios épicos</Text>
               </View>
-            </View>
-          </View>
-        </LinearGradient>
+              <View style={styles.premiumBadge}>
+                <MaterialCommunityIcons name="crown" size={18} style={styles.premiumBadgeIcon} />
+                <Text style={styles.premiumBadgeText}>VIP</Text>
+              </View>
+            </Pressable>
+          </LinearGradient>
 
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Notificacoes")}>
-            <View style={styles.optionTextWrap}>
-              <Text style={styles.optionText}>Notificacoes</Text>
-              {unreadNotificationsCount > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unreadNotificationsCount > 99 ? "99+" : String(unreadNotificationsCount)}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
-          </Pressable>
-        </LinearGradient>
+          <LinearGradient
+            colors={PROGRESS_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.cardBorder}
+          >
+            <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Notificacoes")}>
+              <View style={styles.optionTextWrap}>
+                <Text style={styles.optionText}>Notificacoes</Text>
+                {unreadNotificationsCount > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadNotificationsCount > 99 ? "99+" : String(unreadNotificationsCount)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
+            </Pressable>
+          </LinearGradient>
 
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Conta")}>
-            <Text style={styles.optionText}>Conta</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
-          </Pressable>
-        </LinearGradient>
+          <LinearGradient
+            colors={PROGRESS_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.cardBorder}
+          >
+            <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Conta")}>
+              <Text style={styles.optionText}>Conta</Text>
+              <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
+            </Pressable>
+          </LinearGradient>
 
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <Pressable style={styles.optionCard} onPress={goHome}>
-            <Text style={styles.optionText}>Suporte</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
-          </Pressable>
-        </LinearGradient>
+          <LinearGradient
+            colors={PROGRESS_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.cardBorder}
+          >
+            <Pressable style={styles.optionCard} onPress={goHome}>
+              <Text style={styles.optionText}>Suporte</Text>
+              <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
+            </Pressable>
+          </LinearGradient>
 
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <Pressable style={styles.optionCard} onPress={() => setShowLanguageModal(true)}>
-            <View>
-              <Text style={styles.optionText}>{t("settings_language_title")}</Text>
-              <Text style={styles.optionHint}>
-                {language === "pt" ? t("settings_language_pt") : t("settings_language_en")}
-              </Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
-          </Pressable>
-        </LinearGradient>
+          <LinearGradient
+            colors={PROGRESS_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.cardBorder}
+          >
+            <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/GerenciarPosts")}>
+              <Text style={styles.optionText}>Gerenciar posts</Text>
+              <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
+            </Pressable>
+          </LinearGradient>
 
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Premium")}>
-            <Text style={styles.optionText}>Obter Premium</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
-          </Pressable>
-        </LinearGradient>
-
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/GerenciarPosts")}>
-            <Text style={styles.optionText}>Gerenciar posts</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
-          </Pressable>
-        </LinearGradient>
-
-        <LinearGradient
-          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-          start={{ x: 0, y: 0.2 }}
-          end={{ x: 1, y: 0.8 }}
-          style={styles.cardBorder}
-        >
-          <Pressable style={styles.optionCard} onPress={goHome}>
-            <Text style={styles.optionText}>Sobre</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
-          </Pressable>
-        </LinearGradient>
+          <LinearGradient
+            colors={PROGRESS_GRADIENT}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.cardBorder}
+          >
+            <Pressable style={styles.optionCard} onPress={goHome}>
+              <Text style={styles.optionText}>Sobre</Text>
+              <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
+            </Pressable>
+          </LinearGradient>
         </View>
 
         <LinearGradient
-          colors={theme.colors.negativeGradient}
+          colors={negativeGradient}
           start={{ x: 0, y: 0.2 }}
           end={{ x: 1, y: 0.8 }}
           style={styles.negativeButtonBorder}
@@ -217,46 +183,6 @@ export default function ConfiguracoesScreen() {
         </LinearGradient>
       </ScrollView>
 
-      <Modal visible={showLanguageModal} animationType="fade" transparent onRequestClose={() => setShowLanguageModal(false)}>
-        <View style={styles.modalBackdrop}>
-          <LinearGradient
-            colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-            start={{ x: 0, y: 0.2 }}
-            end={{ x: 1, y: 0.8 }}
-            style={styles.modalBorder}
-          >
-            <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{t("settings_language_title")}</Text>
-
-            <Pressable
-              style={styles.modalOption}
-              onPress={() => {
-                setLanguage("pt");
-                setShowLanguageModal(false);
-              }}
-            >
-              <Text style={styles.modalOptionText}>{t("settings_language_pt")}</Text>
-              {language === "pt" ? <Text style={styles.modalSelected}>OK</Text> : null}
-            </Pressable>
-
-            <Pressable
-              style={styles.modalOption}
-              onPress={() => {
-                setLanguage("en");
-                setShowLanguageModal(false);
-              }}
-            >
-              <Text style={styles.modalOptionText}>{t("settings_language_en")}</Text>
-              {language === "en" ? <Text style={styles.modalSelected}>OK</Text> : null}
-            </Pressable>
-
-            <Pressable style={styles.modalCancel} onPress={() => setShowLanguageModal(false)}>
-              <Text style={styles.modalCancelText}>Cancelar</Text>
-            </Pressable>
-            </View>
-          </LinearGradient>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -301,34 +227,14 @@ function createStyles(theme: AppTheme) {
       shadowOffset: { width: 0, height: 10 },
       elevation: 8,
     },
-    cardInner: {
-      borderRadius: 16,
-      backgroundColor: "rgba(11, 14, 24, 0.92)",
-      paddingVertical: 2,
-    },
-    themeRow: {
-      minHeight: 56,
-      borderBottomWidth: 1,
-      borderBottomColor: "rgba(124, 92, 255, 0.35)",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      gap: 10,
-    },
-    themePressable: {
-      flex: 1,
-      gap: 2,
-    },
-    switchWrap: {
-      alignItems: "center",
-      gap: 4,
-    },
-    switchLabel: {
-      color: "#7FE7FF",
-      fontSize: 12,
-      fontWeight: "600",
+    premiumBorder: {
+      borderRadius: 18,
+      padding: 2,
+      shadowColor: "#FDE68A",
+      shadowOpacity: 0.55,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10,
     },
     optionCard: {
       minHeight: 64,
@@ -339,10 +245,52 @@ function createStyles(theme: AppTheme) {
       justifyContent: "space-between",
       paddingHorizontal: 16,
     },
+    premiumCard: {
+      minHeight: 68,
+      borderRadius: 16,
+      backgroundColor: "rgba(18, 8, 4, 0.96)",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      gap: 12,
+    },
     optionText: {
       color: "#E0E0E0",
       fontSize: 16,
       fontWeight: "600",
+    },
+    premiumTitle: {
+      color: "#FFF7E0",
+      fontSize: 16,
+      fontWeight: "800",
+      letterSpacing: 0.3,
+    },
+    premiumHint: {
+      color: "rgba(253, 230, 138, 0.85)",
+      fontSize: 12,
+      marginTop: 2,
+      fontWeight: "600",
+    },
+    premiumBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: "rgba(253, 230, 138, 0.15)",
+      borderWidth: 1,
+      borderColor: "rgba(253, 230, 138, 0.6)",
+    },
+    premiumBadgeIcon: {
+      color: "#FDE68A",
+    },
+    premiumBadgeText: {
+      color: "#FDE68A",
+      fontWeight: "800",
+      fontSize: 12,
+      letterSpacing: 0.8,
     },
     optionTextWrap: {
       flexDirection: "row",
@@ -362,10 +310,6 @@ function createStyles(theme: AppTheme) {
       color: "#0B0E18",
       fontSize: 11,
       fontWeight: "800",
-    },
-    optionHint: {
-      color: "#7FE7FF",
-      fontSize: 12,
     },
     chevron: {
       color: "#7FE7FF",
@@ -414,71 +358,6 @@ function createStyles(theme: AppTheme) {
       color: "#FF4BD8",
       fontWeight: "700",
       letterSpacing: 0.3,
-    },
-    modalBackdrop: {
-      flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.45)",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 20,
-    },
-    modalBorder: {
-      width: "100%",
-      maxWidth: 360,
-      borderRadius: 18,
-      padding: 1.5,
-      shadowColor: "#7C5CFF",
-      shadowOpacity: 0.4,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 8,
-    },
-    modalCard: {
-      borderRadius: 16,
-      backgroundColor: "rgba(11, 14, 24, 0.96)",
-      padding: 14,
-      gap: 8,
-    },
-    modalTitle: {
-      color: "#E0E0E0",
-      fontSize: 18,
-      fontWeight: "700",
-      marginBottom: 4,
-    },
-    modalOption: {
-      minHeight: 44,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: "rgba(124, 92, 255, 0.35)",
-      backgroundColor: "rgba(11, 14, 24, 0.92)",
-      paddingHorizontal: 12,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    },
-    modalOptionText: {
-      color: "#E0E0E0",
-      fontSize: 15,
-      fontWeight: "600",
-    },
-    modalSelected: {
-      color: "#7FE7FF",
-      fontSize: 12,
-      fontWeight: "700",
-    },
-    modalCancel: {
-      marginTop: 4,
-      minHeight: 42,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: "rgba(124, 92, 255, 0.35)",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(11, 14, 24, 0.92)",
-    },
-    modalCancelText: {
-      color: "#E0E0E0",
-      fontWeight: "700",
     },
   });
 }

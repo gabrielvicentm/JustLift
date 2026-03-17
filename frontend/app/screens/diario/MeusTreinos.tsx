@@ -11,6 +11,7 @@ import { api } from "@/app/config/api";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
+import PremiumAdModal from "@/app/components/PremiumAdModal";
 
 type DiasTreinoResponse = {
   dias: string[];
@@ -20,6 +21,7 @@ const NOISE_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+const PREMIUM_AD_FLAG_KEY = "show_premium_modal_after_workout";
 
 export default function MeusTreinosScreen() {
   const router = useRouter();
@@ -32,6 +34,7 @@ export default function MeusTreinosScreen() {
   const [diasComTreino, setDiasComTreino] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPremiumAdModal, setShowPremiumAdModal] = useState(false);
 
   const handleDayPress = useCallback((dateString: string) => {
     setSelectedDate(dateString);
@@ -73,7 +76,21 @@ export default function MeusTreinosScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      carregarDiasComTreino().catch(() => undefined);
+      let active = true;
+
+      const hydrate = async () => {
+        await carregarDiasComTreino();
+        const shouldShow = await AsyncStorage.getItem(PREMIUM_AD_FLAG_KEY);
+        if (shouldShow && active) {
+          setShowPremiumAdModal(true);
+          await AsyncStorage.removeItem(PREMIUM_AD_FLAG_KEY);
+        }
+      };
+
+      hydrate().catch(() => undefined);
+      return () => {
+        active = false;
+      };
     }, [carregarDiasComTreino]),
   );
 
@@ -192,6 +209,14 @@ export default function MeusTreinosScreen() {
           </Pressable>
         </LinearGradient>
       </View>
+      <PremiumAdModal
+        visible={showPremiumAdModal}
+        onClose={() => setShowPremiumAdModal(false)}
+        onUpgrade={() => {
+          setShowPremiumAdModal(false);
+          router.push("/screens/settings/Premium");
+        }}
+      />
     </SafeAreaView>
   );
 }
