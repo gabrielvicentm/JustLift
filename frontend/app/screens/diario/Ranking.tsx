@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { api } from "@/app/config/api";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -53,6 +54,12 @@ type RankingResponse = {
   };
 };
 
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
+};
+
 const PODIUM_COLORS = {
   1: "#F59E0B",
   2: "#94A3B8",
@@ -76,6 +83,7 @@ export default function RankingScreen() {
   const [error, setError] = useState<string | null>(null);
   const [myStats, setMyStats] = useState<MinhaGamificacaoResponse | null>(null);
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [isPremium, setIsPremium] = useState(false);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -91,16 +99,18 @@ export default function RankingScreen() {
       }
 
       const headers = { Authorization: `Bearer ${accessToken}` };
-      const [myStatsResponse, rankingResponse] = await Promise.all([
+      const [myStatsResponse, rankingResponse, premiumResponse] = await Promise.all([
         api.get<MinhaGamificacaoResponse>("/diario/gamificacao/me", { headers }),
         api.get<RankingResponse>("/diario/gamificacao/ranking", {
           headers,
           params: { limit: 100 },
         }),
+        api.get<PremiumStatusResponse>("/premium/status", { headers }),
       ]);
 
       setMyStats(myStatsResponse.data);
       setRanking(rankingResponse.data?.ranking ?? []);
+      setIsPremium(Boolean(premiumResponse.data?.isPremium));
     } catch (err) {
       console.error("Erro ao carregar ranking:", err);
       setError("Não foi possível carregar o ranking agora.");
@@ -238,9 +248,17 @@ export default function RankingScreen() {
                         )}
 
                         <View style={styles.userBlock}>
-                          <Text numberOfLines={1} style={styles.usernameText}>
-                            {item.username}
-                          </Text>
+                          <Pressable
+                            style={styles.usernameRow}
+                            onPress={() => router.push(`/screens/social/${encodeURIComponent(item.username)}` as never)}
+                          >
+                            <Text numberOfLines={1} style={styles.usernameText}>
+                              {item.username}
+                            </Text>
+                            {isMe && isPremium ? (
+                              <MaterialCommunityIcons name="crown" size={16} color="#FDE68A" />
+                            ) : null}
+                          </Pressable>
                           <Text style={styles.pointsText}>{`${item.total_points} pts`}</Text>
                         </View>
 
@@ -532,6 +550,11 @@ function createStyles(theme: AppTheme) {
       flex: 1,
       minWidth: 0,
       gap: 2,
+    },
+    usernameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
     },
     usernameText: {
       color: theme.colors.text,

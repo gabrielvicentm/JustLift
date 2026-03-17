@@ -4,7 +4,6 @@ import {
   FlatList,
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
@@ -13,6 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AxiosError } from "axios";
 import { useRouter } from "expo-router";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
@@ -33,6 +33,12 @@ type ExercisesResponse = {
   meta: {
     count: number;
   };
+};
+
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
 };
 
 const NOISE_DATA_URI =
@@ -59,12 +65,15 @@ function getApiErrorMessage(err: unknown) {
 
 export default function GraficoExerciciosScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exercicios, setExercicios] = useState<ExerciseItem[]>([]);
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  const [checkingPremium, setCheckingPremium] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -111,9 +120,49 @@ export default function GraficoExerciciosScreen() {
     };
   }, []);
 
+  const fetchPremiumStatus = async () => {
+    if (isPremium !== null) return isPremium;
+    setCheckingPremium(true);
+    try {
+      const token = await AsyncStorage.getItem("accessToken");
+      if (!token) {
+        setIsPremium(false);
+        return false;
+      }
+
+      const response = await api.get<PremiumStatusResponse>("/premium/status", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const premium = Boolean(response.data?.isPremium);
+      setIsPremium(premium);
+      return premium;
+    } catch {
+      setIsPremium(false);
+      return false;
+    } finally {
+      setCheckingPremium(false);
+    }
+  };
+
+  const handleOpenExercise = async (item: ExerciseItem) => {
+    const premium = await fetchPremiumStatus();
+    router.push({
+      pathname: "/screens/diario/GraficoExercicioDetalhe",
+      params: {
+        source: item.source,
+        exercise_id: item.exercise_id ?? "",
+        custom_exercise_id: item.custom_exercise_id ? String(item.custom_exercise_id) : "",
+        nome: item.nome,
+        premium_blocked: premium ? "0" : "1",
+      },
+    });
+  };
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.container}>
+    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+      <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
         <LinearGradient
           colors={theme.colors.buttonGradient}
           start={{ x: 0, y: 0.2 }}
@@ -156,20 +205,7 @@ export default function GraficoExerciciosScreen() {
                 >
                   <View style={styles.cardInner}>
                     <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
-                    <Pressable
-                      style={styles.itemCard}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/screens/diario/GraficoExercicioDetalhe",
-                          params: {
-                            source: item.source,
-                            exercise_id: item.exercise_id ?? "",
-                            custom_exercise_id: item.custom_exercise_id ? String(item.custom_exercise_id) : "",
-                            nome: item.nome,
-                          },
-                        })
-                      }
-                    >
+                    <Pressable style={styles.itemCard} onPress={() => handleOpenExercise(item)}>
                       <View style={styles.itemRow}>
                         {item.imagem_url ? (
                           <Image source={{ uri: item.imagem_url }} style={styles.itemImage} />

@@ -208,3 +208,53 @@ exports.syncFromRevenueCat = async (userId) => {
   await syncPremiumCache(userId, mapped.is_premium);
   return mapped;
 };
+
+exports.setManualStatus = async (userId, enabled) => {
+  await ensureUserExists(userId);
+
+  const now = new Date();
+  const future = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30);
+  const status = enabled ? 'active' : 'inactive';
+  const currentPeriodEndsAt = enabled ? future : now;
+
+  const result = await db.query(
+    `INSERT INTO user_subscriptions (
+       user_id,
+       provider,
+       product_id,
+       status,
+       current_period_ends_at,
+       raw_payload,
+       updated_at
+     )
+     VALUES (
+       $1,
+       'manual',
+       'fake',
+       $2,
+       $3,
+       $4,
+       NOW()
+     )
+     ON CONFLICT (user_id, provider)
+     DO UPDATE SET
+       status = EXCLUDED.status,
+       current_period_ends_at = EXCLUDED.current_period_ends_at,
+       raw_payload = EXCLUDED.raw_payload,
+       updated_at = NOW()
+     RETURNING user_id, provider, status, current_period_ends_at, updated_at`,
+    [
+      userId,
+      status,
+      currentPeriodEndsAt,
+      {
+        source: 'manual',
+        enabled,
+      },
+    ],
+  );
+
+  const mapped = toPremiumModel(result.rows[0]);
+  await syncPremiumCache(userId, mapped.is_premium);
+  return mapped;
+};

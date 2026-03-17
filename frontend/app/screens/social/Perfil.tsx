@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActivityIndicator,
   Image,
@@ -20,6 +21,10 @@ import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import { useRouter } from "expo-router";
+import PremiumAdModal from "@/app/components/PremiumAdModal";
+
+const PREMIUM_AD_FLAG_KEY = "show_premium_modal_after_workout_post";
+const PREMIUM_AD_PROFILE_FLAG_KEY = "show_premium_modal_after_profile_update";
 
 export default function PerfilScreen() {
   const { theme } = useAppTheme();
@@ -33,6 +38,7 @@ export default function PerfilScreen() {
   const [postsError, setPostsError] = useState("");
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
   const [activeTab, setActiveTab] = useState<"posts" | "treinos" | "salvos">("posts");
+  const [showPremiumAdModal, setShowPremiumAdModal] = useState(false);
 
   const loading = profileQuery.isLoading;
   const refreshing = profileQuery.isRefetching;
@@ -92,8 +98,25 @@ export default function PerfilScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
-      loadDailySummary();
+      let active = true;
+
+      const hydrate = async () => {
+        await loadPosts();
+        await loadDailySummary();
+        const [shouldShowPost, shouldShowProfile] = await Promise.all([
+          AsyncStorage.getItem(PREMIUM_AD_FLAG_KEY),
+          AsyncStorage.getItem(PREMIUM_AD_PROFILE_FLAG_KEY),
+        ]);
+        if ((shouldShowPost || shouldShowProfile) && active) {
+          setShowPremiumAdModal(true);
+          await AsyncStorage.multiRemove([PREMIUM_AD_FLAG_KEY, PREMIUM_AD_PROFILE_FLAG_KEY]);
+        }
+      };
+
+      hydrate().catch(() => undefined);
+      return () => {
+        active = false;
+      };
     }, [loadPosts, loadDailySummary]),
   );
 
@@ -324,6 +347,14 @@ export default function PerfilScreen() {
           })}
         </View>
       </ScrollView>
+      <PremiumAdModal
+        visible={showPremiumAdModal}
+        onClose={() => setShowPremiumAdModal(false)}
+        onUpgrade={() => {
+          setShowPremiumAdModal(false);
+          router.push("/screens/settings/Premium");
+        }}
+      />
     </View>
   );
 }

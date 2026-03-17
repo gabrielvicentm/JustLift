@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +13,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMyProfileQuery } from "@/app/features/profile/hooks";
 import {
   getApiErrorMessage,
@@ -20,12 +24,23 @@ import {
   updateMyProfile,
   uploadImageToR2,
 } from "@/app/features/profile/service";
+import { api } from "@/app/config/api";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
+
+const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+const PREMIUM_AD_PROFILE_FLAG_KEY = "show_premium_modal_after_profile_update";
+
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
+};
 
 export default function EditarPerfilScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -93,8 +108,22 @@ export default function EditarPerfilScreen() {
       setSuccess("Perfil atualizado com sucesso!");
 
       await queryClient.invalidateQueries({ queryKey: profileKeys.me() });
-      setTimeout(() => {
-        router.back();
+      setTimeout(async () => {
+        try {
+          const accessToken = await AsyncStorage.getItem("accessToken");
+          if (accessToken) {
+            const response = await api.get<PremiumStatusResponse>("/premium/status", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (!response.data?.isPremium) {
+              await AsyncStorage.setItem(PREMIUM_AD_PROFILE_FLAG_KEY, "1");
+            }
+          }
+        } catch {
+          await AsyncStorage.setItem(PREMIUM_AD_PROFILE_FLAG_KEY, "1");
+        } finally {
+          router.replace("/(tabs)/perfil_tab");
+        }
       }, 1000);
     },
     onError: (err) => {
@@ -126,6 +155,20 @@ export default function EditarPerfilScreen() {
     }
   };
 
+  const handleRemoveFotoPerfil = () => {
+    setFotoPerfilUri(null);
+    setFotoPerfilUrl(null);
+  };
+
+  const handleFotoPerfilAction = () => {
+    const hasFoto = Boolean(fotoPerfilUri || fotoPerfilUrl);
+    Alert.alert("Foto de perfil", "O que deseja fazer?", [
+      { text: "Selecionar imagem", onPress: handleSelectFotoPerfil },
+      ...(hasFoto ? [{ text: "Remover foto", onPress: handleRemoveFotoPerfil, style: "destructive" as const }] : []),
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
+
   const handleSelectBanner = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -148,6 +191,20 @@ export default function EditarPerfilScreen() {
     } catch {
       setError("Erro ao selecionar banner");
     }
+  };
+
+  const handleRemoveBanner = () => {
+    setBannerUri(null);
+    setBannerUrl(null);
+  };
+
+  const handleBannerAction = () => {
+    const hasBanner = Boolean(bannerUri || bannerUrl);
+    Alert.alert("Banner", "O que deseja fazer?", [
+      { text: "Selecionar imagem", onPress: handleSelectBanner },
+      ...(hasBanner ? [{ text: "Remover banner", onPress: handleRemoveBanner, style: "destructive" as const }] : []),
+      { text: "Cancelar", style: "cancel" },
+    ]);
   };
 
   const handleSaveProfile = () => {
@@ -176,7 +233,7 @@ export default function EditarPerfilScreen() {
 
   if (profileQuery.isLoading && !formHydrated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.centeredBlock}>
           <ActivityIndicator color={theme.colors.text} />
           <Text style={styles.loadingText}>Carregando perfil...</Text>
@@ -186,79 +243,109 @@ export default function EditarPerfilScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + insets.bottom }]}>
         <Text style={styles.title}>Editar Perfil</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Foto de Perfil</Text>
-          {fotoPerfilUri ? (
-            <Image source={{ uri: fotoPerfilUri }} style={styles.imagePreview} />
-          ) : fotoPerfilUrl ? (
-            <Image source={{ uri: fotoPerfilUrl }} style={styles.imagePreview} />
-          ) : (
-            <View style={[styles.imagePreview, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>Nenhuma foto selecionada</Text>
-            </View>
-          )}
-          <Pressable
-            style={[styles.button, styles.buttonSecondary, loading && styles.buttonDisabled]}
-            onPress={handleSelectFotoPerfil}
-            disabled={loading}
-          >
-            <Text style={styles.buttonSecondaryText}>Selecionar Foto</Text>
-          </Pressable>
-        </View>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.inputBorder}
+        >
+          <View style={styles.inputCard}>
+            <Text style={styles.sectionTitle}>Foto de Perfil</Text>
+            {fotoPerfilUri ? (
+              <Image source={{ uri: fotoPerfilUri }} style={styles.imagePreview} />
+            ) : fotoPerfilUrl ? (
+              <Image source={{ uri: fotoPerfilUrl }} style={styles.imagePreview} />
+            ) : (
+              <View style={[styles.imagePreview, styles.placeholderImage]}>
+                <Text style={styles.placeholderText}>Nenhuma foto selecionada</Text>
+              </View>
+            )}
+            <Pressable
+              style={[styles.button, styles.buttonSecondary, loading && styles.buttonDisabled]}
+              onPress={handleFotoPerfilAction}
+              disabled={loading}
+            >
+              <Ionicons name="image-outline" size={18} color="#7FE7FF" />
+              <Text style={styles.buttonSecondaryText}>Selecionar foto</Text>
+            </Pressable>
+          </View>
+        </LinearGradient>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Banner</Text>
-          {bannerUri ? (
-            <Image source={{ uri: bannerUri }} style={styles.bannerPreview} />
-          ) : bannerUrl ? (
-            <Image source={{ uri: bannerUrl }} style={styles.bannerPreview} />
-          ) : (
-            <View style={[styles.bannerPreview, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>Nenhum banner selecionado</Text>
-            </View>
-          )}
-          <Pressable
-            style={[styles.button, styles.buttonSecondary, loading && styles.buttonDisabled]}
-            onPress={handleSelectBanner}
-            disabled={loading}
-          >
-            <Text style={styles.buttonSecondaryText}>Selecionar Banner</Text>
-          </Pressable>
-        </View>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.inputBorder}
+        >
+          <View style={styles.inputCard}>
+            <Text style={styles.sectionTitle}>Banner</Text>
+            {bannerUri ? (
+              <Image source={{ uri: bannerUri }} style={styles.bannerPreview} />
+            ) : bannerUrl ? (
+              <Image source={{ uri: bannerUrl }} style={styles.bannerPreview} />
+            ) : (
+              <View style={[styles.bannerPreview, styles.placeholderImage]}>
+                <Text style={styles.placeholderText}>Nenhum banner selecionado</Text>
+              </View>
+            )}
+            <Pressable
+              style={[styles.button, styles.buttonSecondary, loading && styles.buttonDisabled]}
+              onPress={handleBannerAction}
+              disabled={loading}
+            >
+              <Ionicons name="images-outline" size={18} color="#7FE7FF" />
+              <Text style={styles.buttonSecondaryText}>Selecionar banner</Text>
+            </Pressable>
+          </View>
+        </LinearGradient>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Nome de Exibicao</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Digite seu nome"
-            placeholderTextColor={theme.colors.mutedText}
-            value={nomeExibicao}
-            onChangeText={setNomeExibicao}
-            editable={!loading}
-            maxLength={255}
-          />
-          <Text style={styles.charCount}>{nomeExibicao.length} / 255</Text>
-        </View>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.inputBorder}
+        >
+          <View style={styles.inputCard}>
+            <Text style={styles.label}>Nome de Exibicao</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Digite seu nome"
+              placeholderTextColor="rgba(127, 231, 255, 0.75)"
+              value={nomeExibicao}
+              onChangeText={setNomeExibicao}
+              editable={!loading}
+              maxLength={255}
+            />
+            <Text style={styles.charCount}>{nomeExibicao.length} / 255</Text>
+          </View>
+        </LinearGradient>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Biografia</Text>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            placeholder="Conte um pouco sobre voce"
-            placeholderTextColor={theme.colors.mutedText}
-            value={biografia}
-            onChangeText={setBiografia}
-            editable={!loading}
-            maxLength={500}
-            multiline
-            numberOfLines={4}
-          />
-          <Text style={styles.charCount}>{biografia.length} / 500</Text>
-        </View>
+        <LinearGradient
+          colors={PROGRESS_GRADIENT}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.inputBorder}
+        >
+          <View style={styles.inputCard}>
+            <Text style={styles.label}>Biografia</Text>
+            <TextInput
+              style={[styles.input, styles.textarea]}
+              placeholder="Conte um pouco sobre voce"
+              placeholderTextColor="rgba(127, 231, 255, 0.75)"
+              value={biografia}
+              onChangeText={setBiografia}
+              editable={!loading}
+              maxLength={500}
+              multiline
+              numberOfLines={4}
+            />
+            <Text style={styles.charCount}>{biografia.length} / 500</Text>
+          </View>
+        </LinearGradient>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {success ? <Text style={styles.success}>{success}</Text> : null}
@@ -293,7 +380,7 @@ function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "#0B0E18",
     },
     centeredBlock: {
       flex: 1,
@@ -309,11 +396,15 @@ function createStyles(theme: AppTheme) {
     scrollContent: {
       padding: 16,
       gap: 16,
+      paddingBottom: 24,
     },
     title: {
       fontSize: 28,
-      fontWeight: "700",
-      color: theme.colors.text,
+      fontWeight: "800",
+      color: "#E0E0E0",
+      textShadowColor: "rgba(0, 255, 255, 0.75)",
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 12,
       marginBottom: 8,
     },
     section: {
@@ -329,18 +420,34 @@ function createStyles(theme: AppTheme) {
     },
     label: {
       fontSize: 14,
-      fontWeight: "600",
-      color: theme.colors.text,
+      fontWeight: "700",
+      color: "#7FE7FF",
+      letterSpacing: 0.4,
+    },
+    inputBorder: {
+      borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#74D3FF",
+      shadowOpacity: 0.45,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+    },
+    inputCard: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      padding: 16,
+      gap: 10,
     },
     input: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 10,
+      borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      backgroundColor: theme.colors.inputBackground,
-      color: theme.colors.text,
+      backgroundColor: "rgba(9, 12, 20, 0.95)",
+      color: "#E0E0E0",
       fontSize: 14,
+      borderWidth: 1,
+      borderColor: "rgba(127, 231, 255, 0.25)",
     },
     textarea: {
       minHeight: 100,
@@ -348,7 +455,7 @@ function createStyles(theme: AppTheme) {
     },
     charCount: {
       fontSize: 12,
-      color: theme.colors.mutedText,
+      color: "rgba(127, 231, 255, 0.75)",
       textAlign: "right",
     },
     imagePreview: {
@@ -398,9 +505,11 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
+      flexDirection: "row",
+      gap: 8,
     },
     buttonSecondaryText: {
-      color: theme.colors.text,
+      color: "#E0E0E0",
       fontWeight: "600",
       fontSize: 15,
     },

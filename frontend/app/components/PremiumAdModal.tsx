@@ -14,7 +14,7 @@ const BENEFITS = [
   "Sem anúncios",
   "Banners exclusivos",
   "Mudar a cor do seu perfil",
-  "Mudar a cor do app localmente (fundo, botões, bordas)",
+  "Exercícios personalizados ilimitados",
   "Treinos ilimitados (grátis: 3x por semana)",
   "Boost de pontos 2x",
   "Retrospectiva semanal, mensal e anual",

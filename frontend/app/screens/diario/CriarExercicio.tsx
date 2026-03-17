@@ -33,6 +33,17 @@ const MUSCULOS_ALVO = [
   "panturrilhas",
   "abdômen",
 ];
+const MAX_CUSTOM_EXERCISES_FREE = 5;
+
+type PremiumStatusResponse = {
+  isPremium: boolean;
+  premiumUpdatedAt?: string | null;
+  message?: string;
+};
+
+type ExercicioCustomizadoResponse = {
+  exercicios: unknown[];
+};
 
 export default function CriarExercicioScreen() {
   const router = useRouter();
@@ -49,6 +60,8 @@ export default function CriarExercicioScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  const [checkingPremium, setCheckingPremium] = useState(false);
 
   const getApiErrorMessage = (err: unknown) => {
     const axiosError = err as AxiosError<{ message?: string } | string>;
@@ -124,6 +137,51 @@ export default function CriarExercicioScreen() {
     ]);
   };
 
+  const fetchPremiumStatus = async () => {
+    if (isPremium !== null) return isPremium;
+    if (checkingPremium) return false;
+    setCheckingPremium(true);
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (!accessToken) {
+        setIsPremium(false);
+        return false;
+      }
+      const response = await api.get<PremiumStatusResponse>("/premium/status", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const premium = Boolean(response.data?.isPremium);
+      setIsPremium(premium);
+      return premium;
+    } catch {
+      setIsPremium(false);
+      return false;
+    } finally {
+      setCheckingPremium(false);
+    }
+  };
+
+  const canCreateCustomExercise = async () => {
+    const premium = await fetchPremiumStatus();
+    if (premium) return true;
+
+    const accessToken = await AsyncStorage.getItem("accessToken");
+    if (!accessToken) {
+      setError("Faça login para criar exercícios.");
+      return false;
+    }
+
+    const response = await api.get<ExercicioCustomizadoResponse>("/diario/custom", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const total = response.data?.exercicios?.length ?? 0;
+    if (total >= MAX_CUSTOM_EXERCISES_FREE) {
+      setError("Limite atingido. Usuários grátis podem criar até 5 exercícios.");
+      return false;
+    }
+    return true;
+  };
+
   const uploadImageIfNeeded = async (): Promise<string | null> => {
     if (!imageUri) {
       return null;
@@ -153,6 +211,9 @@ export default function CriarExercicioScreen() {
 
     setLoading(true);
     try {
+      const allowed = await canCreateCustomExercise();
+      if (!allowed) return;
+
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
         setError("Faça login para criar exercícios.");
