@@ -2,9 +2,9 @@
   "expo": {
     "name": "JustLift",
     "slug": "TIGRINHO",
-    "version": "1.0.0",
+    "version": "3.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/JUSTLIFT.png",
+    "icon": "./assets/images/justliftlogo.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,9 +14,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#b1ffa3",
-        "foregroundImage": "./assets/images/JUSTLIFT.png",
-        "backgroundImage": "./assets/images/JUSTLIFT.png",
-        "monochromeImage": "./assets/images/JUSTLIFT.png"
+        "foregroundImage": "./assets/images/justliftlogo.png",
+        "backgroundImage": "./assets/images/justliftlogo.png",
+        "monochromeImage": "./assets/images/justliftlogo.png"
       },
       "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
@@ -25,7 +25,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/JUSTLIFT.png"
+      "favicon": "./assets/images/justliftlogo.png"
     },
     "plugins": [
       "expo-router",
@@ -35,10 +35,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/JUSTLIFT.png",
+          "image": "./assets/images/justliftlogo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#000000",
           "dark": {
             "backgroundColor": "#000000"
           }

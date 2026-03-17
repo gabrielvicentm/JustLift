@@ -251,6 +251,15 @@ export default function EditarPerfilScreen() {
     }
     if (!isPremium) {
       setShowBannerPremiumModal(true);
+    if (!isPremium) {
+      Alert.alert(
+        "Banner Premium",
+        "Apenas usuários Premium podem fazer upload de banner. Escolha uma cor ou gradiente.",
+        [
+          { text: "Ver Premium", onPress: () => router.push("/screens/settings/Premium") },
+          { text: "Fechar", style: "cancel" },
+        ],
+      );
       return;
     }
     const hasBanner = Boolean(bannerUri || bannerUrl);
