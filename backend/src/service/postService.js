@@ -110,6 +110,8 @@ async function getCommentOwner(commentId) {
   );
 
   return result.rows[0] || null;
+}
+
 function mapPostSummaryRow(row) {
   return {
     id: row.id,
@@ -805,4 +807,3 @@ exports.toggleCommentLike = async ({ postId, commentId, userId }) => {
     likes_count: likesCount.rows[0]?.likes_count || 0,
   };
 };
-}

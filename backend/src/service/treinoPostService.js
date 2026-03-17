@@ -33,7 +33,8 @@ exports.getTreinoResumoById = async ({ userId, treinoId, lang }) => {
     `
       SELECT
         et.exercicio_treino_id,
-        COALESCE(ec.nome, tr_lang.nome, tr_en.nome, et.exercise_id, 'Exercicio') AS nome
+        COALESCE(ec.nome, tr_lang.nome, tr_en.nome, et.exercise_id, 'Exercicio') AS nome,
+        COALESCE(ec.img_url, e.gif_url) AS imagem_url
       FROM exercicios_do_treino et
       INNER JOIN treinos t
         ON t.treino_id = et.treino_id
@@ -57,6 +58,7 @@ exports.getTreinoResumoById = async ({ userId, treinoId, lang }) => {
   const exercicios = exerciciosResult.rows.map((row) => ({
     exercicio_treino_id: row.exercicio_treino_id,
     nome: row.nome,
+    imagem_url: row.imagem_url,
   }));
 
   return {
