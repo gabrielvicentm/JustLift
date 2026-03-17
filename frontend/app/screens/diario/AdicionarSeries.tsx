@@ -107,6 +107,7 @@ const NOISE_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
+const PREMIUM_AD_FLAG_KEY = "show_premium_modal_after_workout";
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -519,7 +520,8 @@ export default function AdicionarSeriesScreen() {
       setExercicios([]);
       setElapsedSeconds(0);
       setPaused(false);
-      router.replace("/screens/diario/Diario");
+      await AsyncStorage.setItem(PREMIUM_AD_FLAG_KEY, "1");
+      router.replace("/screens/diario/MeusTreinos");
     } catch (err) {
       console.error("Erro ao salvar treino:", err);
       setSaveError(language === "en" ? "Could not save workout." : "Não foi possível salvar o treino.");
