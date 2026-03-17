@@ -123,8 +123,7 @@ const LEGACY_WORKOUT_KEY = "current_workout_exercises_v1";
 const NOISE_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 
-const FILTER_IMAGE_URL =
-  "https://pub-0fb9b964942445dd91ff19d7779f2131.r2.dev/media/1772134869145-4dc40590-ed2f-4fc2-aed2-c5d7a380c273-perfil_1772134868620.jpg";
+const FALLBACK_FILTER_IMAGE = require("../../../assets/images/options/maquina.png");
 
 const MUSCLE_FILTER_OPTIONS = [
   { key: "pectorals", label: "Peitoral" },
@@ -135,6 +134,15 @@ const MUSCLE_FILTER_OPTIONS = [
   { key: "abs", label: "Abdomem" },
 ];
 
+const MUSCLE_FILTER_IMAGES: Record<string, number> = {
+  pectorals: require("../../../assets/images/options/peitoral.png"),
+  "upper back": require("../../../assets/images/options/costas.png"),
+  delts: require("../../../assets/images/options/ombros.png"),
+  biceps: require("../../../assets/images/options/bracos.png"),
+  quads: require("../../../assets/images/options/pernas.png"),
+  abs: require("../../../assets/images/options/abdomem.png"),
+};
+
 const EQUIPMENT_FILTER_OPTIONS = [
   { key: "barbell", label: "Barra" },
   { key: "dumbbell", label: "Halter" },
@@ -143,6 +151,18 @@ const EQUIPMENT_FILTER_OPTIONS = [
   { key: "leverage machine", label: "Máquina" },
   { key: "band", label: "Elástico" },
 ];
+
+const EQUIPMENT_FILTER_IMAGES: Record<string, number> = {
+  barbell: require("../../../assets/images/options/barra.png"),
+  dumbbell: require("../../../assets/images/options/halter.png"),
+  "body weight": require("../../../assets/images/options/pesocorporal.png"),
+  cable: require("../../../assets/images/options/cabo.png"),
+  "leverage machine": require("../../../assets/images/options/maquina.png"),
+  band: require("../../../assets/images/options/elastico.png"),
+};
+
+const getMuscleFilterImage = (key: string) => MUSCLE_FILTER_IMAGES[key] ?? FALLBACK_FILTER_IMAGE;
+const getEquipmentFilterImage = (key: string) => EQUIPMENT_FILTER_IMAGES[key] ?? FALLBACK_FILTER_IMAGE;
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 const MAX_FREE_WORKOUTS_PER_WEEK = 3;
@@ -1033,7 +1053,7 @@ export default function AdicionarTreinoScreen() {
                       setShowMuscleModal(false);
                     }}
                   >
-                    <Image source={{ uri: FILTER_IMAGE_URL }} style={styles.filterImage} />
+                    <Image source={getMuscleFilterImage(item.key)} style={styles.filterImage} />
                     <Text style={styles.filterLabel}>{item.label}</Text>
                   </Pressable>
                 );
@@ -1088,7 +1108,7 @@ export default function AdicionarTreinoScreen() {
                       setShowEquipmentModal(false);
                     }}
                   >
-                    <Image source={{ uri: FILTER_IMAGE_URL }} style={styles.filterImage} />
+                    <Image source={getEquipmentFilterImage(item.key)} style={styles.filterImage} />
                     <Text style={styles.filterLabel}>{item.label}</Text>
                   </Pressable>
                 );

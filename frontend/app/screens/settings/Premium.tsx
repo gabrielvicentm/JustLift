@@ -26,7 +26,6 @@ const NOISE_DATA_URI =
 const BENEFITS = [
   "Sem anúncios",
   "Banners exclusivos",
-  "Mudar a cor do seu perfil",
   "Exercícios personalizados ilimitados",
   "Treinos ilimitados (grátis: 3x por semana)",
   "Boost de pontos 2x",
