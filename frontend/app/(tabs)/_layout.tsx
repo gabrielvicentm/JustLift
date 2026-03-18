@@ -3,11 +3,9 @@ import { Tabs } from "expo-router";
 import { useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "@/providers/ThemeProvider";
-import { useI18n } from "@/providers/I18nProvider";
 
 export default function TabsLayout() {
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const insets = useSafeAreaInsets();
 
   const screenOptions = useMemo(
@@ -43,12 +41,12 @@ export default function TabsLayout() {
         },
       })}
     >
-      <Tabs.Screen name="home_tab" options={{ title: t("tab_home") }} />
-      <Tabs.Screen name="diario_tab" options={{ title: t("tab_diary") }} />
+      <Tabs.Screen name="home_tab" options={{ title: "Home" }} />
+      <Tabs.Screen name="diario_tab" options={{ title: "Diario" }} />
       <Tabs.Screen
         name="perfil_tab"
         options={{
-          title: t("tab_profile"),
+          title: "Perfil",
           sceneStyle: {
             backgroundColor: theme.colors.background,
             paddingTop: 0,
@@ -56,7 +54,7 @@ export default function TabsLayout() {
           },
         }}
       />
-      <Tabs.Screen name="configuracoes_tab" options={{ title: t("tab_settings") }} />
+      <Tabs.Screen name="configuracoes_tab" options={{ title: "Configurações" }} />
     </Tabs>
   );
 }

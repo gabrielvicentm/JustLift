@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '@/app/config/api';
-import { useI18n } from '@/providers/I18nProvider';
 import { useAppTheme } from '@/providers/ThemeProvider';
 import { AppTheme } from '@/theme/theme';
 import { AxiosError } from 'axios';
@@ -39,7 +38,6 @@ const BACKGROUND_GRADIENT = ["#0B0E18", "#0B1022", "#120C2A"] as const;
 export default function Register() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [step, setStep] = useState<'register' | 'verify'>('register');
@@ -96,7 +94,7 @@ export default function Register() {
     setError('');
 
     if (!cleanUsername || !cleanEmail || !cleanSenha) {
-      setError(t('register_error_required'));
+      setError('Preencha username, email e senha.');
       return;
     }
     if (cleanSenha.length < 8) {
@@ -117,7 +115,7 @@ export default function Register() {
       setMessage(response.data.message ?? 'Codigo enviado para seu email.');
     } catch (err) {
       const axiosError = err as AxiosError<BackendResponse>;
-      const backendMessage = axiosError.response?.data?.message ?? t('register_error_default');
+      const backendMessage = axiosError.response?.data?.message ?? 'Erro ao fazer cadastro.';
       setError(backendMessage);
     } finally {
       setLoading(false);
@@ -259,13 +257,13 @@ export default function Register() {
         style={styles.cardBorder}
       >
       <View style={styles.card}>
-        <Text style={styles.title}>{t('register_title')}</Text>
-        <Text style={styles.subtitle}>{t('register_subtitle')}</Text>
+        <Text style={styles.title}>Cadastrar</Text>
+        <Text style={styles.subtitle}>Crie sua conta para continuar.</Text>
 
         {step === 'register' ? (
           <>
             <TextInput
-              placeholder={t('register_username_placeholder')}
+              placeholder="Username"
               placeholderTextColor={theme.colors.mutedText}
               autoCapitalize="none"
               value={username}
@@ -275,7 +273,7 @@ export default function Register() {
             />
 
             <TextInput
-              placeholder={t('register_email_placeholder')}
+              placeholder="Email"
               placeholderTextColor={theme.colors.mutedText}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -286,7 +284,7 @@ export default function Register() {
             />
 
             <TextInput
-              placeholder={t('register_password_placeholder')}
+              placeholder="Senha"
               placeholderTextColor={theme.colors.mutedText}
               secureTextEntry
               value={senha}
@@ -373,7 +371,7 @@ export default function Register() {
         {message ? <Text style={styles.success}>{message}</Text> : null}
 
         <Pressable onPress={() => router.replace('./Login')} disabled={loading}>
-          <Text style={styles.link}>{t('register_has_account')}</Text>
+          <Text style={styles.link}>Ja tem conta? Fazer login</Text>
         </Pressable>
       </View>
       </LinearGradient>

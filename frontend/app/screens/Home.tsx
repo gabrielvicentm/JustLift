@@ -2,20 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 
 export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>{t("home_title")}</Text>
+        <Text style={styles.title}>Voce esta na Home</Text>
         <View style={styles.headerActions}>
           <Pressable
             style={styles.iconButton}
