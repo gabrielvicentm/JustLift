@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { api } from "@/app/config/api";
+import type { FollowListItem, MyProfileResponse } from "@/app/features/profile/types";
 import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
@@ -82,8 +83,11 @@ export default function RankingScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myStats, setMyStats] = useState<MinhaGamificacaoResponse | null>(null);
-  const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [rankingGlobal, setRankingGlobal] = useState<RankingEntry[]>([]);
+  const [rankingMutual, setRankingMutual] = useState<RankingEntry[]>([]);
+  const [activeRanking, setActiveRanking] = useState<"global" | "mutual">("global");
   const [isPremium, setIsPremium] = useState(false);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -94,28 +98,82 @@ export default function RankingScreen() {
       if (!accessToken) {
         setError("Faça login para visualizar o ranking.");
         setMyStats(null);
-        setRanking([]);
+        setRankingGlobal([]);
+        setRankingMutual([]);
+        setMyUserId(null);
         return;
       }
 
       const headers = { Authorization: `Bearer ${accessToken}` };
-      const [myStatsResponse, rankingResponse, premiumResponse] = await Promise.all([
+
+      const fetchAllFollows = async (
+        endpoint: "/follows/followers" | "/follows/following",
+      ): Promise<FollowListItem[]> => {
+        const limit = 200;
+        const maxOffset = 2000;
+        let offset = 0;
+        let all: FollowListItem[] = [];
+
+        while (true) {
+          const response = await api.get<FollowListItem[]>(endpoint, {
+            headers,
+            params: { limit, offset },
+          });
+          const batch = response.data ?? [];
+          all = all.concat(batch);
+
+          if (batch.length < limit || offset >= maxOffset) {
+            break;
+          }
+          offset += limit;
+        }
+
+        return all;
+      };
+
+      const [
+        myStatsResponse,
+        rankingResponse,
+        premiumResponse,
+        myProfileResponse,
+        followers,
+        following,
+      ] = await Promise.all([
         api.get<MinhaGamificacaoResponse>("/diario/gamificacao/me", { headers }),
         api.get<RankingResponse>("/diario/gamificacao/ranking", {
           headers,
           params: { limit: 100 },
         }),
         api.get<PremiumStatusResponse>("/premium/status", { headers }),
+        api.get<MyProfileResponse>("/profile/me", { headers }),
+        fetchAllFollows("/follows/followers"),
+        fetchAllFollows("/follows/following"),
       ]);
 
+      const globalRanking = rankingResponse.data?.ranking ?? [];
+      const followerIds = new Set(followers.map((item) => item.user_id));
+      const mutualIds = new Set(
+        following.filter((item) => followerIds.has(item.user_id)).map((item) => item.user_id),
+      );
+      const mutualRanking = globalRanking
+        .filter((item) => mutualIds.has(item.user_id))
+        .map((item, index) => ({
+          ...item,
+          posicao: index + 1,
+        }));
+
       setMyStats(myStatsResponse.data);
-      setRanking(rankingResponse.data?.ranking ?? []);
+      setRankingGlobal(globalRanking);
+      setRankingMutual(mutualRanking);
+      setMyUserId(myProfileResponse.data?.user_id ?? null);
       setIsPremium(Boolean(premiumResponse.data?.isPremium));
     } catch (err) {
       console.error("Erro ao carregar ranking:", err);
       setError("Não foi possível carregar o ranking agora.");
       setMyStats(null);
-      setRanking([]);
+      setRankingGlobal([]);
+      setRankingMutual([]);
+      setMyUserId(null);
     } finally {
       setLoading(false);
     }
@@ -127,14 +185,19 @@ export default function RankingScreen() {
     }, [loadRanking]),
   );
 
-  const podium = useMemo(() => {
-    const first = ranking.find((item) => item.posicao === 1) ?? null;
-    const second = ranking.find((item) => item.posicao === 2) ?? null;
-    const third = ranking.find((item) => item.posicao === 3) ?? null;
-    return { first, second, third };
-  }, [ranking]);
+  const activeRankingList = useMemo(
+    () => (activeRanking === "global" ? rankingGlobal : rankingMutual),
+    [activeRanking, rankingGlobal, rankingMutual],
+  );
 
-  const rankingTop100 = useMemo(() => ranking.slice(0, 100), [ranking]);
+  const podium = useMemo(() => {
+    const first = activeRankingList.find((item) => item.posicao === 1) ?? null;
+    const second = activeRankingList.find((item) => item.posicao === 2) ?? null;
+    const third = activeRankingList.find((item) => item.posicao === 3) ?? null;
+    return { first, second, third };
+  }, [activeRankingList]);
+
+  const rankingTop100 = useMemo(() => activeRankingList.slice(0, 100), [activeRankingList]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -226,46 +289,90 @@ export default function RankingScreen() {
               <View style={styles.gradientInner}>
                 <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
                 <View style={styles.listCard}>
-                  <Text style={styles.sectionTitle}>Top 100</Text>
-                  {rankingTop100.map((item) => {
-                    const isMe = myStats?.global_position === item.posicao;
-                    return (
-                      <View
-                        key={item.user_id}
+                  <Text style={styles.sectionTitle}>Ranking</Text>
+                  <View style={styles.rankToggleRow}>
+                    <Pressable
+                      style={[
+                        styles.rankToggleButton,
+                        activeRanking === "global" && styles.rankToggleButtonActive,
+                      ]}
+                      onPress={() => setActiveRanking("global")}
+                    >
+                      <Text
                         style={[
-                          styles.rankingRow,
-                          isMe && styles.rankingRowMe,
+                          styles.rankToggleText,
+                          activeRanking === "global" && styles.rankToggleTextActive,
                         ]}
                       >
-                        <Text style={styles.positionText}>#{item.posicao}</Text>
+                        Global
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.rankToggleButton,
+                        activeRanking === "mutual" && styles.rankToggleButtonActive,
+                      ]}
+                      onPress={() => setActiveRanking("mutual")}
+                    >
+                      <Text
+                        style={[
+                          styles.rankToggleText,
+                          activeRanking === "mutual" && styles.rankToggleTextActive,
+                        ]}
+                      >
+                        Seguidores mútuos
+                      </Text>
+                    </Pressable>
+                  </View>
+                  {rankingTop100.length === 0 ? (
+                    <Text style={styles.emptyText}>
+                      {activeRanking === "global"
+                        ? "Nenhum ranking global encontrado."
+                        : "Nenhum seguidor mútuo encontrado."}
+                    </Text>
+                  ) : (
+                    rankingTop100.map((item) => {
+                      const isMe = Boolean(myUserId && myUserId === item.user_id);
+                      return (
+                        <View
+                          key={item.user_id}
+                          style={[
+                            styles.rankingRow,
+                            isMe && styles.rankingRowMe,
+                          ]}
+                        >
+                          <Text style={styles.positionText}>#{item.posicao}</Text>
 
-                        {item.foto_perfil ? (
-                          <Image source={{ uri: item.foto_perfil }} style={styles.avatar} />
-                        ) : (
-                          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                            <Text style={styles.avatarPlaceholderText}>{getInitial(item.username)}</Text>
+                          {item.foto_perfil ? (
+                            <Image source={{ uri: item.foto_perfil }} style={styles.avatar} />
+                          ) : (
+                            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                              <Text style={styles.avatarPlaceholderText}>{getInitial(item.username)}</Text>
+                            </View>
+                          )}
+
+                          <View style={styles.userBlock}>
+                            <Pressable
+                              style={styles.usernameRow}
+                              onPress={() =>
+                                router.push(`/screens/social/${encodeURIComponent(item.username)}` as never)
+                              }
+                            >
+                              <Text numberOfLines={1} style={styles.usernameText}>
+                                {item.username}
+                              </Text>
+                              {isMe && isPremium ? (
+                                <MaterialCommunityIcons name="crown" size={16} color="#FDE68A" />
+                              ) : null}
+                            </Pressable>
+                            <Text style={styles.pointsText}>{`${item.total_points} pts`}</Text>
                           </View>
-                        )}
 
-                        <View style={styles.userBlock}>
-                          <Pressable
-                            style={styles.usernameRow}
-                            onPress={() => router.push(`/screens/social/${encodeURIComponent(item.username)}` as never)}
-                          >
-                            <Text numberOfLines={1} style={styles.usernameText}>
-                              {item.username}
-                            </Text>
-                            {isMe && isPremium ? (
-                              <MaterialCommunityIcons name="crown" size={16} color="#FDE68A" />
-                            ) : null}
-                          </Pressable>
-                          <Text style={styles.pointsText}>{`${item.total_points} pts`}</Text>
+                          {isMe ? <Text style={styles.meBadge}>VOCÊ</Text> : null}
                         </View>
-
-                        {isMe ? <Text style={styles.meBadge}>VOCÊ</Text> : null}
-                      </View>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </View>
               </View>
             </LinearGradient>
@@ -503,6 +610,31 @@ function createStyles(theme: AppTheme) {
       padding: 12,
       gap: 8,
     },
+    rankToggleRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    rankToggleButton: {
+      flex: 1,
+      borderRadius: 10,
+      paddingVertical: 8,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "rgba(148, 163, 184, 0.3)",
+      backgroundColor: "rgba(15, 23, 42, 0.4)",
+    },
+    rankToggleButtonActive: {
+      borderColor: "rgba(124, 92, 255, 0.85)",
+      backgroundColor: "rgba(30, 27, 75, 0.5)",
+    },
+    rankToggleText: {
+      color: theme.colors.mutedText,
+      fontWeight: "700",
+      fontSize: 12,
+    },
+    rankToggleTextActive: {
+      color: theme.colors.text,
+    },
     rankingRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -565,6 +697,12 @@ function createStyles(theme: AppTheme) {
       color: "#93C5FD",
       fontSize: 12,
       fontWeight: "600",
+    },
+    emptyText: {
+      color: theme.colors.mutedText,
+      textAlign: "center",
+      fontWeight: "600",
+      paddingVertical: 12,
     },
     meBadge: {
       fontSize: 11,
