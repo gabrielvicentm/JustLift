@@ -1,7 +1,14 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "@/app/config/api";
 import { getAuthHeader } from "@/app/features/profile/service";
-import type { PostCommentItem, PostDetail, PostMediaPayload, PostSummary, TreinoResumo } from "./types";
+import type {
+  PostCommentItem,
+  PostDetail,
+  PostMediaPayload,
+  PostSummary,
+  SearchPostResponseItem,
+  TreinoResumo,
+} from "./types";
 
 type PresignResponse = {
   key: string;
@@ -75,7 +82,7 @@ export async function uploadMediaToR2(
 
 export async function createPost(payload: CreatePostPayload): Promise<PostSummary> {
   const headers = await getAuthHeader();
-  const response = await api.post<{ post: PostSummary }>("/posts", payload, { headers });
+  const response = await api.post<{ post: PostSummary }>("/posts/create-post", payload, { headers });
   return response.data.post;
 }
 
@@ -132,6 +139,15 @@ export async function togglePostSave(postId: number): Promise<{ saved: boolean }
 export async function reportPost(postId: number, reason = "conteudo_inadequado") {
   const headers = await getAuthHeader();
   await api.post(`/posts/${postId}/report`, { reason }, { headers });
+}
+
+export async function searchPostsByDescription(query: string, limit = 20) {
+  const headers = await getAuthHeader();
+  const response = await api.get<SearchPostResponseItem[]>("/search/posts", {
+    headers,
+    params: { q: query, limit },
+  });
+  return response.data ?? [];
 }
 
 export async function createPostComment(postId: number, comentario: string): Promise<PostCommentItem> {

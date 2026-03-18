@@ -3,11 +3,12 @@ import {
   searchUsersByUsername,
 } from "@/app/features/profile/service";
 import type { SearchUserResponseItem } from "@/app/features/profile/types";
+import { searchPostsByDescription } from "@/app/features/social/service";
+import type { SearchPostResponseItem } from "@/app/features/social/types";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -15,20 +16,32 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+
+type ActiveTab = "profiles" | "posts";
 
 export default function SearchUsersScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { width } = useWindowDimensions();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUserResponseItem[]>([]);
+  const [postResults, setPostResults] = useState<SearchPostResponseItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("profiles");
   const searchRequestIdRef = useRef(0);
+
+  const gridSpacing = 2;
+  const horizontalPadding = 0;
+  const baseWidth = width && width > 0 ? width : 360;
+  const tileSize = Math.floor((baseWidth - horizontalPadding * 2 - gridSpacing * 2) / 3);
 
   const runSearch = async (rawQuery: string) => {
     const q = rawQuery.trim();
@@ -36,6 +49,7 @@ export default function SearchUsersScreen() {
 
     if (q.length < 1) {
       setResults([]);
+      setPostResults([]);
       setHasSearched(false);
       return;
     }
@@ -46,14 +60,38 @@ export default function SearchUsersScreen() {
     const requestId = searchRequestIdRef.current;
 
     try {
-      const users = await searchUsersByUsername(q, 20);
-      if (requestId === searchRequestIdRef.current) {
-        setResults(users);
+      const [usersResult, postsResult] = await Promise.allSettled([
+        searchUsersByUsername(q, 20),
+        searchPostsByDescription(q, 20),
+      ]);
+
+      if (requestId !== searchRequestIdRef.current) {
+        return;
       }
+
+      let nextError = "";
+      if (usersResult.status === "fulfilled") {
+        setResults(usersResult.value);
+      } else {
+        setResults([]);
+        nextError = getApiErrorMessage(usersResult.reason, "pesquisar usuarios");
+      }
+
+      if (postsResult.status === "fulfilled") {
+        setPostResults(postsResult.value);
+      } else {
+        setPostResults([]);
+        if (!nextError) {
+          nextError = getApiErrorMessage(postsResult.reason, "pesquisar posts");
+        }
+      }
+
+      setError(nextError);
     } catch (err) {
       if (requestId === searchRequestIdRef.current) {
-        setError(getApiErrorMessage(err, "pesquisar usuarios"));
+        setError(getApiErrorMessage(err, "pesquisar usuarios ou posts"));
         setResults([]);
+        setPostResults([]);
       }
     } finally {
       if (requestId === searchRequestIdRef.current) {
@@ -67,6 +105,7 @@ export default function SearchUsersScreen() {
     if (!trimmed) {
       setError("");
       setResults([]);
+      setPostResults([]);
       setLoading(false);
       setHasSearched(false);
       return;
@@ -81,76 +120,136 @@ export default function SearchUsersScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.topRow}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Voltar</Text>
-        </Pressable>
+      <View style={styles.header}>
+        <Text style={styles.title}>Procure usuários ou posts</Text>
+
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={18} color={theme.colors.mutedText} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={activeTab === "profiles" ? "Pesquisar perfis" : "Pesquisar posts"}
+            placeholderTextColor={theme.colors.mutedText}
+            style={styles.input}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={() => runSearch(query)}
+          />
+        </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {hasSearched && query.trim().length < 1 ? (
+          <Text style={styles.hint}>Digite ao menos 1 caractere para pesquisar.</Text>
+        ) : null}
+
+        <View style={styles.tabRow}>
+          <Pressable
+            onPress={() => setActiveTab("profiles")}
+            style={[styles.tabButton, activeTab === "profiles" && styles.tabButtonActive]}
+          >
+            <Text style={[styles.tabText, activeTab === "profiles" && styles.tabTextActive]}>
+              Perfis
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setActiveTab("posts")}
+            style={[styles.tabButton, activeTab === "posts" && styles.tabButtonActive]}
+          >
+            <Text style={[styles.tabText, activeTab === "posts" && styles.tabTextActive]}>
+              Posts
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      <Text style={styles.title}>Pesquisar usuarios</Text>
+      {activeTab === "profiles" ? (
+        <FlatList
+          key="profiles"
+          data={results}
+          keyExtractor={(item) => item.user_id}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            !loading && hasSearched && query.trim().length >= 1 ? (
+              <Text style={styles.emptyText}>Nenhum perfil encontrado.</Text>
+            ) : null
+          }
+          renderItem={({ item }) => {
+            const avatarUri = String(item.foto_perfil || "").trim();
+            const displayName = item.nome_exibicao || item.username;
 
-      <View style={styles.searchRow}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Digite o username"
-          placeholderTextColor={theme.colors.mutedText}
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          onSubmitEditing={() => runSearch(query)}
-        />
+            return (
+              <Pressable
+                style={styles.resultCard}
+                onPress={() => router.push(`/screens/social/${item.username}` as never)}
+              >
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarFallback]}>
+                    <Text style={styles.avatarFallbackText}>
+                      {String(displayName).slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
 
-        <Pressable
-          style={[styles.searchButton, loading && styles.disabled]}
-          onPress={() => runSearch(query)}
-          disabled={loading}
-        >
-          {loading ? <ActivityIndicator color={theme.colors.buttonText} /> : <Text style={styles.searchButtonText}>Buscar</Text>}
-        </Pressable>
-      </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {hasSearched && query.trim().length < 1 ? (
-        <Text style={styles.hint}>Digite ao menos 1 caractere para pesquisar.</Text>
-      ) : null}
-
-      <FlatList
-        data={results}
-        keyExtractor={(item) => item.user_id}
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        ListEmptyComponent={
-          !loading && hasSearched && query.trim().length >= 1 ? (
-            <Text style={styles.emptyText}>Nenhum usuario encontrado.</Text>
-          ) : null
-        }
-        renderItem={({ item }) => {
-          const avatarUri = String(item.foto_perfil || "").trim();
-
-          return (
-            <Pressable
-              style={styles.resultCard}
-              onPress={() => router.push(`/screens/social/${item.username}` as never)}
-            >
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarFallbackText}>
-                    {(item.nome_exibicao || item.username).slice(0, 1).toUpperCase()}
-                  </Text>
+                <View style={styles.resultContent}>
+                  <Text style={styles.resultDisplayName}>{displayName}</Text>
+                  <Text style={styles.resultSubtle}>@{item.username}</Text>
                 </View>
-              )}
+              </Pressable>
+            );
+          }}
+        />
+      ) : (
+        <FlatList
+          key="posts"
+          data={postResults}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.gridContent}
+          columnWrapperStyle={styles.gridRow}
+          keyboardShouldPersistTaps="handled"
+          numColumns={3}
+          ListEmptyComponent={
+            !loading && hasSearched && query.trim().length >= 1 ? (
+              <Text style={styles.emptyText}>Nenhum post encontrado.</Text>
+            ) : null
+          }
+          renderItem={({ item }) => {
+            const mediaUri = String(item.media_url || "").trim();
+            const fallbackUri = String(item.foto_perfil || "").trim();
+            const displayName = item.nome_exibicao || item.username;
+            const isVideo = item.media_type === "video";
+            const thumbUri = mediaUri || fallbackUri;
 
-              <Text style={styles.resultDisplayName}>
-                {item.nome_exibicao || item.username}
-              </Text>
-            </Pressable>
-          );
-        }}
-      />
+            return (
+              <Pressable
+                style={[styles.gridItem, { width: tileSize, height: tileSize }]}
+                onPress={() => router.push(`/screens/social/Post/${item.id}` as never)}
+              >
+                {mediaUri && isVideo ? (
+                  <View style={[styles.gridImage, styles.videoTile]}>
+                    <Text style={styles.videoText}>Video</Text>
+                  </View>
+                ) : thumbUri ? (
+                  <Image
+                    source={{ uri: thumbUri }}
+                    style={styles.gridImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.gridImage, styles.avatarFallback]}>
+                    <Text style={styles.avatarFallbackText}>
+                      {String(displayName || "").slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -160,61 +259,64 @@ function createStyles(theme: AppTheme) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-      paddingHorizontal: 16,
-      paddingTop: 12,
+      paddingTop: 18,
       gap: 10,
     },
-    topRow: {
-      flexDirection: "row",
-      justifyContent: "flex-start",
-    },
-    backButton: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      backgroundColor: theme.colors.surface,
-    },
-    backButtonText: {
-      color: theme.colors.text,
-      fontWeight: "600",
+    header: {
+      paddingHorizontal: 16,
+      gap: 10,
     },
     title: {
       fontSize: 24,
       fontWeight: "700",
       color: theme.colors.text,
+      marginTop: 4,
     },
     searchRow: {
       flexDirection: "row",
-      gap: 8,
       alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.colors.inputBackground,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    tabRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    tabButton: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      borderBottomWidth: 2,
+      borderBottomColor: "transparent",
+    },
+    tabButtonActive: {
+      borderBottomColor: theme.colors.text,
+    },
+    tabText: {
+      color: theme.colors.mutedText,
+      fontWeight: "600",
+      fontSize: 14,
+    },
+    tabTextActive: {
+      color: theme.colors.text,
+      fontWeight: "700",
     },
     input: {
       flex: 1,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      backgroundColor: theme.colors.inputBackground,
+      paddingHorizontal: 4,
+      paddingVertical: 6,
+      backgroundColor: "transparent",
       color: theme.colors.text,
-    },
-    searchButton: {
-      height: 44,
-      borderRadius: 10,
-      minWidth: 86,
-      backgroundColor: theme.colors.button,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 12,
-    },
-    searchButtonText: {
-      color: theme.colors.buttonText,
-      fontWeight: "700",
-    },
-    disabled: {
-      opacity: 0.7,
     },
     error: {
       color: theme.colors.error,
@@ -225,8 +327,36 @@ function createStyles(theme: AppTheme) {
       fontWeight: "500",
     },
     listContent: {
+      paddingHorizontal: 16,
       paddingBottom: 24,
       gap: 8,
+    },
+    gridContent: {
+      paddingBottom: 24,
+    },
+    gridRow: {
+      justifyContent: "space-between",
+      gap: 2,
+      marginBottom: 2,
+    },
+    gridItem: {
+      backgroundColor: theme.colors.inputBackground,
+      overflow: "hidden",
+    },
+    gridImage: {
+      width: "100%",
+      height: "100%",
+      backgroundColor: theme.colors.inputBackground,
+    },
+    videoTile: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.button,
+    },
+    videoText: {
+      color: theme.colors.buttonText,
+      fontWeight: "700",
+      fontSize: 12,
     },
     emptyText: {
       color: theme.colors.mutedText,
@@ -264,6 +394,15 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
       fontSize: 16,
       fontWeight: "700",
+    },
+    resultContent: {
+      flex: 1,
+      gap: 4,
+    },
+    resultSubtle: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "600",
     },
   });
 }

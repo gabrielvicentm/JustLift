@@ -166,6 +166,8 @@ export default function PostDetailScreen() {
     } finally {
       setTogglingCommentLike((prev) => ({ ...prev, [commentId]: false }));
     }
+  };
+
   const handleDeletePost = async () => {
     if (!post || deleting || !isOwner) return;
     Alert.alert("Excluir post", "Tem certeza que deseja excluir este post?", [
@@ -538,5 +540,4 @@ function createStyles(theme: AppTheme) {
       fontWeight: "600",
     },
   });
-}
 }
