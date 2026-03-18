@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '@/app/config/api';
 import { registerPushTokenIfPossible } from '@/app/features/notifications/push';
-import { useI18n } from '@/providers/I18nProvider';
 import { useAppTheme } from '@/providers/ThemeProvider';
 import { AppTheme } from '@/theme/theme';
 import { AxiosError } from 'axios';
@@ -46,7 +45,6 @@ const BACKGROUND_GRADIENT = ["#0B0E18", "#0B1022", "#120C2A"] as const;
 export default function Login() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [identifier, setIdentifier] = useState('');
@@ -114,7 +112,7 @@ export default function Login() {
     setError('');
 
     if (!cleanIdentifier || !cleanSenha) {
-      setError(t('login_error_required'));
+      setError('Preencha identifier (username ou email) e senha.');
       return;
     }
     if (cleanSenha.length < 8) {
@@ -134,7 +132,7 @@ export default function Login() {
         await registerPushTokenIfPossible();
       } catch {}
 
-      setMessage(response.data.message ?? t('login_success_default'));
+      setMessage(response.data.message ?? 'Login efetuado com sucesso.');
       router.replace('/(tabs)/home_tab');
     } catch (err) {
       const axiosError = err as AxiosError<BackendResponse>;
@@ -142,7 +140,7 @@ export default function Login() {
         axiosError.response?.data?.message ??
         (!axiosError.response
           ? `Sem conexao com o servidor (${api.defaults.baseURL}).`
-          : t('login_error_default'));
+          : 'Erro ao fazer login.');
       setError(backendMessage);
     } finally {
       setLoading(false);
@@ -253,11 +251,11 @@ export default function Login() {
         style={styles.cardBorder}
       >
       <View style={styles.card}>
-        <Text style={styles.title}>{t('login_title')}</Text>
-        <Text style={styles.subtitle}>{t('login_subtitle')}</Text>
+        <Text style={styles.title}>Entrar</Text>
+        <Text style={styles.subtitle}>Use username ou email para login.</Text>
 
         <TextInput
-          placeholder={t('login_identifier_placeholder')}
+          placeholder="Username ou email"
           placeholderTextColor={theme.colors.mutedText}
           autoCapitalize="none"
           value={identifier}
@@ -267,7 +265,7 @@ export default function Login() {
         />
 
         <TextInput
-          placeholder={t('login_password_placeholder')}
+          placeholder="Senha"
           placeholderTextColor={theme.colors.mutedText}
           secureTextEntry
           value={senha}
@@ -290,7 +288,7 @@ export default function Login() {
             {loading ? (
               <ActivityIndicator color={theme.colors.buttonText} />
             ) : (
-              <Text style={styles.buttonText}>{t('login_button')}</Text>
+              <Text style={styles.buttonText}>Login</Text>
             )}
           </Pressable>
         </LinearGradient>
@@ -308,7 +306,7 @@ export default function Login() {
         {message ? <Text style={styles.success}>{message}</Text> : null}
 
         <Pressable onPress={() => router.push('./Register')} disabled={loading}>
-          <Text style={styles.link}>{t('login_no_account')}</Text>
+          <Text style={styles.link}>Nao tem conta? Cadastre-se</Text>
         </Pressable>
       </View>
       </LinearGradient>

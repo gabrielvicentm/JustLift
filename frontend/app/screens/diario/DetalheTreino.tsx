@@ -6,7 +6,6 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 
@@ -69,8 +68,7 @@ export default function DetalheTreinoScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ data?: string }>();
   const { theme } = useAppTheme();
-  const { language } = useI18n();
-  const isEn = language === "en";
+  const language = "pt";
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const data = typeof params.data === "string" ? params.data : "";
@@ -80,7 +78,7 @@ export default function DetalheTreinoScreen() {
 
   const carregarDetalhe = useCallback(async () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) {
-      setError(isEn ? "Invalid workout date." : "Data do treino inválida.");
+      setError("Data do treino inválida.");
       setTreinos([]);
       setLoading(false);
       return;
@@ -92,7 +90,7 @@ export default function DetalheTreinoScreen() {
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
-        setError(isEn ? "Sign in to view workout details." : "Faça login para ver os detalhes.");
+        setError("Faça login para ver os detalhes.");
         setTreinos([]);
         return;
       }
@@ -111,11 +109,11 @@ export default function DetalheTreinoScreen() {
     } catch (err) {
       console.error("Erro ao carregar detalhe de treino:", err);
       setTreinos([]);
-      setError(isEn ? "Failed to load workout details." : "Falha ao carregar detalhes do treino.");
+      setError("Falha ao carregar detalhes do treino.");
     } finally {
       setLoading(false);
     }
-  }, [data, isEn, language]);
+  }, [data, language]);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,7 +125,7 @@ export default function DetalheTreinoScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.screen}>
         <View style={styles.header}>
-          <Text style={styles.title}>{isEn ? "Workout details" : "Detalhes do treino"}</Text>
+          <Text style={styles.title}>Detalhes do treino</Text>
           <Text style={styles.subtitle}>{formatDate(data)}</Text>
         </View>
 
@@ -141,9 +139,7 @@ export default function DetalheTreinoScreen() {
           </View>
         ) : treinos.length === 0 ? (
           <View style={styles.stateContainer}>
-            <Text style={styles.emptyText}>
-              {isEn ? "No workouts saved for this date." : "Nenhum treino salvo para esta data."}
-            </Text>
+            <Text style={styles.emptyText}>Nenhum treino salvo para esta data.</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
@@ -160,12 +156,10 @@ export default function DetalheTreinoScreen() {
                   <View style={styles.workoutCard}>
                     <View style={styles.workoutHeader}>
                       <View style={styles.workoutHeaderLeft}>
-                        <Text style={styles.workoutTitle}>{isEn ? "Workout" : "Treino"} #{index + 1}</Text>
+                        <Text style={styles.workoutTitle}>Treino #{index + 1}</Text>
                         <View style={[styles.statusBadge, treino.finalizado ? styles.statusDone : styles.statusDraft]}>
                           <Text style={styles.statusBadgeText}>
-                            {treino.finalizado
-                              ? (isEn ? "Finished" : "Finalizado")
-                              : (isEn ? "Draft" : "Rascunho")}
+                            {treino.finalizado ? "Finalizado" : "Rascunho"}
                           </Text>
                         </View>
                       </View>
@@ -174,21 +168,21 @@ export default function DetalheTreinoScreen() {
                         style={styles.shareButton}
                         onPress={() => router.push(`/screens/diario/CriarPostTreino?treinoId=${treino.treino_id}` as never)}
                       >
-                        <Text style={styles.shareButtonText}>{isEn ? "Share" : "Compartilhar"}</Text>
+                        <Text style={styles.shareButtonText}>Compartilhar</Text>
                       </Pressable>
                     </View>
 
                     <View style={styles.metricsRow}>
                       <View style={styles.metricBlock}>
-                        <Text style={styles.metricLabel}>{isEn ? "Duration" : "Duração"}</Text>
+                        <Text style={styles.metricLabel}>Duração</Text>
                         <Text style={styles.metricValue}>{formatDuration(treino.duracao)}</Text>
                       </View>
                       <View style={styles.metricBlock}>
-                        <Text style={styles.metricLabel}>{isEn ? "Total weight" : "Peso total"}</Text>
+                        <Text style={styles.metricLabel}>Peso total</Text>
                         <Text style={styles.metricValue}>{Number(treino.peso_total ?? 0).toFixed(1)}kg</Text>
                       </View>
                       <View style={styles.metricBlock}>
-                        <Text style={styles.metricLabel}>{isEn ? "Sets" : "Séries"}</Text>
+                        <Text style={styles.metricLabel}>Séries</Text>
                         <Text style={styles.metricValue}>{treino.total_series ?? 0}</Text>
                       </View>
                     </View>
@@ -207,29 +201,27 @@ export default function DetalheTreinoScreen() {
                           <View style={styles.exerciseHeaderText}>
                             <Text style={styles.exerciseTitle}>{exercicio.nome}</Text>
                             <Text style={styles.exerciseSubtitle}>
-                              {exercicio.source === "custom"
-                                ? (isEn ? "Custom exercise" : "Exercício personalizado")
-                                : (isEn ? "ExerciseDB" : "ExerciseDB")}
+                              {exercicio.source === "custom" ? "Exercício personalizado" : "ExerciseDB"}
                             </Text>
                           </View>
                         </View>
 
                         {exercicio.anotacoes ? (
                           <View style={styles.noteCard}>
-                            <Text style={styles.noteLabel}>{isEn ? "Notes" : "Anotações"}</Text>
+                            <Text style={styles.noteLabel}>Anotações</Text>
                             <Text style={styles.noteText}>{exercicio.anotacoes}</Text>
                           </View>
                         ) : null}
 
                         <View style={styles.seriesHeader}>
-                          <Text style={[styles.seriesHeaderText, styles.seriesColSet]}>{isEn ? "SET" : "SÉRIE"}</Text>
+                          <Text style={[styles.seriesHeaderText, styles.seriesColSet]}>SÉRIE</Text>
                           <Text style={[styles.seriesHeaderText, styles.seriesColKg]}>KG</Text>
                           <Text style={[styles.seriesHeaderText, styles.seriesColReps]}>REPS</Text>
                           <Text style={[styles.seriesHeaderText, styles.seriesColOk]}>OK</Text>
                         </View>
 
                         {exercicio.series.length === 0 ? (
-                          <Text style={styles.noSeriesText}>{isEn ? "No sets in this exercise." : "Sem séries neste exercício."}</Text>
+                          <Text style={styles.noSeriesText}>Sem séries neste exercício.</Text>
                         ) : (
                           exercicio.series.map((serie) => (
                             <View key={serie.serie_id} style={[styles.seriesRow, serie.concluido && styles.seriesRowDone]}>
@@ -256,7 +248,7 @@ export default function DetalheTreinoScreen() {
           style={styles.backButtonBorder}
         >
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>{isEn ? "Back" : "Voltar"}</Text>
+            <Text style={styles.backButtonText}>Voltar</Text>
           </Pressable>
         </LinearGradient>
       </View>

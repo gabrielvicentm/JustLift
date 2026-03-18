@@ -6,7 +6,6 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 
@@ -16,7 +15,6 @@ const GOLD_GRADIENT = ["#FDE68A", "#F8C84A", "#B45309"] as const;
 export default function DiarioScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const premiumPulse = useRef(new Animated.Value(1)).current;
@@ -140,7 +138,7 @@ export default function DiarioScreen() {
             <View style={styles.neonInner}>
               <View style={styles.buttonContent}>
               <MaterialCommunityIcons name="dumbbell" size={26} style={styles.icon} />
-              <Text style={styles.buttonText}>{t("diary_add_workout")}</Text>
+              <Text style={styles.buttonText}>Adicionar Treino</Text>
             </View>
             </View>
           </LinearGradient>
@@ -159,7 +157,7 @@ export default function DiarioScreen() {
             <View style={styles.neonInner}>
               <View style={styles.buttonContent}>
                 <MaterialCommunityIcons name="clipboard-text-outline" size={26} style={styles.icon} />
-                <Text style={styles.buttonText}>{t("diary_my_workouts")}</Text>
+                <Text style={styles.buttonText}>Meus Treinos</Text>
               </View>
             </View>
           </LinearGradient>
@@ -178,7 +176,7 @@ export default function DiarioScreen() {
             <View style={styles.neonInner}>
               <View style={styles.buttonContent}>
                 <MaterialCommunityIcons name="chart-bar" size={26} style={styles.icon} />
-                <Text style={styles.buttonText}>{t("diary_charts")}</Text>
+                <Text style={styles.buttonText}>Graficos</Text>
               </View>
             </View>
           </LinearGradient>
@@ -197,7 +195,7 @@ export default function DiarioScreen() {
             <View style={styles.neonInner}>
               <View style={styles.buttonContent}>
                 <MaterialCommunityIcons name="trophy-outline" size={26} style={styles.icon} />
-                <Text style={styles.buttonText}>{t("diary_ranking")}</Text>
+                <Text style={styles.buttonText}>Ranking</Text>
               </View>
             </View>
           </LinearGradient>
@@ -216,7 +214,7 @@ export default function DiarioScreen() {
             <View style={styles.neonInner}>
               <View style={styles.buttonContent}>
                 <MaterialCommunityIcons name="diamond-stone" size={26} style={styles.icon} />
-                <Text style={styles.buttonText}>{t("diary_patents")}</Text>
+                <Text style={styles.buttonText}>Patentes</Text>
               </View>
             </View>
           </LinearGradient>
