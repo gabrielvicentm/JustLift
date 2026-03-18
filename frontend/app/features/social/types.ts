@@ -57,3 +57,15 @@ export type PostSummary = {
 export type PostDetail = PostSummary & {
   comentarios: PostCommentItem[];
 };
+
+export type SearchPostResponseItem = {
+  id: number;
+  user_id: string;
+  username: string;
+  nome_exibicao: string | null;
+  foto_perfil: string | null;
+  descricao: string | null;
+  created_at: string;
+  media_url?: string | null;
+  media_type?: "image" | "video" | null;
+};
