@@ -66,7 +66,7 @@ function getIconName(routeName: string): keyof typeof Ionicons.glyphMap {
     case "home_tab":
       return "home";
     case "diario_tab":
-      return "book";
+      return "barbell";
     case "perfil_tab":
       return "person";
     case "configuracoes_tab":
