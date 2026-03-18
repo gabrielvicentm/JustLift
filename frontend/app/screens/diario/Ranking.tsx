@@ -16,7 +16,6 @@ import { useRouter } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { api } from "@/app/config/api";
 import type { FollowListItem, MyProfileResponse } from "@/app/features/profile/types";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 
@@ -78,7 +77,6 @@ function getInitial(username?: string) {
 export default function RankingScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +200,7 @@ export default function RankingScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.container}>
-        <Text style={styles.title}>{t("diary_ranking_title")}</Text>
+        <Text style={styles.title}>Ranking</Text>
 
         {loading ? (
           <View style={styles.stateContainer}>
@@ -386,7 +384,7 @@ export default function RankingScreen() {
           style={styles.actionButtonBorder}
         >
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>{t("common_back")}</Text>
+            <Text style={styles.backButtonText}>Voltar</Text>
           </Pressable>
         </LinearGradient>
       </View>

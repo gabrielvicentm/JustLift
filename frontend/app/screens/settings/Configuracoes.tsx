@@ -8,7 +8,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "@/app/config/api";
 import { fetchUnreadNotificationsCount } from "@/app/features/notifications/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
-import { useI18n } from "@/providers/I18nProvider";
 import type { AppTheme } from "@/theme/theme";
 
 const PROGRESS_GRADIENT = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
@@ -17,7 +16,6 @@ const GOLD_GRADIENT = ["#FDE68A", "#F8C84A", "#B45309"] as const;
 export default function ConfiguracoesScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const premiumPulse = useRef(new Animated.Value(1)).current;
   const negativeGradient = (theme.colors.negativeGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
@@ -99,8 +97,8 @@ export default function ConfiguracoesScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator
       >
-        <Text style={styles.title}>{t("settings_title")}</Text>
-        <Text style={styles.subtitle}>{t("settings_subtitle")}</Text>
+        <Text style={styles.title}>Configurações</Text>
+        <Text style={styles.subtitle}>Personalize o tema e gerencie sua conta.</Text>
 
         <View style={styles.optionsList}>
           <Animated.View style={{ transform: [{ scale: premiumPulse }] }}>

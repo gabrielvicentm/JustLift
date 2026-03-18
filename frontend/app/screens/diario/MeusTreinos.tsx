@@ -8,7 +8,6 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "rea
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/app/config/api";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 import PremiumAdModal from "@/app/components/PremiumAdModal";
@@ -26,8 +25,6 @@ const PREMIUM_AD_FLAG_KEY = "show_premium_modal_after_workout";
 export default function MeusTreinosScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t, language } = useI18n();
-  const isEn = language === "en";
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -53,7 +50,7 @@ export default function MeusTreinosScreen() {
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
-        setError(isEn ? "Sign in to view your workouts." : "Faça login para ver seus treinos.");
+        setError("Faça login para ver seus treinos.");
         setDiasComTreino(new Set());
         return;
       }
@@ -68,11 +65,11 @@ export default function MeusTreinosScreen() {
     } catch (err) {
       console.error("Erro ao carregar dias com treino:", err);
       setDiasComTreino(new Set());
-      setError(isEn ? "Failed to load workout days." : "Falha ao carregar os dias de treino.");
+      setError("Falha ao carregar os dias de treino.");
     } finally {
       setLoading(false);
     }
-  }, [isEn]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -153,8 +150,8 @@ export default function MeusTreinosScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.container}>
-        <Text style={styles.title}>{t("diary_my_workouts_title")}</Text>
-        <Text style={styles.description}>{t("diary_my_workouts_description")}</Text>
+        <Text style={styles.title}>Meus Treinos</Text>
+        <Text style={styles.description}>Aqui voce podera consultar os treinos salvos.</Text>
 
         <LinearGradient
           colors={PROGRESS_GRADIENT}
@@ -195,7 +192,7 @@ export default function MeusTreinosScreen() {
 
         <Text style={styles.legend}>
           <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} /> {" "}
-          {isEn ? "Day with saved workout" : "Dia com treino salvo"}
+          Dia com treino salvo
         </Text>
 
         <LinearGradient
@@ -205,7 +202,7 @@ export default function MeusTreinosScreen() {
           style={styles.backButtonBorder}
         >
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>{t("common_back")}</Text>
+            <Text style={styles.backButtonText}>Voltar</Text>
           </Pressable>
         </LinearGradient>
       </View>

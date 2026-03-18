@@ -16,7 +16,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 import { api } from "@/app/config/api";
@@ -176,8 +175,7 @@ type PremiumStatusResponse = {
 export default function AdicionarTreinoScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { language } = useI18n();
-  const isEn = language === "en";
+  const language = "pt";
   const styles = useMemo(() => createStyles(theme), [theme]);
   const buttonGradient = (theme.colors.buttonGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
     string,
@@ -223,7 +221,7 @@ export default function AdicionarTreinoScreen() {
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
-        setError(isEn ? "Sign in to search exercises." : "Faça login para buscar exercícios.");
+        setError("Faça login para buscar exercícios.");
         setExercicios([]);
         return;
       }
@@ -245,12 +243,12 @@ export default function AdicionarTreinoScreen() {
       setExercicios(response.data.exercicios ?? []);
     } catch (err) {
       console.error("Erro ao buscar exercícios:", err);
-      setError(isEn ? "Error while fetching exercises." : "Erro ao buscar exercícios.");
+      setError("Erro ao buscar exercícios.");
       setExercicios([]);
     } finally {
       setLoading(false);
     }
-  }, [equipmentFilter, isEn, language, muscleFilter, query]);
+  }, [equipmentFilter, language, muscleFilter, query]);
 
   const fetchPremiumStatus = useCallback(async () => {
     if (isPremium !== null) return isPremium;
@@ -279,7 +277,7 @@ export default function AdicionarTreinoScreen() {
   const getWeeklyWorkoutCount = useCallback(async () => {
     const accessToken = await AsyncStorage.getItem("accessToken");
     if (!accessToken) {
-      setError(isEn ? "Sign in to start a workout." : "Faça login para iniciar um treino.");
+      setError("Faça login para iniciar um treino.");
       return null;
     }
 
@@ -297,7 +295,7 @@ export default function AdicionarTreinoScreen() {
       const treinoDate = new Date(`${treino.data}T00:00:00`);
       return treinoDate >= start && treinoDate <= now;
     }).length;
-  }, [isEn]);
+  }, []);
 
   const canStartWorkout = useCallback(async () => {
     const premium = await fetchPremiumStatus();
@@ -311,11 +309,11 @@ export default function AdicionarTreinoScreen() {
         return false;
       }
     } catch {
-      setError(isEn ? "Could not verify workout limit." : "Não foi possível verificar o limite de treinos.");
+      setError("Não foi possível verificar o limite de treinos.");
       return false;
     }
     return true;
-  }, [fetchPremiumStatus, getWeeklyWorkoutCount, isEn]);
+  }, [fetchPremiumStatus, getWeeklyWorkoutCount]);
 
   useEffect(() => {
     loadExercises("").catch(() => undefined);
@@ -528,7 +526,7 @@ export default function AdicionarTreinoScreen() {
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
         setCustomExercises([]);
-        setCustomError(isEn ? "Sign in to view custom exercises." : "Faça login para ver exercícios personalizados.");
+        setCustomError("Faça login para ver exercícios personalizados.");
         return;
       }
 
@@ -541,11 +539,11 @@ export default function AdicionarTreinoScreen() {
     } catch (err) {
       console.error("Erro ao buscar exercícios customizados:", err);
       setCustomExercises([]);
-      setCustomError(isEn ? "Error loading custom exercises." : "Erro ao carregar exercícios personalizados.");
+      setCustomError("Erro ao carregar exercícios personalizados.");
     } finally {
       setLoadingCustom(false);
     }
-  }, [isEn]);
+  }, []);
 
   const loadRepeatWorkouts = useCallback(async () => {
     setLoadingRepeatWorkouts(true);
@@ -554,7 +552,7 @@ export default function AdicionarTreinoScreen() {
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
         setRepeatWorkouts([]);
-        setRepeatWorkoutsError(isEn ? "Sign in to view previous workouts." : "Faça login para ver os treinos anteriores.");
+        setRepeatWorkoutsError("Faça login para ver os treinos anteriores.");
         return;
       }
 
@@ -569,11 +567,11 @@ export default function AdicionarTreinoScreen() {
     } catch (err) {
       console.error("Erro ao buscar treinos para repetir:", err);
       setRepeatWorkouts([]);
-      setRepeatWorkoutsError(isEn ? "Error loading previous workouts." : "Erro ao carregar treinos anteriores.");
+      setRepeatWorkoutsError("Erro ao carregar treinos anteriores.");
     } finally {
       setLoadingRepeatWorkouts(false);
     }
-  }, [isEn]);
+  }, []);
 
   const buildSeriesTemplate = (totalSeries: number, uid: string): WorkoutSetDraft[] => {
     const amount = Math.max(Math.floor(Number(totalSeries) || 1), 1);
@@ -595,7 +593,7 @@ export default function AdicionarTreinoScreen() {
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
-        setRepeatWorkoutsError(isEn ? "Sign in to repeat a workout." : "Faça login para repetir treino.");
+        setRepeatWorkoutsError("Faça login para repetir treino.");
         return;
       }
 
@@ -611,7 +609,7 @@ export default function AdicionarTreinoScreen() {
 
       const templateExercises = response.data?.exercicios ?? [];
       if (templateExercises.length === 0) {
-        setRepeatWorkoutsError(isEn ? "Selected workout has no exercises." : "O treino selecionado não possui exercícios.");
+        setRepeatWorkoutsError("O treino selecionado não possui exercícios.");
         return;
       }
 
@@ -678,16 +676,16 @@ export default function AdicionarTreinoScreen() {
       router.push("/screens/diario/AdicionarSeries");
     } catch (err) {
       console.error("Erro ao carregar template do treino:", err);
-      setRepeatWorkoutsError(isEn ? "Could not load selected workout." : "Não foi possível carregar o treino selecionado.");
+      setRepeatWorkoutsError("Não foi possível carregar o treino selecionado.");
     } finally {
       setLoadingRepeatTemplateId(null);
     }
-  }, [canStartWorkout, isEn, language, router]);
+  }, [canStartWorkout, language, router]);
 
   const selectedMuscleLabel =
-    MUSCLE_FILTER_OPTIONS.find((option) => option.key === muscleFilter)?.label ?? (isEn ? "Muscles" : "Músculos");
+    MUSCLE_FILTER_OPTIONS.find((option) => option.key === muscleFilter)?.label ?? "Músculos";
   const selectedEquipmentLabel =
-    EQUIPMENT_FILTER_OPTIONS.find((option) => option.key === equipmentFilter)?.label ?? (isEn ? "Equipment" : "Equipamentos");
+    EQUIPMENT_FILTER_OPTIONS.find((option) => option.key === equipmentFilter)?.label ?? "Equipamentos";
 
   const handleContinue = async () => {
     const selectedApi = Object.values(selectedApiItems).map<WorkoutExercisePayload>((item) => ({
@@ -713,7 +711,7 @@ export default function AdicionarTreinoScreen() {
 
     const payload = [...selectedApi, ...selectedCustom];
     if (payload.length === 0) {
-      setError(isEn ? "Select at least one exercise to continue." : "Selecione pelo menos um exercício para continuar.");
+      setError("Selecione pelo menos um exercício para continuar.");
       return;
     }
 
@@ -764,7 +762,7 @@ export default function AdicionarTreinoScreen() {
                 style={styles.cancelHeaderBorder}
               >
                 <Pressable style={styles.cancelHeaderButton} onPress={() => setShowCancelConfirmModal(true)}>
-                  <Text style={styles.cancelHeaderText}>{isEn ? "Cancel workout" : "Cancelar treino"}</Text>
+                  <Text style={styles.cancelHeaderText}>Cancelar treino</Text>
                 </Pressable>
               </LinearGradient>
               <LinearGradient
@@ -774,7 +772,7 @@ export default function AdicionarTreinoScreen() {
                 style={styles.primaryButtonBorder}
               >
                 <Pressable style={styles.primaryButton} onPress={() => handleContinue().catch(() => undefined)}>
-                  <Text style={styles.primaryButtonText}>{isEn ? "Continue" : "Continuar"}</Text>
+                  <Text style={styles.primaryButtonText}>Continuar</Text>
                 </Pressable>
               </LinearGradient>
             </View>
@@ -784,7 +782,7 @@ export default function AdicionarTreinoScreen() {
                 value={query}
                 onChangeText={setQuery}
                 onSubmitEditing={() => loadExercises().catch(() => undefined)}
-                placeholder={isEn ? "Search exercise..." : "Pesquisar exercício..."}
+                placeholder="Pesquisar exercício..."
                 placeholderTextColor={theme.colors.mutedText}
                 style={styles.searchInput}
                 returnKeyType="search"
@@ -813,7 +811,7 @@ export default function AdicionarTreinoScreen() {
               >
                 <View style={styles.buttonContent}>
                   <Ionicons name="repeat" size={16} color={theme.colors.text} />
-                  <Text style={styles.tabButtonText}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
+                  <Text style={styles.tabButtonText}>Repetir treino</Text>
                 </View>
               </Pressable>
             </View>
@@ -834,7 +832,7 @@ export default function AdicionarTreinoScreen() {
               <Pressable style={styles.smallButton} onPress={() => router.push("/screens/diario/CriarExercicio")}>
                 <View style={styles.buttonContentSmall}>
                   <Ionicons name="add-circle-outline" size={14} color={theme.colors.text} />
-                  <Text style={styles.smallButtonText}>{isEn ? "Create" : "Criar"}</Text>
+                  <Text style={styles.smallButtonText}>Criar</Text>
                 </View>
               </Pressable>
             </View>
@@ -859,7 +857,6 @@ export default function AdicionarTreinoScreen() {
           ListEmptyComponent={
             <View style={styles.stateContainer}>
               <Text style={styles.emptyText}>Nenhum exercício encontrado.</Text>
-              <Text style={styles.emptyText}>{isEn ? "No exercises found." : "Nenhum exercício encontrado."}</Text>
             </View>
           }
         />
@@ -867,7 +864,7 @@ export default function AdicionarTreinoScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          {selectedIds.size + selectedCustomIds.size} {isEn ? "selected" : "selecionado(s)"}
+          {selectedIds.size + selectedCustomIds.size} selecionado(s)
         </Text>
       </View>
 
@@ -877,7 +874,7 @@ export default function AdicionarTreinoScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Exercícios personalizados</Text>
               <Pressable onPress={() => setShowCustomModal(false)}>
-                <Text style={styles.modalClose}>{isEn ? "Close" : "Fechar"}</Text>
+                <Text style={styles.modalClose}>Fechar</Text>
               </Pressable>
             </View>
 
@@ -897,13 +894,12 @@ export default function AdicionarTreinoScreen() {
                 ListEmptyComponent={
                   <View style={styles.modalState}>
                     <Text style={styles.emptyText}>Nenhum exercício personalizado encontrado.</Text>
-                    <Text style={styles.emptyText}>{isEn ? "No custom exercises found." : "Nenhum exercício personalizado encontrado."}</Text>
                   </View>
                 }
                 renderItem={({ item }) => {
                   const selected = selectedCustomIds.has(item.id_exercicio_customizado);
-                  const muscleTag = item.musculo_alvo || (isEn ? "No target muscle" : "Sem músculo alvo");
-                  const equipmentTag = item.equipamento || (isEn ? "No equipment" : "Sem equipamento");
+                  const muscleTag = item.musculo_alvo || "Sem músculo alvo";
+                  const equipmentTag = item.equipamento || "Sem equipamento";
                   return (
                   <LinearGradient
                     colors={PROGRESS_GRADIENT}
@@ -953,9 +949,9 @@ export default function AdicionarTreinoScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{isEn ? "Repeat workout" : "Repetir treino"}</Text>
+              <Text style={styles.modalTitle}>Repetir treino</Text>
               <Pressable onPress={() => setShowRepeatWorkoutModal(false)}>
-                <Text style={styles.modalClose}>{isEn ? "Close" : "Fechar"}</Text>
+                <Text style={styles.modalClose}>Fechar</Text>
               </Pressable>
             </View>
 
@@ -974,9 +970,7 @@ export default function AdicionarTreinoScreen() {
                 contentContainerStyle={styles.modalList}
                 ListEmptyComponent={
                   <View style={styles.modalState}>
-                    <Text style={styles.emptyText}>
-                      {isEn ? "No previous workouts found." : "Nenhum treino anterior encontrado."}
-                    </Text>
+                    <Text style={styles.emptyText}>Nenhum treino anterior encontrado.</Text>
                   </View>
                 }
                 renderItem={({ item }) => {
@@ -992,17 +986,17 @@ export default function AdicionarTreinoScreen() {
                           {new Date(item.data).toLocaleDateString("pt-BR")}
                         </Text>
                         <Text style={styles.repeatWorkoutMeta}>
-                          {`${item.total_exercicios} ${isEn ? "exercises" : "exercícios"} • ${item.total_series} ${isEn ? "sets" : "séries"}`}
+                          {`${item.total_exercicios} exercícios • ${item.total_series} séries`}
                         </Text>
                         <Text style={styles.repeatWorkoutMeta}>
-                          {`${isEn ? "Duration" : "Duração"}: ${Math.floor((item.duracao || 0) / 60)}m ${Number(item.duracao || 0) % 60}s`}
+                          {`Duração: ${Math.floor((item.duracao || 0) / 60)}m ${Number(item.duracao || 0) % 60}s`}
                         </Text>
                       </View>
 
                       {isLoadingThis ? (
                         <ActivityIndicator color={theme.colors.button} />
                       ) : (
-                        <Text style={styles.repeatWorkoutSelectText}>{isEn ? "Use" : "Usar"}</Text>
+                        <Text style={styles.repeatWorkoutSelectText}>Usar</Text>
                       )}
                     </Pressable>
                   );
@@ -1019,7 +1013,7 @@ export default function AdicionarTreinoScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtrar por músculos</Text>
               <Pressable onPress={() => setShowMuscleModal(false)}>
-                <Text style={styles.modalClose}>{isEn ? "Close" : "Fechar"}</Text>
+                <Text style={styles.modalClose}>Fechar</Text>
               </Pressable>
             </View>
 
@@ -1040,7 +1034,7 @@ export default function AdicionarTreinoScreen() {
                   <View style={[styles.filterImage, styles.filterClear]}>
                     <Text style={styles.filterClearText}>Todos</Text>
                   </View>
-                  <Text style={styles.filterLabel}>{isEn ? "No filter" : "Sem filtro"}</Text>
+                  <Text style={styles.filterLabel}>Sem filtro</Text>
                 </Pressable>
               }
               renderItem={({ item }) => {
@@ -1074,7 +1068,7 @@ export default function AdicionarTreinoScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtrar por equipamentos</Text>
               <Pressable onPress={() => setShowEquipmentModal(false)}>
-                <Text style={styles.modalClose}>{isEn ? "Close" : "Fechar"}</Text>
+                <Text style={styles.modalClose}>Fechar</Text>
               </Pressable>
             </View>
 
@@ -1095,7 +1089,7 @@ export default function AdicionarTreinoScreen() {
                   <View style={[styles.filterImage, styles.filterClear]}>
                     <Text style={styles.filterClearText}>Todos</Text>
                   </View>
-                  <Text style={styles.filterLabel}>{isEn ? "No filter" : "Sem filtro"}</Text>
+                  <Text style={styles.filterLabel}>Sem filtro</Text>
                 </Pressable>
               }
               renderItem={({ item }) => {
@@ -1127,13 +1121,11 @@ export default function AdicionarTreinoScreen() {
           <View style={styles.cancelModalCard}>
             <Text style={styles.modalTitle}>Cancelar treino?</Text>
             <Text style={styles.cancelConfirmText}>
-              {isEn
-                ? "If you continue, the current workout will be removed locally."
-                : "Se continuar, o treino atual será removido localmente."}
+              Se continuar, o treino atual será removido localmente.
             </Text>
             <View style={styles.cancelActionRow}>
               <Pressable style={styles.cancelNoButton} onPress={() => setShowCancelConfirmModal(false)}>
-                <Text style={styles.cancelNoText}>{isEn ? "No" : "Não"}</Text>
+                <Text style={styles.cancelNoText}>Não</Text>
               </Pressable>
               <LinearGradient
                 colors={negativeGradient}
@@ -1142,7 +1134,7 @@ export default function AdicionarTreinoScreen() {
                 style={styles.cancelYesBorder}
               >
                 <Pressable style={styles.cancelYesButton} onPress={() => handleConfirmCancelWorkout().catch(() => undefined)}>
-                  <Text style={styles.cancelYesText}>{isEn ? "Yes" : "Sim"}</Text>
+                  <Text style={styles.cancelYesText}>Sim</Text>
                 </Pressable>
               </LinearGradient>
             </View>

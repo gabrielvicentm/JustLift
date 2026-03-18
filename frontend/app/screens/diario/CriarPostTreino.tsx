@@ -23,7 +23,6 @@ import { createTreinoPost, fetchTreinoPostPreview, uploadMediaToR2 } from "@/app
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { api } from "@/app/config/api";
 import { useAppTheme } from "@/providers/ThemeProvider";
-import { useI18n } from "@/providers/I18nProvider";
 import type { TreinoResumo } from "@/app/features/social/types";
 import type { AppTheme } from "@/theme/theme";
 
@@ -69,7 +68,6 @@ export default function CriarPostTreinoScreen() {
   const params = useLocalSearchParams<{ treinoId?: string }>();
   const treinoId = Number(params.treinoId);
   const { theme } = useAppTheme();
-  const { language } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [descricao, setDescricao] = useState("");
@@ -92,7 +90,7 @@ export default function CriarPostTreinoScreen() {
     setError("");
 
     try {
-      const data = await fetchTreinoPostPreview(treinoId, language === "en" ? "en" : "pt");
+      const data = await fetchTreinoPostPreview(treinoId, "pt");
       setResumo(data);
     } catch (err) {
       setResumo(null);
@@ -100,7 +98,7 @@ export default function CriarPostTreinoScreen() {
     } finally {
       setLoadingResumo(false);
     }
-  }, [language, treinoId]);
+  }, [treinoId]);
 
   useFocusEffect(
     useCallback(() => {

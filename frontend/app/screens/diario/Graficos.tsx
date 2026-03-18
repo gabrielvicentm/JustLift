@@ -4,7 +4,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 
@@ -14,7 +13,6 @@ export default function GraficosScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
@@ -31,8 +29,8 @@ export default function GraficosScreen() {
           </Pressable>
         </LinearGradient>
 
-        <Text style={styles.title}>{t("diary_charts_title")}</Text>
-        <Text style={styles.description}>{t("diary_charts_description")}</Text>
+        <Text style={styles.title}>Graficos</Text>
+        <Text style={styles.description}>Aqui voce podera acompanhar sua evolucao.</Text>
 
       <Pressable
         style={[styles.button, styles.buttonCard]}
