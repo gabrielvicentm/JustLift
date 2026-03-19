@@ -22,6 +22,7 @@ const normalizeOffset = (value) => { // isso garante que o offset seja valido pa
 };
 
 const normalizeContent = (value) => String(value || '').trim();
+const isSameUser = (left, right) => String(left) === String(right);
 
 const getChatTarget = async (userId, targetUserId) => {
   if (!targetUserId) {
@@ -53,55 +54,53 @@ const getChatTarget = async (userId, targetUserId) => {
   return targetUser;
 };
 
-const hasChatAccess = async (userId, targetUserId) => {
-  const followResult = await db.query(
-    `SELECT 1
-     FROM user_follows
-     WHERE follower_id = $1
-       AND following_id = $2
-     LIMIT 1`,
+const getBlockStatus = async (userId, targetUserId) => {
+  const result = await db.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+         FROM blocked_users
+         WHERE blocker_id = $1
+           AND blocked_id = $2
+       ) AS is_blocked_by_me,
+       EXISTS (
+         SELECT 1
+         FROM blocked_users
+         WHERE blocker_id = $2
+           AND blocked_id = $1
+       ) AS has_blocked_me`,
     [userId, targetUserId]
   );
 
-  if (followResult.rows.length > 0) {
-    return true;
-  }
-
-  const existingChatResult = await db.query(
-    `SELECT 1
-     FROM chat
-     WHERE
-       (sender_id = $1 AND recipient_id = $2)
-       OR
-       (sender_id = $2 AND recipient_id = $1)
-     LIMIT 1`,
-    [userId, targetUserId]
-  );
-
-  return existingChatResult.rows.length > 0;
+  return {
+    isBlockedByMe: Boolean(result.rows[0]?.is_blocked_by_me),
+    hasBlockedMe: Boolean(result.rows[0]?.has_blocked_me),
+  };
 };
 
 exports.getMessages = async ({ userId, targetUserId, limit, offset }) => {
   await ensureChatTables();
 
   const targetUser = await getChatTarget(userId, targetUserId);
-  const canAccessChat = await hasChatAccess(userId, targetUserId);
+  const blockStatus = await getBlockStatus(userId, targetUserId);
   const safeLimit = normalizeLimit(limit);
   const safeOffset = normalizeOffset(offset);
 
-  if (!canAccessChat) {
-    throw new Error('NOT_FOLLOWING');
+  if (blockStatus.hasBlockedMe && !isSameUser(userId, targetUserId)) {
+    throw new Error('CHAT_BLOCKED');
   }
 
-  await db.query(
-    `UPDATE chat
-     SET read_at = CURRENT_TIMESTAMP,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE sender_id = $1
-       AND recipient_id = $2
-       AND read_at IS NULL`,
-    [targetUserId, userId]
-  );
+  if (!blockStatus.isBlockedByMe) {
+    await db.query(
+      `UPDATE chat
+       SET read_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE sender_id = $1
+         AND recipient_id = $2
+         AND read_at IS NULL`,
+      [targetUserId, userId]
+    );
+  }
 
   const result = await db.query(
     `SELECT *
@@ -116,18 +115,28 @@ exports.getMessages = async ({ userId, targetUserId, limit, offset }) => {
          dm.updated_at
        FROM chat dm
        WHERE
-         (dm.sender_id = $1 AND dm.recipient_id = $2)
-         OR
-         (dm.sender_id = $2 AND dm.recipient_id = $1)
+         (
+           (dm.sender_id = $1 AND dm.recipient_id = $2)
+           OR
+           (dm.sender_id = $2 AND dm.recipient_id = $1)
+         )
+         AND (
+           NOT $5
+           OR dm.sender_id <> $2
+         )
        ORDER BY dm.created_at DESC, dm.id DESC
        LIMIT $3 OFFSET $4
      ) messages
      ORDER BY created_at ASC, id ASC`,
-    [userId, targetUserId, safeLimit, safeOffset]
+    [userId, targetUserId, safeLimit, safeOffset, blockStatus.isBlockedByMe]
   );
 
   return {
-    targetUser,
+    targetUser: {
+      ...targetUser,
+      is_blocked_by_me: blockStatus.isBlockedByMe,
+      has_blocked_me: blockStatus.hasBlockedMe,
+    },
     messages: result.rows,
   };
 };
@@ -136,15 +145,15 @@ exports.sendMessage = async ({ userId, targetUserId, content }) => {
   await ensureChatTables();
 
   const targetUser = await getChatTarget(userId, targetUserId);
-  const canAccessChat = await hasChatAccess(userId, targetUserId);
+  const blockStatus = await getBlockStatus(userId, targetUserId);
   const safeContent = normalizeContent(content);
 
   if (!safeContent) {
     throw new Error('EMPTY_MESSAGE');
   }
 
-  if (!canAccessChat) {
-    throw new Error('NOT_FOLLOWING');
+  if (blockStatus.isBlockedByMe || blockStatus.hasBlockedMe) {
+    throw new Error('CHAT_BLOCKED');
   }
 
   const result = await db.query(
@@ -154,8 +163,21 @@ exports.sendMessage = async ({ userId, targetUserId, content }) => {
     [userId, targetUserId, safeContent]
   );
 
+  await db.query(
+    `DELETE FROM hidden_conversations
+     WHERE
+       (user_id = $1 AND other_user_id = $2)
+       OR
+       (user_id = $2 AND other_user_id = $1)`,
+    [userId, targetUserId]
+  );
+
   return {
-    targetUser,
+    targetUser: {
+      ...targetUser,
+      is_blocked_by_me: blockStatus.isBlockedByMe,
+      has_blocked_me: blockStatus.hasBlockedMe,
+    },
     message: result.rows[0],
   };
 };

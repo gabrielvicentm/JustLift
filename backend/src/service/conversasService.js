@@ -5,6 +5,7 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50; 
 
 let ensureTablesPromise = null;
+const MAX_PINNED_CONVERSATIONS = 5;
 
 const normalizeLimit = (value) => { //pega value que vem da URL
   const parsed = Number(value); //tenta converter para número
@@ -50,6 +51,34 @@ const ensureChatTables = async () => {
         CREATE INDEX IF NOT EXISTS idx_chat_recipient_sender_created_at
         ON chat (recipient_id, sender_id, created_at DESC)
       `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS hidden_conversations (
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          other_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          hidden_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id, other_user_id)
+        )
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS pinned_conversations (
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          other_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          pinned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id, other_user_id)
+        )
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS blocked_users (
+          blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (blocker_id, blocked_id),
+          CHECK (blocker_id <> blocked_id)
+        )
+      `);
     })().catch((err) => {
       ensureTablesPromise = null;
       throw err;
@@ -60,6 +89,23 @@ const ensureChatTables = async () => {
 };
 
 exports.ensureChatTables = ensureChatTables;
+
+const getTargetUser = async (targetUserId) => {
+  const result = await db.query(
+    `SELECT
+       u.id AS user_id,
+       u.username,
+       up.nome_exibicao,
+       up.foto_perfil
+     FROM users u
+     LEFT JOIN users_profile up ON up.user_id = u.id
+     WHERE u.id = $1
+     LIMIT 1`,
+    [targetUserId]
+  );
+
+  return result.rows[0] || null;
+};
 
 exports.listConversations = async ({ userId, search, limit, offset }) => {
   await ensureChatTables();
@@ -133,8 +179,20 @@ exports.listConversations = async ({ userId, search, limit, offset }) => {
        lm.last_message,
        lm.last_message_at,
        COALESCE(unread.unread_count, 0)::INT AS unread_count,
-       (lm.sender_id = $1) AS last_message_is_mine
+       (lm.sender_id = $1) AS last_message_is_mine,
+       (pin.other_user_id IS NOT NULL) AS is_pinned,
+       pin.pinned_at,
+       (blocked.blocked_id IS NOT NULL) AS is_blocked
      FROM available_users au
+     LEFT JOIN hidden_conversations hidden
+       ON hidden.user_id = $1
+      AND hidden.other_user_id = au.user_id
+     LEFT JOIN pinned_conversations pin
+       ON pin.user_id = $1
+      AND pin.other_user_id = au.user_id
+     LEFT JOIN blocked_users blocked
+       ON blocked.blocker_id = $1
+      AND blocked.blocked_id = au.user_id
      LEFT JOIN LATERAL (
        SELECT
          dm.content AS last_message,
@@ -142,9 +200,15 @@ exports.listConversations = async ({ userId, search, limit, offset }) => {
          dm.created_at AS last_message_at
        FROM chat dm
        WHERE
-         (dm.sender_id = $1 AND dm.recipient_id = au.user_id)
-         OR
-         (dm.sender_id = au.user_id AND dm.recipient_id = $1)
+         (
+           (dm.sender_id = $1 AND dm.recipient_id = au.user_id)
+           OR
+           (dm.sender_id = au.user_id AND dm.recipient_id = $1)
+         )
+         AND (
+           blocked.blocked_id IS NULL
+           OR dm.sender_id <> au.user_id
+         )
        ORDER BY dm.created_at DESC, dm.id DESC
        LIMIT 1
      ) lm ON TRUE
@@ -155,10 +219,136 @@ exports.listConversations = async ({ userId, search, limit, offset }) => {
          AND dm.recipient_id = $1
          AND dm.read_at IS NULL
      ) unread ON TRUE
-     ORDER BY COALESCE(lm.last_message_at, au.followed_at) DESC, au.username ASC
+     WHERE hidden.other_user_id IS NULL
+        OR lm.last_message_at IS NULL
+        OR lm.last_message_at > hidden.hidden_at
+     ORDER BY
+       (pin.other_user_id IS NOT NULL) DESC,
+       pin.pinned_at ASC NULLS LAST,
+       COALESCE(lm.last_message_at, au.followed_at) DESC,
+       au.username ASC
      LIMIT $4 OFFSET $5`,
     [userId, safeSearch, likeSearch, safeLimit, safeOffset]
   );
 
   return result.rows;
+};
+
+exports.hideConversation = async ({ userId, targetUserId }) => {
+  await ensureChatTables();
+
+  if (String(userId) === String(targetUserId)) {
+    throw new Error('INVALID_TARGET');
+  }
+
+  const targetUser = await getTargetUser(targetUserId);
+  if (!targetUser) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  await db.query(
+    `INSERT INTO hidden_conversations (user_id, other_user_id)
+     VALUES ($1, $2)
+     ON CONFLICT (user_id, other_user_id)
+     DO UPDATE SET hidden_at = CURRENT_TIMESTAMP`,
+    [userId, targetUserId]
+  );
+
+  await db.query(
+    `DELETE FROM pinned_conversations
+     WHERE user_id = $1
+       AND other_user_id = $2`,
+    [userId, targetUserId]
+  );
+};
+
+exports.pinConversation = async ({ userId, targetUserId }) => {
+  await ensureChatTables();
+
+  if (String(userId) === String(targetUserId)) {
+    throw new Error('INVALID_TARGET');
+  }
+
+  const targetUser = await getTargetUser(targetUserId);
+  if (!targetUser) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  const pinnedCountResult = await db.query(
+    `SELECT COUNT(*)::INT AS count
+     FROM pinned_conversations
+     WHERE user_id = $1`,
+    [userId]
+  );
+
+  const alreadyPinnedResult = await db.query(
+    `SELECT 1
+     FROM pinned_conversations
+     WHERE user_id = $1
+       AND other_user_id = $2
+     LIMIT 1`,
+    [userId, targetUserId]
+  );
+
+  if (!alreadyPinnedResult.rows[0] && Number(pinnedCountResult.rows[0]?.count || 0) >= MAX_PINNED_CONVERSATIONS) {
+    throw new Error('PIN_LIMIT_REACHED');
+  }
+
+  await db.query(
+    `INSERT INTO pinned_conversations (user_id, other_user_id)
+     VALUES ($1, $2)
+     ON CONFLICT (user_id, other_user_id)
+     DO UPDATE SET pinned_at = CURRENT_TIMESTAMP`,
+    [userId, targetUserId]
+  );
+};
+
+exports.unpinConversation = async ({ userId, targetUserId }) => {
+  await ensureChatTables();
+
+  await db.query(
+    `DELETE FROM pinned_conversations
+     WHERE user_id = $1
+       AND other_user_id = $2`,
+    [userId, targetUserId]
+  );
+};
+
+exports.blockUser = async ({ userId, targetUserId }) => {
+  await ensureChatTables();
+
+  if (String(userId) === String(targetUserId)) {
+    throw new Error('INVALID_TARGET');
+  }
+
+  const targetUser = await getTargetUser(targetUserId);
+  if (!targetUser) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  await db.query(
+    `INSERT INTO blocked_users (blocker_id, blocked_id)
+     VALUES ($1, $2)
+     ON CONFLICT (blocker_id, blocked_id)
+     DO NOTHING`,
+    [userId, targetUserId]
+  );
+
+  await db.query(
+    `DELETE FROM pinned_conversations
+     WHERE user_id = $1
+       AND other_user_id = $2`,
+    [userId, targetUserId]
+  );
+};
+
+exports.unblockUser = async ({ userId, targetUserId }) => {
+  await ensureChatTables();
+
+  await db.query(
+    `DELETE FROM blocked_users
+     WHERE blocker_id = $1
+       AND blocked_id = $2`,
+    [userId, targetUserId]
+  );
 };

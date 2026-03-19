@@ -23,8 +23,8 @@ exports.getMessages = async (req, res) => {
       return res.status(404).json({ message: 'Usuario nao encontrado.' });
     }
 
-    if (err.message === 'NOT_FOLLOWING') {
-      return res.status(403).json({ message: 'Voce so pode abrir chat com quem voce segue.' });
+    if (err.message === 'CHAT_BLOCKED') {
+      return res.status(403).json({ message: 'Esta conversa esta bloqueada.' });
     }
 
     if (err.message === 'CANNOT_CHAT_WITH_SELF') {
@@ -58,8 +58,8 @@ exports.sendMessage = async (req, res) => {
       return res.status(404).json({ message: 'Usuario nao encontrado.' });
     }
 
-    if (err.message === 'NOT_FOLLOWING') {
-      return res.status(403).json({ message: 'Voce so pode enviar mensagem para quem voce segue.' });
+    if (err.message === 'CHAT_BLOCKED') {
+      return res.status(403).json({ message: 'Nao e possivel enviar mensagem porque este chat esta bloqueado.' });
     }
 
     if (err.message === 'CANNOT_CHAT_WITH_SELF') {

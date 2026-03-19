@@ -45,3 +45,28 @@ export async function sendChatMessage(
 
   return response.data;
 }
+
+export async function hideConversation(targetUserId: string): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.post(`/conversas/${encodeURIComponent(targetUserId)}/hide`, {}, { headers });
+}
+
+export async function pinConversation(targetUserId: string): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.post(`/conversas/${encodeURIComponent(targetUserId)}/pin`, {}, { headers });
+}
+
+export async function unpinConversation(targetUserId: string): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/conversas/${encodeURIComponent(targetUserId)}/pin`, { headers });
+}
+
+export async function blockConversationUser(targetUserId: string): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.post(`/conversas/${encodeURIComponent(targetUserId)}/block`, {}, { headers });
+}
+
+export async function unblockConversationUser(targetUserId: string): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/conversas/${encodeURIComponent(targetUserId)}/block`, { headers });
+}

@@ -7,6 +7,9 @@ export type ConversaListItem = {
   last_message_at: string | null;
   unread_count: number;
   last_message_is_mine: boolean;
+  is_pinned: boolean;
+  pinned_at: string | null;
+  is_blocked: boolean;
 };
 
 export type ChatTargetUser = {
@@ -14,6 +17,8 @@ export type ChatTargetUser = {
   username: string;
   nome_exibicao: string | null;
   foto_perfil: string | null;
+  is_blocked_by_me?: boolean;
+  has_blocked_me?: boolean;
 };
 
 export type ChatMessage = {

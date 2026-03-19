@@ -244,7 +244,7 @@ export default function ChatScreen() {
   }, [insets.bottom, keyboardOffset, scrollToLatest]);
 
   const handleSend = async () => {
-    if (!safeTargetUserId || sending) {
+    if (!safeTargetUserId || sending || isChatDisabled) {
       return;
     }
 
@@ -273,6 +273,14 @@ export default function ChatScreen() {
   const title = targetUser?.nome_exibicao || targetUser?.username || safeNomeExibicao || safeUsername || "Chat";
   const subtitle = targetUser?.username || safeUsername || "";
   const avatarUri = String(targetUser?.foto_perfil || safeFotoPerfil || "").trim();
+  const isBlockedByMe = Boolean(targetUser?.is_blocked_by_me);
+  const hasBlockedMe = Boolean(targetUser?.has_blocked_me);
+  const isChatDisabled = isBlockedByMe || hasBlockedMe;
+  const chatRestrictionMessage = isBlockedByMe
+    ? "Você bloqueou este usuário. Desbloqueie em Conversas para voltar a enviar mensagens."
+    : hasBlockedMe
+      ? "Você foi bloqueado por este usuário e não pode enviar novas mensagens."
+      : "";
   const handleOpenProfile = () => {
     const targetUsername = targetUser?.username || safeUsername;
     if (!targetUsername) {
@@ -307,6 +315,7 @@ export default function ChatScreen() {
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {chatRestrictionMessage ? <Text style={styles.info}>{chatRestrictionMessage}</Text> : null}
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -387,11 +396,12 @@ export default function ChatScreen() {
             placeholderTextColor={theme.colors.mutedText}
             style={styles.input}
             multiline
+            editable={!isChatDisabled}
           />
           <Pressable
             onPress={handleSend}
-            disabled={sending || !text.trim()}
-            style={[styles.sendButton, (sending || !text.trim()) && styles.disabled]}
+            disabled={sending || !text.trim() || isChatDisabled}
+            style={[styles.sendButton, (sending || !text.trim() || isChatDisabled) && styles.disabled]}
           >
             {sending ? (
               <ActivityIndicator color={theme.colors.buttonText} />
@@ -461,6 +471,12 @@ function createStyles(theme: AppTheme) {
     error: {
       color: theme.colors.error,
       fontWeight: "500",
+    },
+    info: {
+      color: theme.colors.mutedText,
+      fontWeight: "500",
+      paddingHorizontal: 16,
+      paddingBottom: 8,
     },
     loadingContainer: {
       flex: 1,

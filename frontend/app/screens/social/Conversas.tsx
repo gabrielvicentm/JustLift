@@ -1,10 +1,11 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -14,7 +15,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { fetchConversas } from "@/app/features/chat/service";
+import {
+  blockConversationUser,
+  fetchConversas,
+  hideConversation,
+  pinConversation,
+  unblockConversationUser,
+  unpinConversation,
+} from "@/app/features/chat/service";
 import type { ConversaListItem } from "@/app/features/chat/types";
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -34,6 +42,8 @@ export default function ConversasScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState("");
+  const [selectedConversation, setSelectedConversation] = useState<ConversaListItem | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
   const requestIdRef = useRef(0);
   const queryRef = useRef("");
   const conversasLengthRef = useRef(0);
@@ -41,6 +51,7 @@ export default function ConversasScreen() {
   const loadingRef = useRef(false);
   const loadingMoreRef = useRef(false);
   const isNearTopRef = useRef(true);
+  const skipNextPressRef = useRef(false);
 
   const loadConversas = useCallback(async (rawQuery: string, mode: "replace" | "append" = "replace") => {
     const safeQuery = rawQuery.trim();
@@ -120,6 +131,29 @@ export default function ConversasScreen() {
     isNearTopRef.current = event.nativeEvent.contentOffset.y < 80;
   }, []);
 
+  const closeActions = useCallback(() => {
+    if (actionLoading) {
+      return;
+    }
+
+    setSelectedConversation(null);
+  }, [actionLoading]);
+
+  const runConversationAction = useCallback(async (action: () => Promise<void>) => {
+    try {
+      setActionLoading(true);
+      await action();
+      setSelectedConversation(null);
+      hasMoreRef.current = true;
+      setHasMore(true);
+      await loadConversas(queryRef.current, "replace");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "executar acao da conversa"));
+    } finally {
+      setActionLoading(false);
+    }
+  }, [loadConversas]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
       <View style={styles.topRow}>
@@ -174,6 +208,8 @@ export default function ConversasScreen() {
           const title = item.nome_exibicao || item.username;
           const preview = item.last_message
             ? `${item.last_message_is_mine ? "Voce: " : ""}${item.last_message}`
+            : item.is_blocked
+              ? "Usuario bloqueado"
             : "Toque para iniciar a conversa";
           const openChat = () =>
             router.push({
@@ -185,9 +221,24 @@ export default function ConversasScreen() {
                 fotoPerfil: item.foto_perfil || "",
               },
             });
+          const handlePress = () => {
+            if (skipNextPressRef.current) {
+              skipNextPressRef.current = false;
+              return;
+            }
+
+            openChat();
+          };
 
           return (
-            <Pressable style={styles.card} onPress={openChat}>
+            <Pressable
+              style={styles.card}
+              onPress={handlePress}
+              onLongPress={() => {
+                skipNextPressRef.current = true;
+                setSelectedConversation(item);
+              }}
+            >
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
               ) : (
@@ -202,15 +253,18 @@ export default function ConversasScreen() {
                     <Text style={styles.cardTitle}>{title}</Text>
                     <Text style={styles.cardSubtitle}>@{item.username}</Text>
                   </View>
-                  {item.unread_count > 0 ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.unread_count}</Text>
-                    </View>
+                  {item.is_pinned ? (
+                    <MaterialCommunityIcons name="pin" size={13} color="#FFFFFF" style={styles.pinIcon} />
                   ) : null}
                 </View>
                 <Text numberOfLines={1} style={styles.preview}>
                   {preview}
                 </Text>
+                {item.unread_count > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{item.unread_count}</Text>
+                  </View>
+                ) : null}
               </View>
             </Pressable>
           );
@@ -229,6 +283,78 @@ export default function ConversasScreen() {
           <ActivityIndicator color={theme.colors.text} />
         </View>
       ) : null}
+
+      <Modal
+        visible={Boolean(selectedConversation)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeActions}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={closeActions}>
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            {selectedConversation ? (
+              <>
+                <Text style={styles.modalTitle}>
+                  {selectedConversation.nome_exibicao || selectedConversation.username}
+                </Text>
+                <Text style={styles.modalSubtitle}>@{selectedConversation.username}</Text>
+
+                <Pressable
+                  style={styles.modalPrimaryAction}
+                  disabled={actionLoading}
+                  onPress={() =>
+                    runConversationAction(() =>
+                      selectedConversation.is_pinned
+                        ? unpinConversation(selectedConversation.user_id)
+                        : pinConversation(selectedConversation.user_id)
+                    )
+                  }
+                >
+                  <Text style={styles.modalActionText}>
+                    {selectedConversation.is_pinned ? "Desafixar" : "Fixar"}
+                  </Text>
+                </Pressable>
+
+                <View style={styles.modalDivider} />
+
+                <Pressable
+                  style={styles.modalAction}
+                  disabled={actionLoading}
+                  onPress={() =>
+                    runConversationAction(() => hideConversation(selectedConversation.user_id))
+                  }
+                >
+                  <Text style={styles.modalActionText}>Excluir conversa</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.modalAction}
+                  disabled={actionLoading}
+                  onPress={() =>
+                    runConversationAction(() =>
+                      selectedConversation.is_blocked
+                        ? unblockConversationUser(selectedConversation.user_id)
+                        : blockConversationUser(selectedConversation.user_id)
+                    )
+                  }
+                >
+                  <Text style={[styles.modalActionText, styles.modalDangerText]}>
+                    {selectedConversation.is_blocked ? "Desbloquear" : "Bloquear"}
+                  </Text>
+                </Pressable>
+
+                <Pressable style={styles.modalCancel} disabled={actionLoading} onPress={closeActions}>
+                  {actionLoading ? (
+                    <ActivityIndicator color={theme.colors.text} />
+                  ) : (
+                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                  )}
+                </Pressable>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -309,6 +435,7 @@ function createStyles(theme: AppTheme) {
     cardInfo: {
       flex: 1,
       gap: 2,
+      minHeight: 50,
     },
     cardHeader: {
       flexDirection: "row",
@@ -319,6 +446,7 @@ function createStyles(theme: AppTheme) {
     profileMeta: {
       flex: 1,
       gap: 2,
+      paddingRight: 28,
     },
     cardTitle: {
       flex: 1,
@@ -330,11 +458,18 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.mutedText,
       fontSize: 13,
     },
+    pinIcon: {
+      marginTop: 2,
+    },
     preview: {
       color: theme.colors.text,
       fontSize: 13,
+      paddingRight: 28,
     },
     badge: {
+      position: "absolute",
+      right: 0,
+      bottom: 0,
       minWidth: 22,
       height: 22,
       borderRadius: 11,
@@ -353,6 +488,76 @@ function createStyles(theme: AppTheme) {
     },
     loadingMoreRow: {
       paddingVertical: 14,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.45)",
+      justifyContent: "flex-end",
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 34,
+    },
+    modalCard: {
+      borderRadius: 18,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      gap: 8,
+    },
+    modalTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    modalSubtitle: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+      marginBottom: 4,
+    },
+    modalAction: {
+      minHeight: 46,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.inputBackground,
+      justifyContent: "center",
+      paddingHorizontal: 14,
+    },
+    modalPrimaryAction: {
+      minHeight: 50,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+      justifyContent: "center",
+      paddingHorizontal: 14,
+      marginBottom: 6,
+    },
+    modalActionText: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: "600",
+    },
+    modalDivider: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+      opacity: 0.8,
+      marginBottom: 6,
+    },
+    modalDangerText: {
+      color: theme.colors.error,
+    },
+    modalCancel: {
+      minHeight: 46,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalCancelText: {
+      color: theme.colors.mutedText,
+      fontSize: 14,
+      fontWeight: "600",
     },
   });
 }
