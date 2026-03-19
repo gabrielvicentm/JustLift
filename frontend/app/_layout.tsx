@@ -49,6 +49,26 @@ function RootStack() {
           },
         }}
       />
+      <Stack.Screen
+        name="screens/social/Chat"
+        options={{
+          contentStyle: {
+            backgroundColor: theme.colors.background,
+            paddingTop: 0,
+            paddingBottom: 0,
+          },
+        }}
+      />
+      <Stack.Screen
+        name="screens/social/Conversas"
+        options={{
+          contentStyle: {
+            backgroundColor: theme.colors.background,
+            paddingTop: 0,
+            paddingBottom: 0,
+          },
+        }}
+      />
     </Stack>
   );
 }
