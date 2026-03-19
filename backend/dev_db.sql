@@ -61,6 +61,10 @@ CREATE TABLE users_profile (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_users_profile_nome_trgm
+ON users_profile
+USING gin (nome_exibicao gin_trgm_ops);
+
 CREATE TABLE user_follows (
   follower_id UUID NOT NULL,
   following_id UUID NOT NULL,
@@ -542,6 +546,10 @@ CREATE TABLE posts (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE INDEX idx_posts_descricao_trgm
+ON posts
+USING gin (descricao gin_trgm_ops);
+
 CREATE TABLE post_photos (
   photo_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   post_id INT NOT NULL,
@@ -659,6 +667,9 @@ WHERE type = 'user_follow';
 CREATE UNIQUE INDEX uq_notifications_follow_request_once
 ON notifications(recipient_user_id, actor_user_id, type)
 WHERE type = 'follow_request';
+
+CREATE INDEX idx_notifications_recipient_created
+ON notifications(recipient_user_id, created_at DESC);
 
 CREATE INDEX idx_comment_likes_comment_created_at ON comment_likes(comment_id, created_at DESC);
 

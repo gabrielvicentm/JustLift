@@ -12,10 +12,14 @@ exports.register = async (req, res) => {
     }
 
     await authService.createUser(username, email, senha);
-    return res.status(200).json({ message: 'Codigo de verificacao enviado para o email informado.' });
+    return res.status(200).json({
+      message: 'Se os dados forem validos, enviaremos um codigo de verificacao.',
+    });
   } catch (err) {
     if (err.message === 'DUPLICATE_USER') {
-      return res.status(400).json({ message: 'Username ou email ja em uso.' });
+      return res.status(200).json({
+        message: 'Se os dados forem validos, enviaremos um codigo de verificacao.',
+      });
     }
 
     if (err.message === 'EMAIL_PROVIDER_NOT_CONFIGURED') {
@@ -42,24 +46,14 @@ exports.verifyRegister = async (req, res) => {
     await authService.verifyEmailAndCreateUser(email, code);
     return res.status(201).json({ message: 'Email verificado com sucesso. Conta criada.' });
   } catch (err) {
-    if (err.message === 'VERIFICATION_NOT_FOUND') {
-      return res.status(404).json({ message: 'Solicitacao de verificacao nao encontrada para este email.' });
-    }
-
-    if (err.message === 'VERIFICATION_EXPIRED') {
-      return res.status(400).json({ message: 'Codigo expirado. Solicite um novo codigo.' });
-    }
-
-    if (err.message === 'INVALID_VERIFICATION_CODE') {
-      return res.status(400).json({ message: 'Codigo invalido.' });
-    }
-
-    if (err.message === 'VERIFICATION_TOO_MANY_ATTEMPTS') {
-      return res.status(429).json({ message: 'Muitas tentativas invalidas. Solicite um novo codigo.' });
-    }
-
-    if (err.message === 'DUPLICATE_USER') {
-      return res.status(400).json({ message: 'Username ou email ja em uso.' });
+    if (
+      err.message === 'VERIFICATION_NOT_FOUND' ||
+      err.message === 'VERIFICATION_EXPIRED' ||
+      err.message === 'INVALID_VERIFICATION_CODE' ||
+      err.message === 'VERIFICATION_TOO_MANY_ATTEMPTS' ||
+      err.message === 'DUPLICATE_USER'
+    ) {
+      return res.status(400).json({ message: 'Codigo invalido ou expirado.' });
     }
 
     if (isMissingEmailVerificationTable(err)) {
@@ -80,14 +74,14 @@ exports.resendRegisterCode = async (req, res) => {
     }
 
     await authService.resendVerificationCode(email);
-    return res.status(200).json({ message: 'Novo codigo enviado para o email informado.' });
+    return res.status(200).json({
+      message: 'Se o email existir, enviaremos um novo codigo de verificacao.',
+    });
   } catch (err) {
-    if (err.message === 'VERIFICATION_NOT_FOUND') {
-      return res.status(404).json({ message: 'Solicitacao de verificacao nao encontrada para este email.' });
-    }
-
-    if (err.message === 'VERIFICATION_RESEND_TOO_SOON') {
-      return res.status(429).json({ message: 'Aguarde alguns segundos antes de reenviar o codigo.' });
+    if (err.message === 'VERIFICATION_NOT_FOUND' || err.message === 'VERIFICATION_RESEND_TOO_SOON') {
+      return res.status(200).json({
+        message: 'Se o email existir, enviaremos um novo codigo de verificacao.',
+      });
     }
 
     if (err.message === 'EMAIL_PROVIDER_NOT_CONFIGURED') {
@@ -116,6 +110,9 @@ exports.login = async (req, res) => {
   } catch (err) {
     if (err.message === 'INVALID_CREDENTIALS') {
       return res.status(401).json({ message: 'Credenciais invalidas' });
+    }
+    if (err.message === 'GOOGLE_LOGIN_REQUIRED') {
+      return res.status(401).json({ message: 'Use o login com Google' });
     }
 
     console.error('Erro no login:', err);
