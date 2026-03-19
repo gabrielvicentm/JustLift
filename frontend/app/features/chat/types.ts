@@ -27,6 +27,11 @@ export type ChatMessage = {
   recipient_id: string;
   content: string;
   read_at: string | null;
+  deleted_for_everyone_at?: string | null;
+  reply_to_message_id?: number | null;
+  reply_to_content?: string | null;
+  reply_to_sender_id?: string | null;
+  edited_at?: string | null;
   created_at: string;
   updated_at: string;
 };

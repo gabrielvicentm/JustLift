@@ -35,15 +35,41 @@ export async function fetchChatMessages(
 export async function sendChatMessage(
   targetUserId: string,
   content: string,
+  replyToMessageId?: number | null,
 ): Promise<{ targetUser: ChatTargetUser; message: ChatMessage }> {
   const headers = await getAuthHeader();
   const response = await api.post<{ targetUser: ChatTargetUser; message: ChatMessage }>(
     `/chat/${encodeURIComponent(targetUserId)}/messages`,
+    { content, replyToMessageId: replyToMessageId ?? null },
+    { headers },
+  );
+
+  return response.data;
+}
+
+export async function updateChatMessage(
+  targetUserId: string,
+  messageId: number,
+  content: string,
+): Promise<{ targetUser: ChatTargetUser; message: ChatMessage }> {
+  const headers = await getAuthHeader();
+  const response = await api.patch<{ targetUser: ChatTargetUser; message: ChatMessage }>(
+    `/chat/${encodeURIComponent(targetUserId)}/messages/${messageId}`,
     { content },
     { headers },
   );
 
   return response.data;
+}
+
+export async function deleteChatMessageForMe(targetUserId: string, messageId: number): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/chat/${encodeURIComponent(targetUserId)}/messages/${messageId}/for-me`, { headers });
+}
+
+export async function deleteChatMessageForEveryone(targetUserId: string, messageId: number): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/chat/${encodeURIComponent(targetUserId)}/messages/${messageId}/for-everyone`, { headers });
 }
 
 export async function hideConversation(targetUserId: string): Promise<void> {

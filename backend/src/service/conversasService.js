@@ -53,6 +53,30 @@ const ensureChatTables = async () => {
       `);
 
       await db.query(`
+        ALTER TABLE chat
+        ADD COLUMN IF NOT EXISTS reply_to_message_id BIGINT NULL REFERENCES chat(id) ON DELETE SET NULL
+      `);
+
+      await db.query(`
+        ALTER TABLE chat
+        ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ NULL
+      `);
+
+      await db.query(`
+        ALTER TABLE chat
+        ADD COLUMN IF NOT EXISTS deleted_for_everyone_at TIMESTAMPTZ NULL
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS hidden_chat_messages (
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          message_id BIGINT NOT NULL REFERENCES chat(id) ON DELETE CASCADE,
+          hidden_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id, message_id)
+        )
+      `);
+
+      await db.query(`
         CREATE TABLE IF NOT EXISTS hidden_conversations (
           user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           other_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -195,7 +219,10 @@ exports.listConversations = async ({ userId, search, limit, offset }) => {
       AND blocked.blocked_id = au.user_id
      LEFT JOIN LATERAL (
        SELECT
-         dm.content AS last_message,
+         CASE
+           WHEN dm.deleted_for_everyone_at IS NOT NULL THEN 'Mensagem apagada'
+           ELSE dm.content
+         END AS last_message,
          dm.sender_id,
          dm.created_at AS last_message_at
        FROM chat dm
@@ -208,6 +235,12 @@ exports.listConversations = async ({ userId, search, limit, offset }) => {
          AND (
            blocked.blocked_id IS NULL
            OR dm.sender_id <> au.user_id
+         )
+         AND NOT EXISTS (
+           SELECT 1
+           FROM hidden_chat_messages hcm
+           WHERE hcm.user_id = $1
+             AND hcm.message_id = dm.id
          )
        ORDER BY dm.created_at DESC, dm.id DESC
        LIMIT 1
