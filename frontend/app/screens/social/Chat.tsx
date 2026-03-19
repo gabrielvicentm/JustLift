@@ -124,6 +124,9 @@ export default function ChatScreen() {
   const keyboardOpenRef = useRef(false);
   const shouldSnapToBottomRef = useRef(false);
   const isNearBottomRef = useRef(true);
+  const preserveScrollOnNextContentChangeRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
   const displayedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   const scrollToLatest = useCallback((animated = true) => {
@@ -142,7 +145,7 @@ export default function ChatScreen() {
       return;
     }
 
-    if (mode === "append-older" && (loadingMore || !hasMore)) {
+    if (mode === "append-older" && (loadingMoreRef.current || !hasMoreRef.current)) {
       return;
     }
 
@@ -150,6 +153,7 @@ export default function ChatScreen() {
       setLoading(true);
     }
     if (mode === "append-older") {
+      loadingMoreRef.current = true;
       setLoadingMore(true);
     }
 
@@ -158,9 +162,12 @@ export default function ChatScreen() {
       const response = await fetchChatMessages(safeTargetUserId, PAGE_SIZE, nextOffset);
       setTargetUser(response.targetUser);
       setError("");
-      setHasMore(response.messages.length === PAGE_SIZE);
+      hasMoreRef.current = response.messages.length === PAGE_SIZE;
+      setHasMore(hasMoreRef.current);
 
       if (mode === "append-older") {
+        preserveScrollOnNextContentChangeRef.current = response.messages.length > 0;
+        shouldSnapToBottomRef.current = false;
         offsetRef.current += response.messages.length;
         setMessages((prev) => dedupeMessages([...response.messages, ...prev]));
       } else {
@@ -172,13 +179,18 @@ export default function ChatScreen() {
       setError(getApiErrorMessage(err, "carregar mensagens"));
     } finally {
       setLoading(false);
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore, loadingMore, safeTargetUserId]);
+  }, [safeTargetUserId]);
 
   useEffect(() => {
     hasAnchoredToBottomRef.current = false;
     shouldSnapToBottomRef.current = true;
+    hasMoreRef.current = true;
+    loadingMoreRef.current = false;
+    setHasMore(true);
+    setLoadingMore(false);
     loadMessages("replace", true);
   }, [loadMessages]);
 
@@ -261,6 +273,17 @@ export default function ChatScreen() {
   const title = targetUser?.nome_exibicao || targetUser?.username || safeNomeExibicao || safeUsername || "Chat";
   const subtitle = targetUser?.username || safeUsername || "";
   const avatarUri = String(targetUser?.foto_perfil || safeFotoPerfil || "").trim();
+  const handleOpenProfile = () => {
+    const targetUsername = targetUser?.username || safeUsername;
+    if (!targetUsername) {
+      return;
+    }
+
+    router.push({
+      pathname: "/screens/social/[username]",
+      params: { username: targetUsername },
+    });
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
@@ -268,17 +291,19 @@ export default function ChatScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
           <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </Pressable>
-        {avatarUri ? (
-          <Image source={{ uri: avatarUri }} style={styles.headerAvatar} />
-        ) : (
-          <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
-            <Text style={styles.headerAvatarText}>{title.slice(0, 1).toUpperCase()}</Text>
+        <Pressable onPress={handleOpenProfile} style={styles.headerProfile} hitSlop={8}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.headerAvatar} />
+          ) : (
+            <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
+              <Text style={styles.headerAvatarText}>{title.slice(0, 1).toUpperCase()}</Text>
+            </View>
+          )}
+          <View style={styles.headerInfo}>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle ? <Text style={styles.subtitle}>@{subtitle}</Text> : null}
           </View>
-        )}
-        <View style={styles.headerInfo}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>@{subtitle}</Text> : null}
-        </View>
+        </Pressable>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -296,6 +321,11 @@ export default function ChatScreen() {
           contentContainerStyle={[styles.listContent, { paddingTop: inputBarHeight + keyboardSpacerHeight + 8 }]}
           maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 40 }}
           onContentSizeChange={() => {
+            if (preserveScrollOnNextContentChangeRef.current) {
+              preserveScrollOnNextContentChangeRef.current = false;
+              return;
+            }
+
             requestAnimationFrame(() => {
               const shouldSnapToBottom =
                 !hasAnchoredToBottomRef.current
@@ -396,6 +426,12 @@ function createStyles(theme: AppTheme) {
     },
     headerInfo: {
       flex: 1,
+    },
+    headerProfile: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
     },
     headerAvatar: {
       width: 38,

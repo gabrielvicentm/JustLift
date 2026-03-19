@@ -5,6 +5,8 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -34,12 +36,17 @@ export default function ConversasScreen() {
   const [error, setError] = useState("");
   const requestIdRef = useRef(0);
   const queryRef = useRef("");
+  const conversasLengthRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const loadingRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const isNearTopRef = useRef(true);
 
   const loadConversas = useCallback(async (rawQuery: string, mode: "replace" | "append" = "replace") => {
     const safeQuery = rawQuery.trim();
-    const nextOffset = mode === "append" ? conversas.length : 0;
+    const nextOffset = mode === "append" ? conversasLengthRef.current : 0;
 
-    if (mode === "append" && (loadingMore || loading || !hasMore)) {
+    if (mode === "append" && (loadingMoreRef.current || loadingRef.current || !hasMoreRef.current)) {
       return;
     }
 
@@ -48,8 +55,10 @@ export default function ConversasScreen() {
     queryRef.current = safeQuery;
 
     if (mode === "append") {
+      loadingMoreRef.current = true;
       setLoadingMore(true);
     } else {
+      loadingRef.current = true;
       setLoading(true);
       setError("");
     }
@@ -57,27 +66,37 @@ export default function ConversasScreen() {
     try {
       const response = await fetchConversas(safeQuery, 10, nextOffset);
       if (requestId === requestIdRef.current) {
-        setHasMore(response.length === 10);
-        setConversas((prev) => (mode === "append" ? [...prev, ...response] : response));
+        hasMoreRef.current = response.length === 10;
+        setHasMore(hasMoreRef.current);
+        setConversas((prev) => {
+          const nextConversas = mode === "append" ? [...prev, ...response] : response;
+          conversasLengthRef.current = nextConversas.length;
+          return nextConversas;
+        });
       }
     } catch (err) {
       if (requestId === requestIdRef.current) {
         if (mode !== "append") {
+          conversasLengthRef.current = 0;
           setConversas([]);
         }
         setError(getApiErrorMessage(err, "carregar conversas"));
       }
     } finally {
       if (requestId === requestIdRef.current) {
+        loadingRef.current = false;
+        loadingMoreRef.current = false;
         setLoading(false);
         setLoadingMore(false);
         setRefreshing(false);
       }
     }
-  }, [conversas.length, hasMore, loading, loadingMore]);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      hasMoreRef.current = true;
+      setHasMore(true);
       loadConversas(query, "replace");
     }, 250);
 
@@ -88,12 +107,18 @@ export default function ConversasScreen() {
     useCallback(() => {
       loadConversas(queryRef.current, "replace");
       const intervalId = setInterval(() => {
-        loadConversas(queryRef.current, "replace");
+        if (isNearTopRef.current && !loadingMoreRef.current) {
+          loadConversas(queryRef.current, "replace");
+        }
       }, 3000);
 
       return () => clearInterval(intervalId);
     }, [loadConversas]),
   );
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    isNearTopRef.current = event.nativeEvent.contentOffset.y < 80;
+  }, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -107,7 +132,7 @@ export default function ConversasScreen() {
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder="Pesquisar quem voce segue"
+        placeholder="Pesquisar conversas"
         placeholderTextColor={theme.colors.mutedText}
         style={styles.input}
         autoCapitalize="none"
@@ -121,12 +146,16 @@ export default function ConversasScreen() {
         keyExtractor={(item) => item.user_id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.listContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         onEndReachedThreshold={0.2}
         onEndReached={() => loadConversas(queryRef.current, "append")}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              hasMoreRef.current = true;
+              setHasMore(true);
               setRefreshing(true);
               loadConversas(queryRef.current, "replace");
             }}
@@ -136,7 +165,7 @@ export default function ConversasScreen() {
         ListEmptyComponent={
           !loading ? (
             <Text style={styles.emptyText}>
-              Nenhuma conversa encontrada. A lista mostra as pessoas que voce segue.
+              Nenhuma conversa encontrada.
             </Text>
           ) : null
         }
@@ -146,22 +175,19 @@ export default function ConversasScreen() {
           const preview = item.last_message
             ? `${item.last_message_is_mine ? "Voce: " : ""}${item.last_message}`
             : "Toque para iniciar a conversa";
+          const openChat = () =>
+            router.push({
+              pathname: "/screens/social/Chat",
+              params: {
+                targetUserId: item.user_id,
+                username: item.username,
+                nomeExibicao: item.nome_exibicao || "",
+                fotoPerfil: item.foto_perfil || "",
+              },
+            });
 
           return (
-            <Pressable
-              style={styles.card}
-              onPress={() =>
-                router.push({
-                  pathname: "/screens/social/Chat",
-                  params: {
-                    targetUserId: item.user_id,
-                    username: item.username,
-                    nomeExibicao: item.nome_exibicao || "",
-                    fotoPerfil: item.foto_perfil || "",
-                  },
-                })
-              }
-            >
+            <Pressable style={styles.card} onPress={openChat}>
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
               ) : (
@@ -172,14 +198,16 @@ export default function ConversasScreen() {
 
               <View style={styles.cardInfo}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle}>{title}</Text>
+                  <View style={styles.profileMeta}>
+                    <Text style={styles.cardTitle}>{title}</Text>
+                    <Text style={styles.cardSubtitle}>@{item.username}</Text>
+                  </View>
                   {item.unread_count > 0 ? (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{item.unread_count}</Text>
                     </View>
                   ) : null}
                 </View>
-                <Text style={styles.cardSubtitle}>@{item.username}</Text>
                 <Text numberOfLines={1} style={styles.preview}>
                   {preview}
                 </Text>
@@ -284,9 +312,13 @@ function createStyles(theme: AppTheme) {
     },
     cardHeader: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       justifyContent: "space-between",
       gap: 8,
+    },
+    profileMeta: {
+      flex: 1,
+      gap: 2,
     },
     cardTitle: {
       flex: 1,

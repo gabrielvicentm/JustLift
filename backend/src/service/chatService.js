@@ -50,6 +50,10 @@ const getChatTarget = async (userId, targetUserId) => {
     throw new Error('USER_NOT_FOUND');
   }
 
+  return targetUser;
+};
+
+const hasChatAccess = async (userId, targetUserId) => {
   const followResult = await db.query(
     `SELECT 1
      FROM user_follows
@@ -59,19 +63,35 @@ const getChatTarget = async (userId, targetUserId) => {
     [userId, targetUserId]
   );
 
-  if (followResult.rows.length === 0) {
-    throw new Error('NOT_FOLLOWING');
+  if (followResult.rows.length > 0) {
+    return true;
   }
 
-  return targetUser;
+  const existingChatResult = await db.query(
+    `SELECT 1
+     FROM chat
+     WHERE
+       (sender_id = $1 AND recipient_id = $2)
+       OR
+       (sender_id = $2 AND recipient_id = $1)
+     LIMIT 1`,
+    [userId, targetUserId]
+  );
+
+  return existingChatResult.rows.length > 0;
 };
 
 exports.getMessages = async ({ userId, targetUserId, limit, offset }) => {
   await ensureChatTables();
 
   const targetUser = await getChatTarget(userId, targetUserId);
+  const canAccessChat = await hasChatAccess(userId, targetUserId);
   const safeLimit = normalizeLimit(limit);
   const safeOffset = normalizeOffset(offset);
+
+  if (!canAccessChat) {
+    throw new Error('NOT_FOLLOWING');
+  }
 
   await db.query(
     `UPDATE chat
@@ -116,10 +136,15 @@ exports.sendMessage = async ({ userId, targetUserId, content }) => {
   await ensureChatTables();
 
   const targetUser = await getChatTarget(userId, targetUserId);
+  const canAccessChat = await hasChatAccess(userId, targetUserId);
   const safeContent = normalizeContent(content);
 
   if (!safeContent) {
     throw new Error('EMPTY_MESSAGE');
+  }
+
+  if (!canAccessChat) {
+    throw new Error('NOT_FOLLOWING');
   }
 
   const result = await db.query(
