@@ -2,14 +2,15 @@ const express = require('express');
 const router = express.Router();
 const profileController = require('../controller/profileController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { accountChangeLimiter } = require('../middleware/rateLimit');
 
 // Legacy routes
 router.post('/profile', authMiddleware, profileController.profile);
 router.put('/updateProfile', authMiddleware, profileController.updateProfile);
 
-router.post('/account-change/request', authMiddleware, profileController.requestAccountChange);
-router.post('/account-change/confirm', authMiddleware, profileController.confirmAccountChange);
-router.post('/account-change/apply', authMiddleware, profileController.applyAccountChange);
+router.post('/account-change/request', authMiddleware, accountChangeLimiter, profileController.requestAccountChange);
+router.post('/account-change/confirm', authMiddleware, accountChangeLimiter, profileController.confirmAccountChange);
+router.post('/account-change/apply', authMiddleware, accountChangeLimiter, profileController.applyAccountChange);
 router.delete('/account', authMiddleware, profileController.deleteAccount);
 
 // REST routes

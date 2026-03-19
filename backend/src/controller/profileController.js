@@ -148,12 +148,8 @@ exports.applyAccountChange = async (req, res) => {
       return res.status(400).json({ message: 'Informe ao menos um campo para alterar.' });
     }
 
-    if (err.message === 'DUPLICATE_USERNAME') {
-      return res.status(400).json({ message: 'Username ja em uso.' });
-    }
-
-    if (err.message === 'DUPLICATE_EMAIL') {
-      return res.status(400).json({ message: 'Email ja em uso.' });
+    if (err.message === 'DUPLICATE_USERNAME' || err.message === 'DUPLICATE_EMAIL') {
+      return res.status(400).json({ message: 'Nao foi possivel atualizar os dados informados.' });
     }
 
     console.error('Erro ao aplicar alteracao de conta:', err);

@@ -1,5 +1,5 @@
-const jwt =  require('jsonwebtoken');
-const SECRET_KEY = "pantufa";
+const jwt = require('jsonwebtoken');
+const { JWT_ACCESS_SECRET } = require('../config/security');
 
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -14,7 +14,7 @@ const authMiddleware = (req, res, next) => {
   }
   
   try {
-    const decoded = jwt.verify(token, SECRET_KEY);
+    const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
 
     req.user = decoded;
     next();
@@ -22,7 +22,6 @@ const authMiddleware = (req, res, next) => {
   } catch (err) {
 
     console.log("ERRO JWT:", err.message);
-    console.log("AUTH HEADER:", req.headers.authorization);
     return res.status(401).json({ message: "Token expirado ou inválido" });
 
   }

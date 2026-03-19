@@ -1,6 +1,7 @@
 const db = require('../utils/db');
 
 const ACTIVE_DAILY_WINDOW_SQL = "CURRENT_TIMESTAMP - INTERVAL '24 hours'";
+const MAX_DAILY_BATCH = 20;
 
 async function dailyExists(dailyId) {
   const exists = await db.query('SELECT 1 FROM daily WHERE daily_id = $1 LIMIT 1', [dailyId]);
@@ -29,30 +30,53 @@ exports.createDailyBatch = async ({ userId, midias }) => {
   const client = await db.connect();
 
   try {
+    if (midias.length > MAX_DAILY_BATCH) {
+      throw new Error('DAILY_BATCH_TOO_LARGE');
+    }
+
     //se tudo der certo → salva
     // se der erro → desfaz tudo
     await client.query('BEGIN');
 
-    const createdRows = [];
-    //Ele percorre cada mídia enviada.
-    for (const item of midias) {
-      const result = await client.query(
-        `
-          INSERT INTO daily (
-            user_id,
-            media_type,
-            media_url,
-            media_key,
-            duration_seconds
-          )
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING daily_id
-        `,
-        [userId, item.type, item.url, item.key, item.duration_seconds],
-      );
-      //Os IDs são guardados aqui:
-      createdRows.push(result.rows[0].daily_id);
-    }
+    const mediaTypes = midias.map((item) => item.type);
+    const mediaUrls = midias.map((item) => item.url);
+    const mediaKeys = midias.map((item) => item.key);
+    const durations = midias.map((item) => item.duration_seconds || null);
+
+    const batchResult = await client.query(
+      `
+        WITH payload AS (
+          SELECT
+            *
+          FROM unnest(
+            $2::text[],
+            $3::text[],
+            $4::text[],
+            $5::int[]
+          ) WITH ORDINALITY
+          AS t(media_type, media_url, media_key, duration_seconds, ord)
+        )
+        INSERT INTO daily (
+          user_id,
+          media_type,
+          media_url,
+          media_key,
+          duration_seconds
+        )
+        SELECT
+          $1,
+          media_type,
+          media_url,
+          media_key,
+          duration_seconds
+        FROM payload
+        ORDER BY ord
+        RETURNING daily_id
+      `,
+      [userId, mediaTypes, mediaUrls, mediaKeys, durations],
+    );
+
+    const createdRows = batchResult.rows.map((row) => row.daily_id);
 
     await client.query('COMMIT');
 
@@ -93,40 +117,60 @@ exports.createDailyBatch = async ({ userId, midias }) => {
 exports.getActiveDailyByUser = async ({ userId, viewerUserId }) => {
   const result = await db.query(
     `
+      WITH base AS (
+        SELECT
+          d.daily_id,
+          d.user_id,
+          d.media_type,
+          d.media_url,
+          d.media_key,
+          d.duration_seconds,
+          d.created_at
+        FROM daily d
+        WHERE d.user_id = $1
+          AND d.created_at >= ${ACTIVE_DAILY_WINDOW_SQL}
+      ),
+      likes AS (
+        SELECT daily_id, COUNT(*)::INT AS likes_count
+        FROM daily_likes
+        WHERE daily_id = ANY(SELECT daily_id FROM base)
+        GROUP BY daily_id
+      ),
+      viewer_likes AS (
+        SELECT daily_id
+        FROM daily_likes
+        WHERE user_id = $2
+          AND daily_id = ANY(SELECT daily_id FROM base)
+      ),
+      viewer_views AS (
+        SELECT daily_id
+        FROM daily_views
+        WHERE user_id = $2
+          AND daily_id = ANY(SELECT daily_id FROM base)
+      )
       SELECT
-        d.daily_id AS id,
-        d.user_id,
+        b.daily_id AS id,
+        b.user_id,
         u.username,
         up.nome_exibicao,
         up.foto_perfil,
-        d.media_type,
-        d.media_url,
-        d.media_key,
-        d.duration_seconds,
-        d.created_at,
-        (
-          SELECT COUNT(*)
-          FROM daily_likes l
-          WHERE l.daily_id = d.daily_id
-        )::INT AS likes_count,
+        b.media_type,
+        b.media_url,
+        b.media_key,
+        b.duration_seconds,
+        b.created_at,
+        COALESCE(l.likes_count, 0) AS likes_count,
         EXISTS (
-          SELECT 1
-          FROM daily_likes vl
-          WHERE vl.daily_id = d.daily_id
-            AND vl.user_id = $2
+          SELECT 1 FROM viewer_likes vl WHERE vl.daily_id = b.daily_id
         ) AS viewer_liked,
         EXISTS (
-          SELECT 1
-          FROM daily_views vv
-          WHERE vv.daily_id = d.daily_id
-            AND vv.user_id = $2
+          SELECT 1 FROM viewer_views vv WHERE vv.daily_id = b.daily_id
         ) AS viewer_viewed
-      FROM daily d
-      JOIN users u ON u.id = d.user_id
-      LEFT JOIN users_profile up ON up.user_id = d.user_id
-      WHERE d.user_id = $1
-        AND d.created_at >= ${ACTIVE_DAILY_WINDOW_SQL}
-      ORDER BY d.created_at ASC, d.daily_id ASC
+      FROM base b
+      JOIN users u ON u.id = b.user_id
+      LEFT JOIN users_profile up ON up.user_id = b.user_id
+      LEFT JOIN likes l ON l.daily_id = b.daily_id
+      ORDER BY b.created_at ASC, b.daily_id ASC
     `,
     [userId, viewerUserId],
   );
