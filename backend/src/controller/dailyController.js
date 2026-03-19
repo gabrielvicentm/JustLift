@@ -68,6 +68,9 @@ exports.createDailyBatch = async (req, res) => {
       daily: created,
     });
   } catch (err) {
+    if (err.message === 'DAILY_BATCH_TOO_LARGE') {
+      return res.status(400).json({ message: `Limite de ${MAX_DAILY_PER_REQUEST} midias por envio de Daily.` });
+    }
     console.error('Erro ao criar Daily:', err);
     return res.status(500).json({ message: 'Erro ao criar Daily' });
   }

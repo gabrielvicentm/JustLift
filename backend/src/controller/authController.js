@@ -111,6 +111,9 @@ exports.login = async (req, res) => {
     if (err.message === 'INVALID_CREDENTIALS') {
       return res.status(401).json({ message: 'Credenciais invalidas' });
     }
+    if (err.message === 'GOOGLE_LOGIN_REQUIRED') {
+      return res.status(401).json({ message: 'Use o login com Google' });
+    }
 
     console.error('Erro no login:', err);
     return res.status(500).json({ message: 'Erro no servidor' });

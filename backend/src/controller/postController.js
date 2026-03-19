@@ -76,8 +76,16 @@ exports.getPostsByUser = async (req, res) => {
       return res.status(400).json({ message: 'userId obrigatorio' });
     }
 
-    const posts = await postService.getPostsByUser({ userId, viewerUserId });
-    return res.status(200).json({ posts });
+    const limitInput = Number(req.query.limit);
+    const offsetInput = Number(req.query.offset);
+    const limit = Number.isFinite(limitInput) ? Math.min(Math.max(Math.floor(limitInput), 1), 50) : 20;
+    const offset = Number.isFinite(offsetInput) ? Math.max(Math.floor(offsetInput), 0) : 0;
+
+    const posts = await postService.getPostsByUser({ userId, viewerUserId, limit, offset });
+    return res.status(200).json({
+      posts,
+      meta: { limit, offset, count: posts.length },
+    });
   } catch (err) {
     console.error('Erro ao buscar posts por usuario:', err);
     return res.status(500).json({ message: 'Erro ao buscar posts' });

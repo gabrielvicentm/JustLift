@@ -108,11 +108,16 @@ exports.buscarExerciciosCustomizados = async (req, res) => {
       return res.status(401).json({ message: 'Usuário não autenticado' });
     }
 
+    const limitInput = Number(req.query.limit);
+    const offsetInput = Number(req.query.offset);
+    const limit = Number.isFinite(limitInput) ? Math.min(Math.max(Math.floor(limitInput), 1), 100) : 50;
+    const offset = Number.isFinite(offsetInput) ? Math.max(Math.floor(offsetInput), 0) : 0;
+
     // Consulta customizados do usuário.
-    const exercicios = await diarioService.getCustomExercisesByUser({ userId });
+    const exercicios = await diarioService.getCustomExercisesByUser({ userId, limit, offset });
     return res.status(200).json({
       exercicios,
-      meta: { count: exercicios.length },
+      meta: { count: exercicios.length, limit, offset },
     });
   } catch (err) {
     // Erro inesperado.
