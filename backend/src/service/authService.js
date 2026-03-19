@@ -4,12 +4,6 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { Resend } = require('resend');
 
-const SECRET_KEY = process.env.JWT_SECRET;
-const VERIFICATION_CODE_EXPIRATION_MINUTES = Number(process.env.EMAIL_VERIFICATION_EXPIRES_MINUTES || 10);
-const VERIFICATION_MAX_ATTEMPTS = Number(process.env.EMAIL_VERIFICATION_MAX_ATTEMPTS || 5);
-const VERIFICATION_RESEND_COOLDOWN_SECONDS = Number(process.env.EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS);
-const VERIFICATION_CODE_SECRET = process.env.EMAIL_VERIFICATION_CODE_SECRET || SECRET_KEY;
-const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER || SECRET_KEY;
 const {
   JWT_ACCESS_SECRET,
   JWT_REFRESH_SECRET,
@@ -32,7 +26,6 @@ const generateVerificationCode = () =>
 
 
 const hashVerificationCode = (code) =>
-  crypto.createHash('sha256').update(`${code}:${VERIFICATION_CODE_SECRET}`).digest('hex');
   crypto.createHash('sha256').update(`${code}:${EMAIL_VERIFICATION_CODE_SECRET}`).digest('hex');
 
 const hashRefreshToken = (token) =>
@@ -100,7 +93,6 @@ exports.createSession = async (userId) => {
   const refreshToken = jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES });
   const refreshTokenHash = hashRefreshToken(refreshToken);
 
-  const refreshTokenHash = hashRefreshToken(refreshToken);
   await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [refreshTokenHash, userId]);
 
   return { accessToken, refreshToken };
@@ -237,7 +229,6 @@ exports.logar = async (identifier, senha) => {
   const refreshToken = jwt.sign({ userId: user.id }, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES });
   const refreshTokenHash = hashRefreshToken(refreshToken);
 
-  const refreshTokenHash = hashRefreshToken(refreshToken);
   await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [refreshTokenHash, user.id]);
 
   return { accessToken, refreshToken };
@@ -273,7 +264,6 @@ exports.refreshToken = async (refreshToken) => {
   );
   const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
 
-  const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
   await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [
     newRefreshTokenHash,
     user.rows[0].id,

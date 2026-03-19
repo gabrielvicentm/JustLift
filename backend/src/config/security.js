@@ -6,9 +6,8 @@ const requireEnv = (name) => {
   return value;
 };
 
-const JWT_SECRET = String(process.env.JWT_SECRET || '').trim();
-const JWT_ACCESS_SECRET = String(process.env.JWT_ACCESS_SECRET || JWT_SECRET).trim();
-const JWT_REFRESH_SECRET = String(process.env.JWT_REFRESH_SECRET || JWT_SECRET).trim();
+const JWT_ACCESS_SECRET = String(process.env.JWT_ACCESS_SECRET || '').trim();
+const JWT_REFRESH_SECRET = String(process.env.JWT_REFRESH_SECRET || '').trim();
 
 if (!JWT_ACCESS_SECRET || !JWT_REFRESH_SECRET) {
   throw new Error('JWT_SECRET_NOT_CONFIGURED');
@@ -18,10 +17,10 @@ const JWT_ACCESS_EXPIRES = String(process.env.JWT_ACCESS_EXPIRES || '15m').trim(
 const JWT_REFRESH_EXPIRES = String(process.env.JWT_REFRESH_EXPIRES || '7d').trim();
 
 const EMAIL_VERIFICATION_CODE_SECRET = String(
-  process.env.EMAIL_VERIFICATION_CODE_SECRET || JWT_ACCESS_SECRET,
+  process.env.EMAIL_VERIFICATION_CODE_SECRET || '',
 ).trim();
 
-const REFRESH_TOKEN_PEPPER = String(process.env.REFRESH_TOKEN_PEPPER || JWT_REFRESH_SECRET).trim();
+const REFRESH_TOKEN_PEPPER = String(process.env.REFRESH_TOKEN_PEPPER || '').trim();
 
 if (!EMAIL_VERIFICATION_CODE_SECRET) {
   throw new Error('EMAIL_VERIFICATION_CODE_SECRET_NOT_CONFIGURED');
