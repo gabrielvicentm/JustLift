@@ -108,11 +108,12 @@ const ACCOUNT_CHANGE_APPLY_EXPIRATION_MINUTES = Number(
 );
 const VERIFICATION_MAX_ATTEMPTS = Number(process.env.EMAIL_VERIFICATION_MAX_ATTEMPTS || 5);
 const VERIFICATION_CODE_SECRET = process.env.EMAIL_VERIFICATION_CODE_SECRET || process.env.JWT_SECRET;
+const { EMAIL_VERIFICATION_CODE_SECRET } = require('../config/security');
 
 const generateVerificationCode = () =>
   String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 const hashVerificationCode = (code) =>
-  crypto.createHash('sha256').update(`${code}:${VERIFICATION_CODE_SECRET}`).digest('hex');
+  crypto.createHash('sha256').update(`${code}:${EMAIL_VERIFICATION_CODE_SECRET}`).digest('hex');
 
 const sendAccountChangeCodeEmail = async (email, username, code) => {
   if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {

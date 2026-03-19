@@ -1,4 +1,5 @@
 const premiumService = require('../service/premiumService');
+const { PREMIUM_MANUAL_ALLOWLIST, PREMIUM_MANUAL_ENABLED } = require('../config/security');
 
 function getUserId(req) {
   return req.user?.userId || req.user?.id || null;
@@ -72,6 +73,10 @@ exports.setFake = async (req, res) => {
     const userId = getUserId(req);
     if (!userId) {
       return res.status(401).json({ message: 'Usuario nao autenticado' });
+    }
+
+    if (!PREMIUM_MANUAL_ENABLED || !PREMIUM_MANUAL_ALLOWLIST.includes(String(userId))) {
+      return res.status(403).json({ message: 'Operacao nao permitida' });
     }
 
     const enabled = Boolean(req.body?.enabled);

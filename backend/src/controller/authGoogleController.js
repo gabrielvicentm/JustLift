@@ -29,12 +29,12 @@ exports.googleLogin = async (req, res) => {
       google_id: savedGoogleId,
     });
   } catch (err) {
-    if (err.message === 'USER_NOT_FOUND') {
-      return res.status(404).json({ message: 'Usuario nao encontrado para este Google.' });
-    }
-
-    if (err.message === 'INVALID_GOOGLE_TOKEN' || err.message === 'GOOGLE_ID_MISMATCH') {
-      return res.status(401).json({ message: 'Token Google invalido.' });
+    if (
+      err.message === 'USER_NOT_FOUND' ||
+      err.message === 'INVALID_GOOGLE_TOKEN' ||
+      err.message === 'GOOGLE_ID_MISMATCH'
+    ) {
+      return res.status(401).json({ message: 'Nao foi possivel autenticar com Google.' });
     }
 
     if (err.message === 'CONFIG_ERROR') {
@@ -63,16 +63,13 @@ exports.googleRegister = async (req, res) => {
       google_id: savedGoogleId,
     });
   } catch (err) {
-    if (err.message === 'DUPLICATE_USER') {
-      return res.status(400).json({ message: 'Username, email ou Google ja em uso.' });
-    }
-
-    if (err.message === 'INVALID_GOOGLE_TOKEN' || err.message === 'GOOGLE_ID_MISMATCH') {
-      return res.status(401).json({ message: 'Token Google invalido.' });
-    }
-
-    if (err.message === 'INVALID_USERNAME') {
-      return res.status(400).json({ message: 'Username invalido para cadastro Google.' });
+    if (
+      err.message === 'DUPLICATE_USER' ||
+      err.message === 'INVALID_GOOGLE_TOKEN' ||
+      err.message === 'GOOGLE_ID_MISMATCH' ||
+      err.message === 'INVALID_USERNAME'
+    ) {
+      return res.status(400).json({ message: 'Nao foi possivel concluir o cadastro com Google.' });
     }
 
     if (err.message === 'CONFIG_ERROR') {
