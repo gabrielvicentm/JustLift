@@ -30,13 +30,6 @@ if (!REFRESH_TOKEN_PEPPER) {
   throw new Error('REFRESH_TOKEN_PEPPER_NOT_CONFIGURED');
 }
 
-const PREMIUM_MANUAL_ALLOWLIST = String(process.env.PREMIUM_MANUAL_ALLOWLIST || '')
-  .split(',')
-  .map((value) => value.trim())
-  .filter(Boolean);
-
-const PREMIUM_MANUAL_ENABLED = String(process.env.PREMIUM_MANUAL_ENABLED || '').toLowerCase() === 'true';
-
 module.exports = {
   JWT_ACCESS_SECRET,
   JWT_REFRESH_SECRET,
@@ -44,6 +37,4 @@ module.exports = {
   JWT_REFRESH_EXPIRES,
   EMAIL_VERIFICATION_CODE_SECRET,
   REFRESH_TOKEN_PEPPER,
-  PREMIUM_MANUAL_ALLOWLIST,
-  PREMIUM_MANUAL_ENABLED,
 };

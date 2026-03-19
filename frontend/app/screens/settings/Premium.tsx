@@ -129,27 +129,6 @@ export default function PremiumScreen() {
     }
   };
 
-  const toggleFakePremium = async () => {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      const headers = await getAuthHeader();
-      const response = await api.post<PremiumStatusResponse>(
-        "/premium/fake",
-        { enabled: !isPremium },
-        { headers },
-      );
-      setIsPremium(Boolean(response.data.isPremium));
-      setUpdatedAt(response.data.premiumUpdatedAt ?? null);
-      setMessage(response.data.message ?? "Status atualizado.");
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const purchasePremium = async () => {
     setError("");
     setMessage("");
@@ -307,16 +286,6 @@ export default function PremiumScreen() {
           disabled={loading}
         >
           <Text style={styles.secondaryButtonText}>Sincronizar Status</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.ghostButton, loading && styles.buttonDisabled]}
-          onPress={toggleFakePremium}
-          disabled={loading}
-        >
-          <Text style={styles.ghostButtonText}>
-            {isPremium ? "Desativar premium falso" : "Virar premium falso"}
-          </Text>
         </Pressable>
 
         <Pressable style={styles.backButton} onPress={() => router.back()} disabled={loading}>

@@ -86,35 +86,35 @@ function createRateLimiter(options) {
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 20,
   blockMs: 30 * 60 * 1000,
   keyGenerator: (req) => makeKey(req, resolveIdentifier(req)),
 });
 
 const otpLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 8,
   blockMs: 30 * 60 * 1000,
   keyGenerator: (req) => makeKey(req, String(req.body?.email || '').trim().toLowerCase()),
 });
 
 const googleLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 8,
+  max: 15,
   blockMs: 30 * 60 * 1000,
   keyGenerator: (req) => makeKey(req, resolveIdentifier(req)),
 });
 
 const accountChangeLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 8,
   blockMs: 30 * 60 * 1000,
   keyGenerator: (req) => makeKey(req, String(req.user?.userId || req.user?.id || '')),
 });
 
 const mediaLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 60,
   blockMs: 30 * 60 * 1000,
   keyGenerator: (req) => makeKey(req, String(req.user?.userId || req.user?.id || '')),
 });

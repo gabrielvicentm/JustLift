@@ -4,15 +4,20 @@ exports.presignUpload = async (req, res) => {
   try {
     const { filename, contentType, size } = req.body;
 
-    if (!filename || !contentType) {
-      return res.status(400).json({ message: 'filename e contentType são obrigatórios' });
+    if (!filename || !contentType || size == null) {
+      return res.status(400).json({ message: 'filename, contentType e size são obrigatórios' });
     }
 
     if (!contentType.startsWith('image/') && !contentType.startsWith('video/')) {
       return res.status(400).json({ message: 'Tipo de arquivo não permitido' });
     }
 
-    if (size && Number(size) > 50 * 1024 * 1024) {
+    const numericSize = Number(size);
+    if (!Number.isFinite(numericSize) || numericSize <= 0) {
+      return res.status(400).json({ message: 'size inválido' });
+    }
+
+    if (numericSize > 50 * 1024 * 1024) {
       return res.status(400).json({ message: 'Arquivo maior que 50MB' });
     }
 

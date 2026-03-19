@@ -16,8 +16,8 @@ router.post('/login', authLimiter, authController.login);
 router.get('/google/config', authGoogleController.getGoogleConfig);
 router.post('/google/login', googleLimiter, authGoogleController.googleLogin);
 router.post('/google/register', googleLimiter, authGoogleController.googleRegister);
-router.post('/refresh', authController.handleRefresh);
-router.post('/logout', authController.logout);
+router.post('/refresh', authLimiter, authController.handleRefresh);
+router.post('/logout', authLimiter, authController.logout);
 
 
 module.exports = router;
