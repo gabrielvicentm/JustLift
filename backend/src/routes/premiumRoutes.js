@@ -6,6 +6,5 @@ const router = express.Router();
 
 router.get('/status', authMiddleware, premiumController.getStatus);
 router.post('/sync', authMiddleware, premiumController.sync);
-router.post('/fake', authMiddleware, premiumController.setFake);
 
 module.exports = router
