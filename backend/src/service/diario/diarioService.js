@@ -1,6 +1,42 @@
 const db = require('../../utils/db');
 const gamificacaoService = require('./gamificacaoService');
 
+const SEARCH_EXERCISES_CACHE_TTL_MS = Number(process.env.SEARCH_EXERCISES_CACHE_TTL_MS || 60_000);
+const SEARCH_EXERCISES_CACHE_MAX = Number(process.env.SEARCH_EXERCISES_CACHE_MAX || 200);
+const searchExercisesCache = new Map();
+
+const getCachedSearchExercises = (key) => {
+  const cached = searchExercisesCache.get(key);
+  if (!cached) {
+    return null;
+  }
+  if (cached.expiresAt <= Date.now()) {
+    searchExercisesCache.delete(key);
+    return null;
+  }
+  return cached.value;
+};
+
+const setCachedSearchExercises = (key, value) => {
+  if (searchExercisesCache.size >= SEARCH_EXERCISES_CACHE_MAX) {
+    const oldestKey = searchExercisesCache.keys().next().value;
+    if (oldestKey) {
+      searchExercisesCache.delete(oldestKey);
+    }
+  }
+  searchExercisesCache.set(key, { value, expiresAt: Date.now() + SEARCH_EXERCISES_CACHE_TTL_MS });
+};
+
+const buildSearchExercisesCacheKey = (params) =>
+  JSON.stringify({
+    q: params.query || '',
+    lang: params.lang || 'pt',
+    muscle: params.muscleKey || '',
+    equipment: params.equipmentKey || '',
+    limit: params.limit,
+    offset: params.offset,
+  });
+
 // Cria um exercício customizado para o usuário autenticado.
 // Entrada esperada:
 // - userId: UUID do usuário dono do exercício.
@@ -48,6 +84,12 @@ exports.searchExercises = async ({
   limit = 30,
   offset = 0,
 }) => {
+  const cacheKey = buildSearchExercisesCacheKey({ query, lang, muscleKey, equipmentKey, limit, offset });
+  const cached = getCachedSearchExercises(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   // CTE "base":
   // - centraliza o resultado da função SQL com ranking e filtros.
   // CTE "musculos" e "equipamentos":
@@ -117,11 +159,12 @@ exports.searchExercises = async ({
   const values = [query, lang, muscleKey, equipmentKey, limit, offset];
   // Executa e devolve todas as linhas do resultado.
   const result = await db.query(sql, values);
+  setCachedSearchExercises(cacheKey, result.rows);
   return result.rows;
 };
 
 // Lista os exercícios customizados de um usuário em ordem de criação (mais novo primeiro).
-exports.getCustomExercisesByUser = async ({ userId }) => {
+exports.getCustomExercisesByUser = async ({ userId, limit = 50, offset = 0 }) => {
   // Filtro por dono do exercício para isolamento entre usuários.
   const query = `
     SELECT
@@ -135,10 +178,11 @@ exports.getCustomExercisesByUser = async ({ userId }) => {
     FROM exercicios_customizados
     WHERE user_id = $1
     ORDER BY created_at DESC
+    LIMIT $2 OFFSET $3
   `;
 
   // Query simples sem transformação extra.
-  const result = await db.query(query, [userId]);
+  const result = await db.query(query, [userId, limit, offset]);
   return result.rows;
 };
 

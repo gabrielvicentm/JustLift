@@ -285,67 +285,107 @@ exports.createPost = async ({ userId, descricao, midias }) => {
   }
 };
 
-exports.getPostsByUser = async ({ userId, viewerUserId }) => {
+exports.getPostsByUser = async ({ userId, viewerUserId, limit = 20, offset = 0 }) => {
   const result = await db.query(
     `
+      WITH base AS (
+        SELECT
+          p.post_id,
+          p.user_id,
+          p.descricao,
+          p.tipo,
+          p.treino_id,
+          p.created_at
+        FROM posts p
+        WHERE p.user_id = $1
+        ORDER BY p.created_at DESC, p.post_id DESC
+        LIMIT $3 OFFSET $4
+      ),
+      treino_counts AS (
+        SELECT
+          et.treino_id,
+          COUNT(*)::INT AS treino_total_exercicios
+        FROM exercicios_do_treino et
+        WHERE et.treino_id = ANY(
+          SELECT treino_id
+          FROM base
+          WHERE treino_id IS NOT NULL
+        )
+        GROUP BY et.treino_id
+      ),
+      likes AS (
+        SELECT post_id, COUNT(*)::INT AS likes_count
+        FROM post_likes
+        WHERE post_id = ANY(SELECT post_id FROM base)
+        GROUP BY post_id
+      ),
+      saves AS (
+        SELECT post_id, COUNT(*)::INT AS saves_count
+        FROM post_saves
+        WHERE post_id = ANY(SELECT post_id FROM base)
+        GROUP BY post_id
+      ),
+      comments AS (
+        SELECT post_id, COUNT(*)::INT AS comments_count
+        FROM post_comments
+        WHERE post_id = ANY(SELECT post_id FROM base)
+        GROUP BY post_id
+      ),
+      viewer_likes AS (
+        SELECT post_id
+        FROM post_likes
+        WHERE user_id = $2
+          AND post_id = ANY(SELECT post_id FROM base)
+      ),
+      viewer_saves AS (
+        SELECT post_id
+        FROM post_saves
+        WHERE user_id = $2
+          AND post_id = ANY(SELECT post_id FROM base)
+      )
       SELECT
-        p.post_id AS id,
-        p.user_id,
+        b.post_id AS id,
+        b.user_id,
         u.username,
         up.nome_exibicao,
         up.foto_perfil,
-        p.descricao,
-        p.tipo,
-        p.treino_id,
+        b.descricao,
+        b.tipo,
+        b.treino_id,
         t.data AS treino_data,
         t.duracao AS treino_duracao,
         t.peso_total AS treino_peso_total,
         t.total_series AS treino_total_series,
         t.finalizado AS treino_finalizado,
         CASE
-          WHEN p.treino_id IS NULL THEN NULL
-          ELSE (
-            SELECT COUNT(*)
-            FROM exercicios_do_treino et
-            WHERE et.treino_id = p.treino_id
-          )::INT
+          WHEN b.treino_id IS NULL THEN NULL
+          ELSE COALESCE(tc.treino_total_exercicios, 0)
         END AS treino_total_exercicios,
-        p.created_at,
-        (
-          SELECT COUNT(*)
-          FROM post_likes l
-          WHERE l.post_id = p.post_id
-        )::INT AS likes_count,
-        (
-          SELECT COUNT(*)
-          FROM post_saves s
-          WHERE s.post_id = p.post_id
-        )::INT AS saves_count,
-        (
-          SELECT COUNT(*)
-          FROM post_comments c
-          WHERE c.post_id = p.post_id
-        )::INT AS comments_count,
+        b.created_at,
+        COALESCE(l.likes_count, 0) AS likes_count,
+        COALESCE(s.saves_count, 0) AS saves_count,
+        COALESCE(c.comments_count, 0) AS comments_count,
         EXISTS (
           SELECT 1
-          FROM post_likes vl
-          WHERE vl.post_id = p.post_id
-            AND vl.user_id = $2
+          FROM viewer_likes vl
+          WHERE vl.post_id = b.post_id
         ) AS viewer_liked,
         EXISTS (
           SELECT 1
-          FROM post_saves vs
-          WHERE vs.post_id = p.post_id
-            AND vs.user_id = $2
+          FROM viewer_saves vs
+          WHERE vs.post_id = b.post_id
         ) AS viewer_saved
-      FROM posts p
-      JOIN users u ON u.id = p.user_id
+      FROM base b
+      JOIN users u ON u.id = b.user_id
       LEFT JOIN users_profile up ON up.user_id = u.id
-      LEFT JOIN treinos t ON t.treino_id = p.treino_id
-      WHERE p.user_id = $1
-      ORDER BY p.created_at DESC, p.post_id DESC
+      LEFT JOIN treinos t ON t.treino_id = b.treino_id
+      LEFT JOIN treino_counts tc ON tc.treino_id = b.treino_id
+      LEFT JOIN likes l ON l.post_id = b.post_id
+      LEFT JOIN saves s ON s.post_id = b.post_id
+      LEFT JOIN comments c ON c.post_id = b.post_id
+      ORDER BY b.created_at DESC, b.post_id DESC
     `,
-    [userId, viewerUserId],
+    [userId, viewerUserId, limit, offset],
   );
 
   const posts = result.rows.map(mapPostSummaryRow);

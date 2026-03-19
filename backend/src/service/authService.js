@@ -4,17 +4,22 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { Resend } = require('resend');
 
-const SECRET_KEY = process.env.JWT_SECRET || 'pantufa';
+const SECRET_KEY = process.env.JWT_SECRET;
 const VERIFICATION_CODE_EXPIRATION_MINUTES = Number(process.env.EMAIL_VERIFICATION_EXPIRES_MINUTES || 10);
 const VERIFICATION_MAX_ATTEMPTS = Number(process.env.EMAIL_VERIFICATION_MAX_ATTEMPTS || 5);
 const VERIFICATION_RESEND_COOLDOWN_SECONDS = Number(process.env.EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS);
 const VERIFICATION_CODE_SECRET = process.env.EMAIL_VERIFICATION_CODE_SECRET || SECRET_KEY;
+const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER || SECRET_KEY;
 
-const generateVerificationCode = () => String(Math.floor(100000 + Math.random() * 900000));
+const generateVerificationCode = () =>
+  String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 
 
 const hashVerificationCode = (code) =>
   crypto.createHash('sha256').update(`${code}:${VERIFICATION_CODE_SECRET}`).digest('hex');
+
+const hashRefreshToken = (token) =>
+  crypto.createHmac('sha256', REFRESH_TOKEN_PEPPER).update(token).digest('hex');
 // Embaralha o codigo com uma chave secreta pra guardar no banco sem mostrar o codigo real.
 //SHA-256 é uma função que pega qualquer texto e transforma em uma “impressão digital”
 //devolve em formato texto hexadecimal (hex)
@@ -77,7 +82,8 @@ exports.createSession = async (userId) => {
   const accessToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: '15m' });
   const refreshToken = jwt.sign({ userId }, SECRET_KEY, { expiresIn: '7d' });
 
-  await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [refreshToken, userId]);
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+  await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [refreshTokenHash, userId]);
 
   return { accessToken, refreshToken };
 };
@@ -199,6 +205,10 @@ exports.logar = async (identifier, senha) => {
     throw new Error('INVALID_CREDENTIALS');
   }
 
+  if (user.google_id) {
+    throw new Error('GOOGLE_LOGIN_REQUIRED');
+  }
+
   const passwordMatch = bcrypt.compareSync(senha, user.senha);
 
   if (!passwordMatch) {
@@ -208,7 +218,8 @@ exports.logar = async (identifier, senha) => {
   const accessToken = jwt.sign({ userId: user.id }, SECRET_KEY, { expiresIn: '1d' });
   const refreshToken = jwt.sign({ userId: user.id }, SECRET_KEY, { expiresIn: '7d' });
 
-  await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [refreshToken, user.id]);
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+  await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [refreshTokenHash, user.id]);
 
   return { accessToken, refreshToken };
 };
@@ -222,15 +233,21 @@ exports.refreshToken = async (refreshToken) => {
     throw new Error('USER_NOT_FOUND');
   }
 
-  if (user.rows[0].refresh_token !== refreshToken) {
+  const storedToken = user.rows[0].refresh_token;
+  const providedHash = hashRefreshToken(refreshToken);
+  const matchesHashed = storedToken === providedHash;
+  const matchesLegacy = storedToken === refreshToken;
+
+  if (!matchesHashed && !matchesLegacy) {
     throw new Error('INVALID_REFRESH_TOKEN');
   }
 
   const newAccessToken = jwt.sign({ userId: user.rows[0].id }, SECRET_KEY, { expiresIn: '1d' });
   const newRefreshToken = jwt.sign({ userId: user.rows[0].id }, SECRET_KEY, { expiresIn: '7d' });
 
+  const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
   await db.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [
-    newRefreshToken,
+    newRefreshTokenHash,
     user.rows[0].id,
   ]);
 
@@ -249,7 +266,12 @@ exports.logout = async (refreshToken) => {
     throw new Error('USER_NOT_FOUND');
   }
 
-  if (user.rows[0].refresh_token !== refreshToken) {
+  const storedToken = user.rows[0].refresh_token;
+  const providedHash = hashRefreshToken(refreshToken);
+  const matchesHashed = storedToken === providedHash;
+  const matchesLegacy = storedToken === refreshToken;
+
+  if (!matchesHashed && !matchesLegacy) {
     throw new Error('INVALID_REFRESH_TOKEN');
   }
 
