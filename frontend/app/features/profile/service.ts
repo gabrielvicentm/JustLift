@@ -153,6 +153,9 @@ export async function uploadImageToR2(
   size?: number,
 ): Promise<string | null> {
   const headers = await getAuthHeader();
+  const resolvedSize = size && size > 0
+    ? size
+    : ((await FileSystem.getInfoAsync(uri, { size: true })) as { size?: number }).size ?? 0;
 
   let presignResponse;
   try {
@@ -161,7 +164,7 @@ export async function uploadImageToR2(
       {
         filename,
         contentType,
-        size: size ?? 0,
+        size: resolvedSize,
       },
       { headers },
     );
@@ -194,7 +197,7 @@ export async function uploadImageToR2(
       {
         key,
         contentType,
-        size: size ?? 0,
+        size: resolvedSize,
       },
       { headers },
     );

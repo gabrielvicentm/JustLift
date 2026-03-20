@@ -190,8 +190,7 @@ export default function PerfilScreen() {
             )}
           </View>
 
-          <View style={styles.profileTopRow}>
-            <View style={styles.avatarOverlap}>
+          <View style={styles.avatarOverlap}>
               <Pressable
                 style={styles.avatarRing}
                 onPress={handleOpenDaily}
@@ -210,10 +209,13 @@ export default function PerfilScreen() {
               </Pressable>
             </View>
 
+          <View style={styles.profileTopRow}>
             <View style={styles.profileInfo}>
               <View style={styles.nameBlock}>
-                <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Seu perfil"}</Text>
-                {profile?.username ? <Text style={styles.userText}>@{profile.username}</Text> : null}
+                <View style={styles.nameRow}>
+                  <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Seu perfil"}</Text>
+                  {profile?.username ? <Text style={styles.userText}>@{profile.username}</Text> : null}
+                </View>
               </View>
 
               <View style={styles.statsRow}>
@@ -409,10 +411,11 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.surface,
     },
     profileSection: {
-      gap: 10,
+      gap: 0,
       borderRadius: 16,
       backgroundColor: theme.colors.surface,
       padding: 14,
+      position: "relative",
     },
     bannerWrapper: {
       marginHorizontal: -14,
@@ -433,23 +436,29 @@ function createStyles(theme: AppTheme) {
     },
     profileTopRow: {
       flexDirection: "row",
-      gap: 14,
-      alignItems: "flex-end",
-      marginTop: -46,
+      alignItems: "flex-start",
+      marginTop: 12,
+      paddingLeft: 118,
     },
     avatarOverlap: {
-      marginTop: 0,
+      position: "absolute",
+      left: 14,
+      top: 88,
       zIndex: 2,
     },
     profileInfo: {
       flex: 1,
-      minHeight: 104,
-      justifyContent: "space-between",
-      paddingBottom: 4,
-      gap: 6,
+      paddingTop: 10,
+      gap: 10,
     },
     nameBlock: {
-      gap: 2,
+      gap: 0,
+    },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: 6,
+      flexWrap: "wrap",
     },
     avatarRing: {
       width: 104,
@@ -493,25 +502,27 @@ function createStyles(theme: AppTheme) {
     statsRow: {
       flexDirection: "row",
       justifyContent: "flex-start",
-      gap: 20,
-      marginTop: 2,
+      alignItems: "flex-start",
+      gap: 18,
     },
     statItem: {
+      flexDirection: "row",
       alignItems: "center",
-      gap: 2,
-      minWidth: 72,
+      gap: 6,
+      minWidth: 0,
     },
     statValue: {
       color: theme.colors.text,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: "800",
     },
     statLabel: {
       color: theme.colors.mutedText,
-      fontSize: 11,
+      fontSize: 9,
       fontWeight: "600",
       textTransform: "uppercase",
-      letterSpacing: 0.4,
+      letterSpacing: 0.2,
+      lineHeight: 12,
     },
     nameText: {
       color: theme.colors.text,
@@ -520,13 +531,16 @@ function createStyles(theme: AppTheme) {
     },
     userText: {
       color: theme.colors.mutedText,
-      fontSize: 12,
+      fontSize: 11,
     },
     bioText: {
-      color: theme.colors.text,
+      color: theme.colors.mutedText,
       fontSize: 13,
-      lineHeight: 18,
-      marginTop: 2,
+      lineHeight: 20,
+      marginTop: 12,
+      paddingLeft: 10,
+      borderLeftWidth: 2,
+      borderLeftColor: theme.colors.border,
     },
     actionRow: {
       flexDirection: "row",
