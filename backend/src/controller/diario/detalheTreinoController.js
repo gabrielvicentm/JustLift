@@ -7,12 +7,19 @@ exports.buscarDiasComTreino = async (req, res) => {
       return res.status(401).json({ message: 'Usuário não autenticado' });
     }
 
-    const dias = await detalheTreinoService.buscarDiasComTreinoPorUsuario({ userId });
+    const limitInput = Number(req.query.limit);
+    const offsetInput = Number(req.query.offset);
+    const limit = Number.isFinite(limitInput) ? Math.min(Math.max(Math.floor(limitInput), 1), 365) : 90;
+    const offset = Number.isFinite(offsetInput) ? Math.max(Math.floor(offsetInput), 0) : 0;
+
+    const dias = await detalheTreinoService.buscarDiasComTreinoPorUsuario({ userId, limit, offset });
 
     return res.status(200).json({
       dias,
       meta: {
         count: dias.length,
+        limit,
+        offset,
       },
     });
   } catch (err) {
@@ -36,10 +43,28 @@ exports.buscarDetalheTreinoPorData = async (req, res) => {
     const langInput = typeof req.query.lang === 'string' ? req.query.lang.trim().toLowerCase() : 'pt';
     const lang = langInput === 'en' ? 'en' : 'pt';
 
+    const limitInput = Number(req.query.limit);
+    const offsetInput = Number(req.query.offset);
+    const limit = Number.isFinite(limitInput) ? Math.min(Math.max(Math.floor(limitInput), 1), 20) : 10;
+    const offset = Number.isFinite(offsetInput) ? Math.max(Math.floor(offsetInput), 0) : 0;
+
+    const exercisesLimitInput = Number(req.query.exercises_limit);
+    const exercisesOffsetInput = Number(req.query.exercises_offset);
+    const exercisesLimit = Number.isFinite(exercisesLimitInput)
+      ? Math.min(Math.max(Math.floor(exercisesLimitInput), 1), 50)
+      : 30;
+    const exercisesOffset = Number.isFinite(exercisesOffsetInput)
+      ? Math.max(Math.floor(exercisesOffsetInput), 0)
+      : 0;
+
     const treinos = await detalheTreinoService.buscarDetalheTreinoPorData({
       userId,
       data,
       lang,
+      limit,
+      offset,
+      exercisesLimit,
+      exercisesOffset,
     });
 
     return res.status(200).json({
@@ -47,6 +72,10 @@ exports.buscarDetalheTreinoPorData = async (req, res) => {
       treinos,
       meta: {
         count: treinos.length,
+        limit,
+        offset,
+        exercises_limit: exercisesLimit,
+        exercises_offset: exercisesOffset,
       },
     });
   } catch (err) {

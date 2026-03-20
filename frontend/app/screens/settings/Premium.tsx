@@ -21,6 +21,9 @@ type PremiumStatusResponse = {
 const GOLD_BORDER = ["#FDE68A", "#F8C84A", "#B45309"] as const;
 const GOLD_GLOW = ["rgba(253, 230, 138, 0.45)", "rgba(245, 158, 11, 0.15)", "transparent"] as const;
 const DARK_PANEL = ["#120804", "#1B0C03", "#090401"] as const;
+const EMERALD_BORDER = ["#6EE7B7", "#34D399", "#047857"] as const;
+const EMERALD_GLOW = ["rgba(16, 185, 129, 0.35)", "rgba(5, 150, 105, 0.18)", "transparent"] as const;
+const EMERALD_PANEL = ["#04110C", "#072016", "#03130D"] as const;
 const NOISE_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAAJ0lEQVR4Ae3BAQEAAACCIP+vbkhAAQAAAAAAAAAAAAAA4G8G9o0AAaI31xkAAAAASUVORK5CYII=";
 const BENEFITS = [
@@ -129,27 +132,6 @@ export default function PremiumScreen() {
     }
   };
 
-  const toggleFakePremium = async () => {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      const headers = await getAuthHeader();
-      const response = await api.post<PremiumStatusResponse>(
-        "/premium/fake",
-        { enabled: !isPremium },
-        { headers },
-      );
-      setIsPremium(Boolean(response.data.isPremium));
-      setUpdatedAt(response.data.premiumUpdatedAt ?? null);
-      setMessage(response.data.message ?? "Status atualizado.");
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const purchasePremium = async () => {
     setError("");
     setMessage("");
@@ -230,30 +212,53 @@ export default function PremiumScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroBorder}>
-          <View style={styles.heroCard}>
-            <LinearGradient colors={GOLD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glow} />
-
-            <Text style={styles.kicker}>PREMIUM</Text>
-            <Text style={styles.title}>Viva o auge dos seus treinos</Text>
-            <Text style={styles.subtitle}>O pacote completo para evoluir mais rápido.</Text>
-
-            <View style={styles.priceRow}>
-              <Text style={styles.price}>R$ 12,89</Text>
-              <Text style={styles.priceSuffix}>/mês</Text>
+        {isPremium ? (
+          <LinearGradient
+            colors={EMERALD_BORDER}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroBorder}
+          >
+            <View style={styles.heroCard}>
+              <LinearGradient colors={EMERALD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glow} />
+              <Text style={styles.kicker}>PREMIUM ATIVO</Text>
+              <Text style={styles.title}>Você já é Premium</Text>
+              <Text style={styles.subtitle}>
+                Aproveite todos os benefícios sem limites.
+              </Text>
+              {updatedAt ? (
+                <Text style={styles.updatedAt}>
+                  Última atualização: {new Date(updatedAt).toLocaleString()}
+                </Text>
+              ) : null}
             </View>
-            <Text style={styles.priceNote}>Plano mensal único • Cancele quando quiser</Text>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        ) : (
+          <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroBorder}>
+            <View style={styles.heroCard}>
+              <LinearGradient colors={GOLD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glow} />
 
-        <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.benefitsBorder}>
-          <LinearGradient colors={DARK_PANEL} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.benefitsCard}>
+              <Text style={styles.kicker}>PREMIUM</Text>
+              <Text style={styles.title}>Viva o auge dos seus treinos</Text>
+              <Text style={styles.subtitle}>O pacote completo para evoluir mais rápido.</Text>
+
+              <View style={styles.priceRow}>
+                <Text style={styles.price}>R$ 12,89</Text>
+                <Text style={styles.priceSuffix}>/mês</Text>
+              </View>
+              <Text style={styles.priceNote}>Plano mensal único • Cancele quando quiser</Text>
+            </View>
+          </LinearGradient>
+        )}
+
+        <LinearGradient colors={isPremium ? EMERALD_BORDER : GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.benefitsBorder}>
+          <LinearGradient colors={isPremium ? EMERALD_PANEL : DARK_PANEL} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.benefitsCard}>
             <Text style={styles.sectionTitle}>Benefícios Premium</Text>
             <View style={styles.benefitsList}>
               {BENEFITS.map((benefit) => (
                 <LinearGradient
                   key={benefit}
-                  colors={GOLD_BORDER}
+                  colors={isPremium ? EMERALD_BORDER : GOLD_BORDER}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.benefitBorder}
@@ -285,21 +290,23 @@ export default function PremiumScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {message ? <Text style={styles.success}>{message}</Text> : null}
 
-        <Animated.View style={[styles.ctaPulse, { transform: [{ scale: ctaPulse }] }]}>
-          <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaBorder}>
-            <Pressable
-              style={[styles.primaryButton, loading && styles.buttonDisabled]}
-              onPress={purchasePremium}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#0B0B0B" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Assinar Premium</Text>
-              )}
-            </Pressable>
-          </LinearGradient>
-        </Animated.View>
+        {!isPremium ? (
+          <Animated.View style={[styles.ctaPulse, { transform: [{ scale: ctaPulse }] }]}>
+            <LinearGradient colors={GOLD_BORDER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaBorder}>
+              <Pressable
+                style={[styles.primaryButton, loading && styles.buttonDisabled]}
+                onPress={purchasePremium}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#0B0B0B" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Assinar Premium</Text>
+                )}
+              </Pressable>
+            </LinearGradient>
+          </Animated.View>
+        ) : null}
 
         <Pressable
           style={[styles.secondaryButton, loading && styles.buttonDisabled]}
@@ -307,16 +314,6 @@ export default function PremiumScreen() {
           disabled={loading}
         >
           <Text style={styles.secondaryButtonText}>Sincronizar Status</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.ghostButton, loading && styles.buttonDisabled]}
-          onPress={toggleFakePremium}
-          disabled={loading}
-        >
-          <Text style={styles.ghostButtonText}>
-            {isPremium ? "Desativar premium falso" : "Virar premium falso"}
-          </Text>
         </Pressable>
 
         <Pressable style={styles.backButton} onPress={() => router.back()} disabled={loading}>

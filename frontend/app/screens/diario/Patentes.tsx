@@ -18,7 +18,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { api } from "@/app/config/api";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 
@@ -130,7 +129,6 @@ type Tab = "current" | "history";
 export default function PatentesScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [activeTab, setActiveTab] = useState<Tab>("current");
@@ -252,7 +250,7 @@ export default function PatentesScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.container}>
         <View style={styles.titleRow}>
-          <Text style={styles.title}>{t("diary_patents_title")}</Text>
+          <Text style={styles.title}>Patentes</Text>
           <Pressable style={styles.infoButton} onPress={() => setShowInfo(true)}>
             <MaterialCommunityIcons name="information" size={18} color="#7FE7FF" />
           </Pressable>
@@ -482,7 +480,7 @@ export default function PatentesScreen() {
           style={styles.actionButtonBorder}
         >
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>{t("common_back")}</Text>
+            <Text style={styles.backButtonText}>Voltar</Text>
           </Pressable>
         </LinearGradient>
       </View>

@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 router.post('/create-post', authMiddleware, postController.createPost);
+router.post('/', authMiddleware, postController.createPost);
 router.get('/user/:userId', authMiddleware, postController.getPostsByUser);
 router.get('/:postId', authMiddleware, postController.getPostById);
 router.put('/:postId', authMiddleware, postController.updatePost);

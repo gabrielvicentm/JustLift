@@ -19,7 +19,6 @@ import type { PostSummary } from "@/app/features/social/types";
 import { fetchDailySummaryByUser } from "@/app/features/daily/service";
 import type { DailySummary } from "@/app/features/daily/types";
 import { useFocusEffect } from "@react-navigation/native";
-import { useI18n } from "@/providers/I18nProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import { useRouter } from "expo-router";
@@ -44,7 +43,6 @@ const coerceGradientColors = (
 
 export default function PerfilScreen() {
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
 

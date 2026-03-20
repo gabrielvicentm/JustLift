@@ -18,7 +18,6 @@ import DraggableFlatList, { type RenderItemParams } from "react-native-draggable
 import { useAppTheme } from "@/providers/ThemeProvider";
 import type { AppTheme } from "@/theme/theme";
 import { api } from "@/app/config/api";
-import { useI18n } from "@/providers/I18nProvider";
 
 type WorkoutExercisePayload = {
   source: "api" | "custom";
@@ -124,7 +123,6 @@ function formatDuration(totalSeconds: number) {
 export default function AdicionarSeriesScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { language } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const buttonGradient = (theme.colors.buttonGradient ?? PROGRESS_GRADIENT) as unknown as readonly [
     string,
@@ -507,7 +505,7 @@ export default function AdicionarSeriesScreen() {
       isFinalizingRef.current = false;
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (!accessToken) {
-        setSaveError(language === "en" ? "Sign in to save your workout." : "Faça login para salvar o treino.");
+        setSaveError("Faça login para salvar o treino.");
         return;
       }
 
@@ -545,7 +543,7 @@ export default function AdicionarSeriesScreen() {
       router.replace("/screens/diario/MeusTreinos");
     } catch (err) {
       console.error("Erro ao salvar treino:", err);
-      setSaveError(language === "en" ? "Could not save workout." : "Não foi possível salvar o treino.");
+      setSaveError("Não foi possível salvar o treino.");
     } finally {
       setSaving(false);
     }
@@ -587,11 +585,9 @@ export default function AdicionarSeriesScreen() {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.stateContainer}>
-        <Text style={styles.stateText}>
-          {language === "en" ? "No exercise selected." : "Nenhum exercício selecionado."}
-        </Text>
+        <Text style={styles.stateText}>Nenhum exercício selecionado.</Text>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>{language === "en" ? "Back" : "Voltar"}</Text>
+          <Text style={styles.backButtonText}>Voltar</Text>
         </Pressable>
       </View>
       </SafeAreaView>
@@ -613,21 +609,21 @@ export default function AdicionarSeriesScreen() {
           <View style={styles.metricsCard}>
             <View style={styles.metricsRow}>
               <View style={styles.metricBlock}>
-                <Text style={styles.metricLabel}>{language === "en" ? "Duration" : "Duração"}</Text>
+                <Text style={styles.metricLabel}>Duração</Text>
                 <Text style={styles.metricDuration}>{formatDuration(elapsedSeconds)}</Text>
               </View>
               <View style={styles.metricBlock}>
-                <Text style={styles.metricLabel}>{language === "en" ? "Total weight" : "Peso total"}</Text>
+                <Text style={styles.metricLabel}>Peso total</Text>
                 <Text style={styles.metricWeight}>{Math.round(metricas.pesoTotal)} kg</Text>
               </View>
               <View style={styles.metricBlock}>
-                <Text style={styles.metricLabel}>{language === "en" ? "Total sets" : "Total de séries"}</Text>
+                <Text style={styles.metricLabel}>Total de séries</Text>
                 <Text style={styles.metricValue}>{metricas.seriesConcluidas}</Text>
               </View>
             </View>
             <Pressable style={styles.pauseButton} onPress={() => setPaused((prev) => !prev)}>
               <Text style={styles.pauseButtonText}>
-                {paused ? (language === "en" ? "Resume" : "Retomar") : (language === "en" ? "Pause" : "Pausar")}
+                {paused ? "Retomar" : "Pausar"}
               </Text>
             </Pressable>
           </View>
@@ -653,9 +649,7 @@ export default function AdicionarSeriesScreen() {
                 <Text style={styles.imagePlaceholderText}>IMG</Text>
               </View>
             )}
-            <Text style={styles.exerciseName}>
-              {language === "en" && exercise.nome_en ? exercise.nome_en : exercise.nome}
-            </Text>
+            <Text style={styles.exerciseName}>{exercise.nome || exercise.nome_en || ""}</Text>
             <Pressable style={styles.moreButton} onPress={() => openExerciseMenu(exercise.uid)}>
               <Text style={styles.moreIcon}>⋮</Text>
             </Pressable>
@@ -664,12 +658,12 @@ export default function AdicionarSeriesScreen() {
           {exercise.series.map((serie) => (
             <View key={serie.id} style={[styles.serieRow, serie.concluido && styles.serieRowDone]}>
               <View style={styles.serieCellSmall}>
-                <Text style={styles.serieLabel}>{language === "en" ? "SET" : "SÉRIE"}</Text>
+                <Text style={styles.serieLabel}>SÉRIE</Text>
                 <Text style={styles.serieValue}>{serie.numero}</Text>
               </View>
 
               <View style={styles.serieCellLarge}>
-                <Text style={styles.serieLabel}>{language === "en" ? "PREV" : "ANTERIOR"}</Text>
+                <Text style={styles.serieLabel}>ANTERIOR</Text>
                 <Text style={styles.serieValue}>
                   {serie.anteriorKg == null
                     ? "-"
@@ -727,7 +721,7 @@ export default function AdicionarSeriesScreen() {
               </View>
 
               <View style={styles.serieRemoveWrap}>
-                <Text style={styles.serieLabel}>{language === "en" ? "DEL" : "DEL"}</Text>
+                <Text style={styles.serieLabel}>DEL</Text>
                 <Pressable
                   style={[
                     styles.removeSerieButton,
@@ -743,16 +737,14 @@ export default function AdicionarSeriesScreen() {
           ))}
 
           <Pressable style={styles.addSerieButton} onPress={() => addSerie(exercise.uid)}>
-            <Text style={styles.addSerieButtonText}>
-              {language === "en" ? "+ Add Set" : "+ Adicionar Série"}
-            </Text>
+            <Text style={styles.addSerieButtonText}>+ Adicionar Série</Text>
           </Pressable>
 
           <View style={styles.noteCard}>
             <TextInput
               value={exercise.anotacao}
               onChangeText={(value) => updateNote(exercise.uid, value.slice(0, 255))}
-              placeholder={language === "en" ? "Add a note..." : "Adicionar uma anotação..."}
+              placeholder="Adicionar uma anotação..."
               placeholderTextColor={theme.colors.mutedText}
               style={styles.noteInput}
               multiline
@@ -771,9 +763,7 @@ export default function AdicionarSeriesScreen() {
         style={styles.actionButtonBorder}
       >
         <Pressable style={styles.addExercisesButton} onPress={() => router.push("/screens/diario/AdicionarExercicios")}>
-          <Text style={styles.addExercisesButtonText}>
-            {language === "en" ? "Choose more exercises" : "Escolher mais exercícios"}
-          </Text>
+          <Text style={styles.addExercisesButtonText}>Escolher mais exercícios</Text>
         </Pressable>
       </LinearGradient>
 
@@ -785,7 +775,7 @@ export default function AdicionarSeriesScreen() {
           style={styles.negativeButtonBorder}
         >
           <Pressable style={styles.cancelButton} onPress={() => setShowCancelConfirmModal(true)}>
-            <Text style={styles.cancelButtonText}>{language === "en" ? "Cancel" : "Cancelar"}</Text>
+            <Text style={styles.cancelButtonText}>Cancelar</Text>
           </Pressable>
         </LinearGradient>
         <LinearGradient
@@ -802,7 +792,7 @@ export default function AdicionarSeriesScreen() {
             {saving ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.saveButtonText}>{language === "en" ? "Save workout" : "Salvar treino"}</Text>
+              <Text style={styles.saveButtonText}>Salvar treino</Text>
             )}
           </Pressable>
         </LinearGradient>
@@ -820,18 +810,18 @@ export default function AdicionarSeriesScreen() {
           <View style={styles.cardInner}>
             <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>{language === "en" ? "Exercise options" : "Opções do exercício"}</Text>
+              <Text style={styles.modalTitle}>Opções do exercício</Text>
 
               <Pressable style={styles.modalAction} onPress={openReorderModal}>
-                <Text style={styles.modalActionText}>{language === "en" ? "Change order" : "Alterar ordem"}</Text>
+                <Text style={styles.modalActionText}>Alterar ordem</Text>
               </Pressable>
 
               <Pressable style={[styles.modalAction, styles.modalDangerAction]} onPress={removeExercise}>
-                <Text style={styles.modalDangerText}>{language === "en" ? "Delete exercise" : "Excluir exercício"}</Text>
+                <Text style={styles.modalDangerText}>Excluir exercício</Text>
               </Pressable>
 
               <Pressable style={styles.modalCancel} onPress={closeExerciseMenu}>
-                <Text style={styles.modalCancelText}>{language === "en" ? "Close" : "Fechar"}</Text>
+                <Text style={styles.modalCancelText}>Fechar</Text>
               </Pressable>
             </View>
           </View>
@@ -849,14 +839,8 @@ export default function AdicionarSeriesScreen() {
           <View style={styles.cardInner}>
             <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
             <View style={styles.reorderModalCard}>
-              <Text style={styles.modalTitle}>
-                {language === "en" ? "Reorder exercises" : "Alterar ordem dos exercícios"}
-              </Text>
-              <Text style={styles.reorderHint}>
-                {language === "en"
-                  ? "Hold and drag an item to move it."
-                  : "Segure e arraste um exercício para mover."}
-              </Text>
+              <Text style={styles.modalTitle}>Alterar ordem dos exercícios</Text>
+              <Text style={styles.reorderHint}>Segure e arraste um exercício para mover.</Text>
 
           <DraggableFlatList
             data={reorderItems}
@@ -870,7 +854,7 @@ export default function AdicionarSeriesScreen() {
                 onLongPress={drag}
               >
                 <Text numberOfLines={1} style={styles.reorderRowText}>
-                  {language === "en" && item.nome_en ? item.nome_en : item.nome}
+                  {item.nome || item.nome_en || ""}
                 </Text>
                 <Text style={styles.reorderRowGrip}>☰</Text>
               </Pressable>
@@ -879,7 +863,7 @@ export default function AdicionarSeriesScreen() {
 
               <View style={styles.reorderActions}>
                 <Pressable style={styles.cancelNoButton} onPress={closeReorderModal}>
-                  <Text style={styles.cancelNoText}>{language === "en" ? "Cancel" : "Cancelar"}</Text>
+                  <Text style={styles.cancelNoText}>Cancelar</Text>
                 </Pressable>
                 <LinearGradient
                   colors={buttonGradient}
@@ -888,7 +872,7 @@ export default function AdicionarSeriesScreen() {
                   style={styles.actionButtonBorder}
                 >
                   <Pressable style={styles.saveButton} onPress={applyReorder}>
-                    <Text style={styles.saveButtonText}>{language === "en" ? "Apply" : "Aplicar"}</Text>
+                    <Text style={styles.saveButtonText}>Aplicar</Text>
                   </Pressable>
                 </LinearGradient>
               </View>
@@ -913,16 +897,14 @@ export default function AdicionarSeriesScreen() {
           <View style={styles.cardInner}>
             <Image source={{ uri: NOISE_DATA_URI }} style={styles.noiseOverlay} />
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>{language === "en" ? "Cancel workout?" : "Cancelar treino?"}</Text>
+              <Text style={styles.modalTitle}>Cancelar treino?</Text>
               <Text style={styles.cancelConfirmText}>
-                {language === "en"
-                  ? "If you continue, the current workout will be removed locally."
-                  : "Se continuar, o treino atual será removido localmente."}
+                Se continuar, o treino atual será removido localmente.
               </Text>
 
               <View style={styles.cancelActionRow}>
                 <Pressable style={styles.cancelNoButton} onPress={() => setShowCancelConfirmModal(false)}>
-                  <Text style={styles.cancelNoText}>{language === "en" ? "No" : "Não"}</Text>
+                  <Text style={styles.cancelNoText}>Não</Text>
                 </Pressable>
                 <LinearGradient
                   colors={negativeGradient}
@@ -931,7 +913,7 @@ export default function AdicionarSeriesScreen() {
                   style={styles.negativeButtonBorder}
                 >
                   <Pressable style={styles.cancelYesButton} onPress={() => handleConfirmCancelWorkout().catch(() => undefined)}>
-                    <Text style={styles.cancelYesText}>{language === "en" ? "Yes" : "Sim"}</Text>
+                    <Text style={styles.cancelYesText}>Sim</Text>
                   </Pressable>
                 </LinearGradient>
               </View>

@@ -1,15 +1,7 @@
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-/* CODIGO DO RICHARD NAO COLOCA A MAO!!!!!!
-type RateLimitPayload = {
-  message?: string;
-  retryAfterSeconds?: number;
-  cooldownLevel?: "seconds" | "hours";
-};
 
-type RateLimitHandler = (payload: RateLimitPayload) => void;
-*/
 
 const devMachineHost = process.env.EXPO_PUBLIC_DEV_MACHINE_IP ?? "192.168.15.86";
 const fallbackBaseURL = Platform.select({
@@ -81,10 +73,9 @@ api.interceptors.request.use(async (config) => {
   if (!hasAuthorizationHeader) {
     const accessToken = await AsyncStorage.getItem("accessToken");
     if (accessToken) {
-      config.headers = {
-        ...(config.headers || {}),
-        Authorization: `Bearer ${accessToken}`,
-      };
+      const headers = new AxiosHeaders(config.headers);
+      headers.set("Authorization", `Bearer ${accessToken}`);
+      config.headers = headers;
     }
   }
 
@@ -117,10 +108,9 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      originalConfig.headers = {
-        ...(originalConfig.headers || {}),
-        Authorization: `Bearer ${newAccessToken}`,
-      };
+      const retryHeaders = new AxiosHeaders(originalConfig.headers);
+      retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
+      originalConfig.headers = retryHeaders;
 
       return api(originalConfig as any);
     } catch (refreshError) {
@@ -130,32 +120,3 @@ api.interceptors.response.use(
   }
 );
 
-/*  CODIGO DO RICHARD NAO COLOCA A MAO!!!!!!
-let onRateLimit: RateLimitHandler | null = null;
-
-export function setRateLimitHandler(handler: RateLimitHandler | null) {
-  onRateLimit = handler;
-}
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error?.response?.status === 429) {
-      const payload: RateLimitPayload = {
-        message:
-          error.response.data?.message ??
-          "Muitas tentativas. Tente novamente em instantes.",
-        retryAfterSeconds:
-          Number(error.response.data?.retryAfterSeconds) ||
-          Number(error.response.headers?.["retry-after"]) ||
-          0,
-        cooldownLevel: error.response.data?.cooldownLevel,
-      };
-
-      onRateLimit?.(payload);
-    }
-
-    return Promise.reject(error);
-  }
-);
-*/

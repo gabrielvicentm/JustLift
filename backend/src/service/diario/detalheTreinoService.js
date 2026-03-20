@@ -5,20 +5,29 @@ const getIsPremium = async ({ userId }) => {
   return Boolean(result.rows[0]?.is_premium);
 };
 
-exports.buscarDiasComTreinoPorUsuario = async ({ userId }) => {
+exports.buscarDiasComTreinoPorUsuario = async ({ userId, limit = 90, offset = 0 }) => {
   const query = `
     SELECT DISTINCT
       TO_CHAR(data, 'YYYY-MM-DD') AS data
     FROM treinos
     WHERE user_id = $1
     ORDER BY data ASC
+    LIMIT $2 OFFSET $3
   `;
 
-  const result = await db.query(query, [userId]);
+  const result = await db.query(query, [userId, limit, offset]);
   return result.rows.map((row) => row.data);
 };
 
-exports.buscarDetalheTreinoPorData = async ({ userId, data, lang = 'pt' }) => {
+exports.buscarDetalheTreinoPorData = async ({
+  userId,
+  data,
+  lang = 'pt',
+  limit = 10,
+  offset = 0,
+  exercisesLimit = 30,
+  exercisesOffset = 0,
+}) => {
   const safeLang = lang === 'en' ? 'en' : 'pt';
 
   const treinosQuery = `
@@ -33,9 +42,10 @@ exports.buscarDetalheTreinoPorData = async ({ userId, data, lang = 'pt' }) => {
     WHERE t.user_id = $1
       AND t.data = $2::date
     ORDER BY t.treino_id DESC
+    LIMIT $3 OFFSET $4
   `;
 
-  const treinosResult = await db.query(treinosQuery, [userId, data]);
+  const treinosResult = await db.query(treinosQuery, [userId, data, limit, offset]);
   const treinos = treinosResult.rows;
 
   if (treinos.length === 0) {
@@ -45,6 +55,29 @@ exports.buscarDetalheTreinoPorData = async ({ userId, data, lang = 'pt' }) => {
   const treinoIds = treinos.map((treino) => treino.treino_id);
 
   const detalhesQuery = `
+    WITH exercicios_base AS (
+      SELECT
+        et.exercicio_treino_id,
+        et.treino_id,
+        et.exercise_id,
+        et.custom_exercise_id,
+        et.anotacoes,
+        et.ordem,
+        ROW_NUMBER() OVER (
+          PARTITION BY et.treino_id
+          ORDER BY et.ordem ASC, et.exercicio_treino_id ASC
+        ) AS rn
+      FROM exercicios_do_treino et
+      INNER JOIN treinos t
+        ON t.treino_id = et.treino_id
+      WHERE et.treino_id = ANY($2::int[])
+        AND t.user_id = $1
+    ),
+    exercicios_paginados AS (
+      SELECT *
+      FROM exercicios_base
+      WHERE rn > $4 AND rn <= ($4 + $5)
+    )
     SELECT
       et.exercicio_treino_id,
       et.treino_id,
@@ -59,9 +92,7 @@ exports.buscarDetalheTreinoPorData = async ({ userId, data, lang = 'pt' }) => {
       s.kg,
       s.repeticoes,
       s.concluido
-    FROM exercicios_do_treino et
-    INNER JOIN treinos t
-      ON t.treino_id = et.treino_id
+    FROM exercicios_paginados et
     LEFT JOIN exercicios_customizados ec
       ON ec.id_exercicio_customizado = et.custom_exercise_id
     LEFT JOIN exercicios e
@@ -74,12 +105,16 @@ exports.buscarDetalheTreinoPorData = async ({ userId, data, lang = 'pt' }) => {
      AND tr_en.lang = 'en'
     LEFT JOIN series_do_exercicio s
       ON s.exercicio_treino_id = et.exercicio_treino_id
-    WHERE et.treino_id = ANY($2::int[])
-      AND t.user_id = $1
     ORDER BY et.treino_id DESC, et.ordem ASC, s.numero ASC
   `;
 
-  const detalhesResult = await db.query(detalhesQuery, [userId, treinoIds, safeLang]);
+  const detalhesResult = await db.query(detalhesQuery, [
+    userId,
+    treinoIds,
+    safeLang,
+    exercisesOffset,
+    exercisesLimit,
+  ]);
   const rows = detalhesResult.rows;
 
   const treinosMap = new Map(

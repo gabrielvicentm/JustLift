@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '@/app/config/api';
 import { registerPushTokenIfPossible } from '@/app/features/notifications/push';
-import { useI18n } from '@/providers/I18nProvider';
 import { useAppTheme } from '@/providers/ThemeProvider';
 import { AppTheme } from '@/theme/theme';
 import { AxiosError } from 'axios';
@@ -46,7 +45,6 @@ const BACKGROUND_GRADIENT = ["#0B0E18", "#0B1022", "#120C2A"] as const;
 export default function Login() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { t } = useI18n();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [identifier, setIdentifier] = useState('');
@@ -62,11 +60,6 @@ export default function Login() {
         const response = await api.get<GoogleConfigResponse>('/user/google/config');
         const fetchedClientId = response.data?.googleClientId?.trim() ?? '';
 
-        console.log('[GoogleAuth][Frontend][Login] configure:start', {
-          googleClientId: fetchedClientId,
-          apiBaseUrl: api.defaults.baseURL,
-        });
-
         if (!fetchedClientId) {
           setError('GOOGLE_CLIENT_ID vazio no backend.');
           return;
@@ -78,16 +71,7 @@ export default function Login() {
           scopes: ['profile', 'email'],
           offlineAccess: false,
         });
-        console.log('[GoogleAuth][Frontend][Login] configure:done');
       } catch (err: any) {
-        console.log(
-          '[GoogleAuth][Frontend][Login] configure:error',
-          JSON.stringify({
-            message: err?.message,
-            status: err?.response?.status,
-            data: err?.response?.data,
-          })
-        );
         setError('Nao foi possivel carregar configuracao Google do backend.');
       }
     };
@@ -114,7 +98,7 @@ export default function Login() {
     setError('');
 
     if (!cleanIdentifier || !cleanSenha) {
-      setError(t('login_error_required'));
+      setError('Preencha identifier (username ou email) e senha.');
       return;
     }
     if (cleanSenha.length < 8) {
@@ -134,7 +118,7 @@ export default function Login() {
         await registerPushTokenIfPossible();
       } catch {}
 
-      setMessage(response.data.message ?? t('login_success_default'));
+      setMessage(response.data.message ?? 'Login efetuado com sucesso.');
       router.replace('/(tabs)/home_tab');
     } catch (err) {
       const axiosError = err as AxiosError<BackendResponse>;
@@ -142,7 +126,7 @@ export default function Login() {
         axiosError.response?.data?.message ??
         (!axiosError.response
           ? `Sem conexao com o servidor (${api.defaults.baseURL}).`
-          : t('login_error_default'));
+          : 'Erro ao fazer login.');
       setError(backendMessage);
     } finally {
       setLoading(false);
@@ -155,43 +139,63 @@ export default function Login() {
     setLoading(true);
 
     try {
-      console.log('[GoogleAuth][Frontend][Login] flow:start');
       if (!googleClientId) {
         throw new Error('GOOGLE_CLIENT_ID_MISSING');
       }
 
-      console.log('[GoogleAuth][Frontend][Login] hasPlayServices:start');
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      console.log('[GoogleAuth][Frontend][Login] hasPlayServices:ok');
 
       // Forca exibicao do seletor de conta em vez de login silencioso.
       try {
         await GoogleSignin.signOut();
       } catch (signOutErr) {
-        console.log('[GoogleAuth][Frontend][Login] signOut:skip', signOutErr);
       }
 
-      console.log('[GoogleAuth][Frontend][Login] signIn:start');
       const signInResult = (await GoogleSignin.signIn()) as any;
-      console.log('[GoogleAuth][Frontend][Login] signIn:rawResult', signInResult);
       const idToken = signInResult?.data?.idToken ?? signInResult?.idToken;
       const googleId = signInResult?.data?.user?.id ?? signInResult?.user?.id;
-      console.log('[GoogleAuth][Frontend][Login] signIn:parsed', {
-        googleId,
-        idTokenLength: idToken?.length ?? 0,
-        idTokenMasked: maskToken(idToken),
-      });
+      const googleEmail = signInResult?.data?.user?.email ?? signInResult?.user?.email;
+      const googleName = signInResult?.data?.user?.name ?? signInResult?.user?.name;
 
       if (!idToken) {
         throw new Error('GOOGLE_TOKEN_MISSING');
       }
 
-      console.log('[GoogleAuth][Frontend][Login] api:/user/google/login:start', { googleId });
-      const response = await api.post<BackendResponse>('/user/google/login', {
-        googleIdToken: idToken,
-        google_id: googleId,
-      });
-      console.log('[GoogleAuth][Frontend][Login] api:/user/google/login:success', response.data);
+      let response: { data: BackendResponse } | null = null;
+      try {
+        response = await api.post<BackendResponse>('/user/google/login', {
+          googleIdToken: idToken,
+          google_id: googleId,
+        });
+      } catch (loginErr) {
+        const axiosError = loginErr as AxiosError<BackendResponse>;
+        const status = axiosError.response?.status;
+        const message = axiosError.response?.data?.message || '';
+        const shouldAutoRegister =
+          status === 401 &&
+          typeof message === 'string' &&
+          message.toLowerCase().includes('autenticar com google');
+
+        if (!shouldAutoRegister) {
+          throw loginErr;
+        }
+
+        const rawUsername =
+          (googleName || '').trim() ||
+          (googleEmail ? String(googleEmail).split('@')[0] : '') ||
+          '';
+        const fallbackUsername = rawUsername
+          .toLowerCase()
+          .replace(/[^a-z0-9_\.]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .slice(0, 30);
+
+        response = await api.post<BackendResponse>('/user/google/register', {
+          username: fallbackUsername || `user_${String(googleId || '').slice(-6)}`,
+          googleIdToken: idToken,
+          google_id: googleId,
+        });
+      }
 
       await saveTokens(response.data.accessToken, response.data.refreshToken);
       try {
@@ -200,16 +204,6 @@ export default function Login() {
       setMessage(response.data.message ?? 'Login Google efetuado com sucesso.');
       router.replace('/(tabs)/home_tab');
     } catch (err: any) {
-      const debugPayload = {
-        code: err?.code,
-        message: err?.message,
-        stack: err?.stack,
-        responseStatus: err?.response?.status,
-        responseData: err?.response?.data,
-        requestUrl: err?.config?.url,
-        requestBaseURL: err?.config?.baseURL,
-      };
-      console.log('[GoogleAuth][Frontend][Login] flow:error', JSON.stringify(debugPayload));
       if (err?.code === statusCodes.SIGN_IN_CANCELLED) {
         setError('Login com Google cancelado.');
       } else if (err?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
@@ -253,11 +247,11 @@ export default function Login() {
         style={styles.cardBorder}
       >
       <View style={styles.card}>
-        <Text style={styles.title}>{t('login_title')}</Text>
-        <Text style={styles.subtitle}>{t('login_subtitle')}</Text>
+        <Text style={styles.title}>Entrar</Text>
+        <Text style={styles.subtitle}>Use username ou email para login.</Text>
 
         <TextInput
-          placeholder={t('login_identifier_placeholder')}
+          placeholder="Username ou email"
           placeholderTextColor={theme.colors.mutedText}
           autoCapitalize="none"
           value={identifier}
@@ -267,7 +261,7 @@ export default function Login() {
         />
 
         <TextInput
-          placeholder={t('login_password_placeholder')}
+          placeholder="Senha"
           placeholderTextColor={theme.colors.mutedText}
           secureTextEntry
           value={senha}
@@ -290,7 +284,7 @@ export default function Login() {
             {loading ? (
               <ActivityIndicator color={theme.colors.buttonText} />
             ) : (
-              <Text style={styles.buttonText}>{t('login_button')}</Text>
+              <Text style={styles.buttonText}>Login</Text>
             )}
           </Pressable>
         </LinearGradient>
@@ -308,7 +302,7 @@ export default function Login() {
         {message ? <Text style={styles.success}>{message}</Text> : null}
 
         <Pressable onPress={() => router.push('./Register')} disabled={loading}>
-          <Text style={styles.link}>{t('login_no_account')}</Text>
+          <Text style={styles.link}>Nao tem conta? Cadastre-se</Text>
         </Pressable>
       </View>
       </LinearGradient>
