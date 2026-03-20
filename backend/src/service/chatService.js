@@ -35,6 +35,7 @@ const normalizeMessageId = (value) => {
 
   return Math.floor(parsed);
 };
+//isso comprara os ids, porque os ids podem vir de lugares diferentes por conta do nosso banco
 const isSameUser = (left, right) => String(left) === String(right);
 
 const getChatTarget = async (userId, targetUserId) => {
@@ -104,7 +105,6 @@ const getChatMessageById = async (messageId) => {
        dm.deleted_for_everyone_at,
        dm.created_at,
        dm.updated_at,
-       reply.id AS reply_message_id,
        reply.content AS reply_content,
        reply.sender_id AS reply_sender_id
      FROM chat dm
@@ -139,6 +139,7 @@ const assertMessageBelongsToChat = (message, userId, targetUserId) => {
     throw new Error('MESSAGE_NOT_FOUND');
   }
 
+  ////isso basicamte checa se a mensagem e realamente e da conversa e de quem a enviou
   const belongsToChat =
     (isSameUser(message.sender_id, userId) && isSameUser(message.recipient_id, targetUserId))
     || (isSameUser(message.sender_id, targetUserId) && isSameUser(message.recipient_id, userId));
@@ -299,6 +300,7 @@ exports.updateMessage = async ({ userId, targetUserId, messageId, content }) => 
     throw new Error('MESSAGE_NOT_FOUND');
   }
 
+  //pra editar a mensagem tem um tempo limite de 5 minutos depois que ela foi enviada pra editar
   const ageMs = Date.now() - new Date(message.created_at).getTime();
   if (ageMs > EDIT_WINDOW_MINUTES * 60 * 1000) {
     throw new Error('EDIT_WINDOW_EXPIRED');

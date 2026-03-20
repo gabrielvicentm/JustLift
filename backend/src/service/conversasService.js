@@ -1,6 +1,5 @@
 const db = require('../utils/db');
 
-//isso vai sair ou mudar
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50; 
 
@@ -129,6 +128,13 @@ const getTargetUser = async (targetUserId) => {
   );
 
   return result.rows[0] || null;
+};
+
+const ensureTargetUserExists = async (targetUserId) => {
+  const targetUser = await getTargetUser(targetUserId);
+  if (!targetUser) {
+    throw new Error('USER_NOT_FOUND');
+  }
 };
 
 exports.listConversations = async ({ userId, search, limit, offset }) => {
@@ -274,10 +280,7 @@ exports.hideConversation = async ({ userId, targetUserId }) => {
     throw new Error('INVALID_TARGET');
   }
 
-  const targetUser = await getTargetUser(targetUserId);
-  if (!targetUser) {
-    throw new Error('USER_NOT_FOUND');
-  }
+  await ensureTargetUserExists(targetUserId);
 
   await db.query(
     `INSERT INTO hidden_conversations (user_id, other_user_id)
@@ -302,10 +305,7 @@ exports.pinConversation = async ({ userId, targetUserId }) => {
     throw new Error('INVALID_TARGET');
   }
 
-  const targetUser = await getTargetUser(targetUserId);
-  if (!targetUser) {
-    throw new Error('USER_NOT_FOUND');
-  }
+  await ensureTargetUserExists(targetUserId);
 
   const pinnedCountResult = await db.query(
     `SELECT COUNT(*)::INT AS count
@@ -354,10 +354,7 @@ exports.blockUser = async ({ userId, targetUserId }) => {
     throw new Error('INVALID_TARGET');
   }
 
-  const targetUser = await getTargetUser(targetUserId);
-  if (!targetUser) {
-    throw new Error('USER_NOT_FOUND');
-  }
+  await ensureTargetUserExists(targetUserId);
 
   await db.query(
     `INSERT INTO blocked_users (blocker_id, blocked_id)

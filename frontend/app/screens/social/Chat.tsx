@@ -91,6 +91,65 @@ const applyDeleteForEveryone = (items: ChatMessage[], messageId: number, deleted
     return item;
   });
 
+const isSameDay = (left: string, right: string) => {
+  const leftDate = new Date(left);
+  const rightDate = new Date(right);
+
+  return (
+    leftDate.getFullYear() === rightDate.getFullYear()
+    && leftDate.getMonth() === rightDate.getMonth()
+    && leftDate.getDate() === rightDate.getDate()
+  );
+};
+
+const formatMessageTime = (value: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+
+const formatDateDivider = (value: string) => {
+  const date = new Date(value);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((today.getTime() - targetDay.getTime()) / (24 * 60 * 60 * 1000));
+
+  if (diffDays === 0) {
+    return "Hoje";
+  }
+
+  if (diffDays === 1) {
+    return "Ontem";
+  }
+
+  if (diffDays > 1 && diffDays <= 3) {
+    return new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(date);
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+};
+
+type RenderableChatItem = {
+  item: ChatMessage;
+  dateLabel: string | null;
+};
+
+const buildRenderableMessages = (items: ChatMessage[]): RenderableChatItem[] =>
+  items.map((item, index) => {
+    const nextOlder = items[index + 1];
+    const shouldShowDateLabel = !nextOlder || !isSameDay(item.created_at, nextOlder.created_at);
+
+    return {
+      item,
+      dateLabel: shouldShowDateLabel ? formatDateDivider(item.created_at) : null,
+    };
+  });
+
 function MessageBubble({
   item,
   isMine,
@@ -98,6 +157,7 @@ function MessageBubble({
   theme,
   safeTargetUserId,
   onLongPress,
+  dateLabel,
 }: {
   item: ChatMessage;
   isMine: boolean;
@@ -105,6 +165,7 @@ function MessageBubble({
   theme: AppTheme;
   safeTargetUserId?: string;
   onLongPress: (message: ChatMessage) => void;
+  dateLabel: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const shouldCollapse = item.content.length > EXPAND_MESSAGE_LENGTH;
@@ -112,54 +173,72 @@ function MessageBubble({
   const isDeletedForEveryone = Boolean(item.deleted_for_everyone_at);
 
   return (
-    <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
-      <Pressable
-        onLongPress={() => {
-          if (!isDeletedForEveryone) {
-            onLongPress(item);
-          }
-        }}
-        style={[styles.messageBubble, isMine ? styles.messageBubbleMine : styles.messageBubbleOther]}
-      >
-        {item.reply_to_content ? (
-          <View style={[styles.replyPreview, isMine ? styles.replyPreviewMine : styles.replyPreviewOther]}>
-            <Text style={[styles.replyLabel, isMine ? styles.messageTextMine : styles.messageTextOther]}>
-              {replyAuthor}
-            </Text>
-            <Text
-              numberOfLines={2}
-              style={[styles.replyText, isMine ? styles.messageTextMine : styles.messageTextOther]}
-            >
-              {item.reply_to_content}
+    <View>
+      {dateLabel ? (
+        <View style={styles.dateDividerRow}>
+          <View style={styles.dateDividerChip}>
+            <Text style={styles.dateDividerText}>{dateLabel}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
+        <Pressable
+          onLongPress={() => {
+            if (!isDeletedForEveryone) {
+              onLongPress(item);
+            }
+          }}
+          style={[styles.messageBubble, isMine ? styles.messageBubbleMine : styles.messageBubbleOther]}
+        >
+          {item.reply_to_content ? (
+            <View style={[styles.replyPreview, isMine ? styles.replyPreviewMine : styles.replyPreviewOther]}>
+              <Text style={[styles.replyLabel, isMine ? styles.messageTextMine : styles.messageTextOther]}>
+                {replyAuthor}
+              </Text>
+              <Text
+                numberOfLines={2}
+                style={[styles.replyText, isMine ? styles.messageTextMine : styles.messageTextOther]}
+              >
+                {item.reply_to_content}
+              </Text>
+            </View>
+          ) : null}
+
+          <Text
+            numberOfLines={!expanded && shouldCollapse ? 5 : undefined}
+            style={[
+              styles.messageText,
+              isMine ? styles.messageTextMine : styles.messageTextOther,
+              isDeletedForEveryone && styles.deletedMessageText,
+            ]}
+          >
+            {item.content}
+          </Text>
+
+          <View style={styles.messageMetaRow}>
+            {item.edited_at && !isDeletedForEveryone ? (
+              <Text style={[styles.editedText, isMine ? styles.messageTextMine : styles.messageTextOther]}>
+                Editada
+              </Text>
+            ) : (
+              <View />
+            )}
+
+            <Text style={[styles.messageTime, isMine ? styles.messageTextMine : styles.messageTextOther]}>
+              {formatMessageTime(item.created_at)}
             </Text>
           </View>
-        ) : null}
 
-        <Text
-          numberOfLines={!expanded && shouldCollapse ? 5 : undefined}
-          style={[
-            styles.messageText,
-            isMine ? styles.messageTextMine : styles.messageTextOther,
-            isDeletedForEveryone && styles.deletedMessageText,
-          ]}
-        >
-          {item.content}
-        </Text>
-
-        {item.edited_at && !isDeletedForEveryone ? (
-          <Text style={[styles.editedText, isMine ? styles.messageTextMine : styles.messageTextOther]}>
-            Editada
-          </Text>
-        ) : null}
-
-        {shouldCollapse && !isDeletedForEveryone ? (
-          <Pressable onPress={() => setExpanded((prev) => !prev)} hitSlop={8}>
-            <Text style={[styles.expandText, { color: isMine ? theme.colors.buttonText : theme.colors.text }]}>
-              {expanded ? "Ver menos" : "Ver mais"}
-            </Text>
-          </Pressable>
-        ) : null}
-      </Pressable>
+          {shouldCollapse && !isDeletedForEveryone ? (
+            <Pressable onPress={() => setExpanded((prev) => !prev)} hitSlop={8}>
+              <Text style={[styles.expandText, { color: isMine ? theme.colors.buttonText : theme.colors.text }]}>
+                {expanded ? "Ver menos" : "Ver mais"}
+              </Text>
+            </Pressable>
+          ) : null}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -204,7 +283,7 @@ export default function ChatScreen() {
   const [messageActionLoading, setMessageActionLoading] = useState(false);
   const [inputBarHeight, setInputBarHeight] = useState(72);
   const [keyboardSpacerHeight, setKeyboardSpacerHeight] = useState(0);
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const listRef = useRef<FlatList<RenderableChatItem>>(null);
   const inputRef = useRef<TextInput>(null);
   const offsetRef = useRef(0);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
@@ -216,7 +295,7 @@ export default function ChatScreen() {
   const hasMoreRef = useRef(true);
   const loadingMoreRef = useRef(false);
   const loadingRef = useRef(false);
-  const displayedMessages = useMemo(() => [...messages].reverse(), [messages]);
+  const displayedMessages = useMemo(() => buildRenderableMessages([...messages].reverse()), [messages]);
 
   const isMessageEditable = useCallback((message: ChatMessage) => {
     const ageMs = Date.now() - new Date(message.created_at).getTime();
@@ -651,7 +730,7 @@ export default function ChatScreen() {
           ref={listRef}
           data={displayedMessages}
           inverted
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) => String(item.item.id)}
           contentContainerStyle={[styles.listContent, { paddingTop: inputBarHeight + keyboardSpacerHeight + 8 }]}
           maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 40 }}
           onContentSizeChange={() => {
@@ -684,12 +763,13 @@ export default function ChatScreen() {
           ListEmptyComponent={<Text style={styles.emptyText}>Nenhuma mensagem ainda.</Text>}
           renderItem={({ item }) => (
             <MessageBubble
-              item={item}
-              isMine={item.sender_id !== safeTargetUserId}
+              item={item.item}
+              isMine={item.item.sender_id !== safeTargetUserId}
               styles={styles}
               theme={theme}
               safeTargetUserId={safeTargetUserId}
               onLongPress={setSelectedMessage}
+              dateLabel={item.dateLabel}
             />
           )}
           ListFooterComponent={
@@ -912,6 +992,24 @@ function createStyles(theme: AppTheme) {
       textAlign: "center",
       marginTop: 20,
     },
+    dateDividerRow: {
+      alignItems: "center",
+      marginVertical: 10,
+    },
+    dateDividerChip: {
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+    },
+    dateDividerText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "700",
+      textTransform: "capitalize",
+    },
     messageRow: {
       flexDirection: "row",
     },
@@ -970,8 +1068,18 @@ function createStyles(theme: AppTheme) {
       fontSize: 12,
       fontWeight: "700",
     },
-    editedText: {
+    messageMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
       marginTop: 6,
+    },
+    messageTime: {
+      fontSize: 11,
+      opacity: 0.75,
+    },
+    editedText: {
       fontSize: 11,
       opacity: 0.75,
     },

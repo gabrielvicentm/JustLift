@@ -3,10 +3,16 @@ const { Server } = require('socket.io');
 
 const SECRET_KEY = 'pantufa';
 
+//você só cria um servidor socket, evitando uma duplicacao de sevidor
 let ioInstance = null;
 
+//Isso cria um sala. Cada chat seria uma sala pra que os 2 usuario possam conversar
 const getUserRoom = (userId) => `user:${String(userId)}`;
 
+//Bearer token é o formato padrão de enviar token de autenticação no header HTTP
+//Ex: "Authorization: Bearer abc123"
+
+//// tenta pegar o token enviado pelo frontend no handshake do socket de 2 jeitos
 const getSocketToken = (socket) => {
   const authToken = socket.handshake.auth?.token;
   if (authToken) {
@@ -18,6 +24,7 @@ const getSocketToken = (socket) => {
     return null;
   }
 
+  //// verifica se o header veio no formato "Bearer token"
   const [scheme, token] = String(header).split(' ');
   if (scheme !== 'Bearer' || !token) {
     return null;
@@ -28,18 +35,19 @@ const getSocketToken = (socket) => {
 
 const resolveUserId = (payload) => payload?.userId || payload?.id || null;
 
-function initSocket(server) {
-  if (ioInstance) {
+function initSocket(server) { //inicializa o Socket.IO no servido
+  if (ioInstance) { //se nao existir ele cria
     return ioInstance;
   }
 
   ioInstance = new Server(server, {
-    cors: {
-      origin: '*',
+    cors: { //isso controla quem pode se conectar ao socket
+      origin: '*', //permite conexão de qualquer origem
       methods: ['GET', 'POST'],
     },
   });
 
+  // valida o token antes de permitir a conexao do socket
   ioInstance.use((socket, next) => {
     try {
       const token = getSocketToken(socket);

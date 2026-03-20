@@ -3,6 +3,19 @@ const { emitToUser } = require('../socket');
 
 const getUserId = (req) => req.user?.userId || req.user?.id || null;
 
+//Isso server pra manda o mesmo evento (mensagem ou outras opcoes que tem dentro do chat) em socket;
+//para os dois lados do chat mantenham atualizado
+const emitChatEventToParticipants = (userId, targetUserId, event, payload) => {
+  emitToUser(userId, event, {
+    chatUserId: String(targetUserId),
+    ...payload,
+  });
+  emitToUser(targetUserId, event, {
+    chatUserId: String(userId),
+    ...payload,
+  });
+};
+
 exports.getMessages = async (req, res) => { 
   try {
     const userId = getUserId(req);
@@ -16,13 +29,6 @@ exports.getMessages = async (req, res) => {
       targetUserId,
       limit: req.query.limit,
       offset: req.query.offset,
-    });
-
-    res.set({
-      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-      Pragma: "no-cache",
-      Expires: "0",
-      "Surrogate-Control": "no-store",
     });
 
     return res.status(200).json(data);
@@ -61,12 +67,7 @@ exports.sendMessage = async (req, res) => {
       replyToMessageId,
     });
 
-    emitToUser(userId, 'chat:message_created', {
-      chatUserId: String(targetUserId),
-      message: data.message,
-    });
-    emitToUser(targetUserId, 'chat:message_created', {
-      chatUserId: String(userId),
+    emitChatEventToParticipants(userId, targetUserId, 'chat:message_created', {
       message: data.message,
     });
 
@@ -118,12 +119,7 @@ exports.updateMessage = async (req, res) => {
       content,
     });
 
-    emitToUser(userId, 'chat:message_updated', {
-      chatUserId: String(targetUserId),
-      message: data.message,
-    });
-    emitToUser(targetUserId, 'chat:message_updated', {
-      chatUserId: String(userId),
+    emitChatEventToParticipants(userId, targetUserId, 'chat:message_updated', {
       message: data.message,
     });
 
@@ -197,13 +193,7 @@ exports.deleteMessageForEveryone = async (req, res) => {
     const { targetUserId, messageId } = req.params;
     await chatService.deleteMessageForEveryone({ userId, targetUserId, messageId });
     const deletedAt = new Date().toISOString();
-    emitToUser(userId, 'chat:message_deleted_for_everyone', {
-      chatUserId: String(targetUserId),
-      messageId: Number(messageId),
-      deletedAt,
-    });
-    emitToUser(targetUserId, 'chat:message_deleted_for_everyone', {
-      chatUserId: String(userId),
+    emitChatEventToParticipants(userId, targetUserId, 'chat:message_deleted_for_everyone', {
       messageId: Number(messageId),
       deletedAt,
     });
