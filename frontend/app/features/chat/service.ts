@@ -18,11 +18,17 @@ export async function fetchChatMessages(
   offset = 0,
 ): Promise<{ targetUser: ChatTargetUser; messages: ChatMessage[] }> {
   const headers = await getAuthHeader();
+  const requestTs = Date.now();
   const response = await api.get<{ targetUser: ChatTargetUser; messages: ChatMessage[] }>(
     `/chat/${encodeURIComponent(targetUserId)}/messages`,
     {
-      headers,
-      params: { limit, offset },
+      headers: {
+        ...headers,
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+      params: { limit, offset, _ts: requestTs },
     },
   );
 

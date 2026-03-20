@@ -22,6 +22,7 @@ import {
   sendChatMessage,
   updateChatMessage,
 } from "@/app/features/chat/service";
+import { getChatSocket } from "@/app/features/chat/socket";
 import type { ChatMessage, ChatTargetUser } from "@/app/features/chat/types";
 import { getApiErrorMessage } from "@/app/features/profile/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -55,6 +56,40 @@ const hasSameMessages = (left: ChatMessage[], right: ChatMessage[]) => {
     return other && item.id === other.id && item.updated_at === other.updated_at;
   });
 };
+
+const mergeLatestMessages = (current: ChatMessage[], latest: ChatMessage[]) => {
+  if (current.length === 0) {
+    return dedupeMessages(latest);
+  }
+
+  const latestById = new Map(latest.map((message) => [message.id, message]));
+  const mergedCurrent = current.map((message) => latestById.get(message.id) ?? message);
+  const existingIds = new Set(current.map((message) => message.id));
+  const appended = latest.filter((message) => !existingIds.has(message.id));
+
+  return dedupeMessages([...mergedCurrent, ...appended]);
+};
+
+const applyDeleteForEveryone = (items: ChatMessage[], messageId: number, deletedAt: string) =>
+  items.map((item) => {
+    if (item.id === messageId) {
+      return {
+        ...item,
+        content: "Mensagem apagada",
+        deleted_for_everyone_at: deletedAt,
+        reply_to_message_id: null,
+        reply_to_content: null,
+        reply_to_sender_id: null,
+        edited_at: null,
+      };
+    }
+
+    if (item.reply_to_message_id === messageId) {
+      return { ...item, reply_to_message_id: null, reply_to_content: null, reply_to_sender_id: null };
+    }
+
+    return item;
+  });
 
 function MessageBubble({
   item,
@@ -180,6 +215,7 @@ export default function ChatScreen() {
   const preserveScrollOnNextContentChangeRef = useRef(false);
   const hasMoreRef = useRef(true);
   const loadingMoreRef = useRef(false);
+  const loadingRef = useRef(false);
   const displayedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   const isMessageEditable = useCallback((message: ChatMessage) => {
@@ -208,6 +244,7 @@ export default function ChatScreen() {
     }
 
     if (showLoading) {
+      loadingRef.current = true;
       setLoading(true);
     }
     if (mode === "append-older") {
@@ -236,6 +273,7 @@ export default function ChatScreen() {
     } catch (err) {
       setError(getApiErrorMessage(err, "carregar mensagens"));
     } finally {
+      loadingRef.current = false;
       setLoading(false);
       loadingMoreRef.current = false;
       setLoadingMore(false);
@@ -251,6 +289,126 @@ export default function ChatScreen() {
     setLoadingMore(false);
     loadMessages("replace", true);
   }, [loadMessages]);
+
+  const refreshLatestMessages = useCallback(async () => {
+    if (!safeTargetUserId || loadingRef.current || loadingMoreRef.current) {
+      return;
+    }
+
+    try {
+      const response = await fetchChatMessages(safeTargetUserId, PAGE_SIZE, 0);
+      setTargetUser(response.targetUser);
+      setError("");
+
+      setMessages((prev) => {
+        const nextLatest = dedupeMessages(response.messages);
+        const merged = mergeLatestMessages(prev, nextLatest);
+
+        if (merged.length > prev.length) {
+          offsetRef.current += merged.length - prev.length;
+          shouldSnapToBottomRef.current = true;
+        }
+
+        return hasSameMessages(prev, merged) ? prev : merged;
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "atualizar mensagens"));
+    }
+  }, [safeTargetUserId]);
+
+  useEffect(() => {
+    if (!safeTargetUserId) {
+      return;
+    }
+
+    refreshLatestMessages();
+
+    const intervalId = setInterval(() => {
+      refreshLatestMessages();
+    }, 1200);
+
+    return () => clearInterval(intervalId);
+  }, [refreshLatestMessages, safeTargetUserId]);
+
+  useEffect(() => {
+    if (!safeTargetUserId) {
+      return;
+    }
+
+    let cancelled = false;
+    let detachHandlers: (() => void) | null = null;
+
+    getChatSocket()
+      .then((socket) => {
+        if (cancelled) {
+          return;
+        }
+
+        const handleCreated = (payload: { chatUserId?: string; message?: ChatMessage }) => {
+          if (String(payload.chatUserId || "") !== String(safeTargetUserId) || !payload.message) {
+            return;
+          }
+
+          shouldSnapToBottomRef.current = true;
+          setMessages((prev) => {
+            const next = dedupeMessages([...prev, payload.message as ChatMessage]);
+            if (next.length > prev.length) {
+              offsetRef.current += next.length - prev.length;
+            }
+            return hasSameMessages(prev, next) ? prev : next;
+          });
+        };
+
+        const handleUpdated = (payload: { chatUserId?: string; message?: ChatMessage }) => {
+          if (String(payload.chatUserId || "") !== String(safeTargetUserId) || !payload.message) {
+            return;
+          }
+
+          setMessages((prev) => {
+            const next = prev.map((item) => (item.id === payload.message!.id ? payload.message! : item));
+            return hasSameMessages(prev, next) ? prev : next;
+          });
+        };
+
+        const handleDeletedForMe = (payload: { chatUserId?: string; messageId?: number }) => {
+          if (String(payload.chatUserId || "") !== String(safeTargetUserId) || !payload.messageId) {
+            return;
+          }
+
+          setMessages((prev) => prev.filter((item) => item.id !== payload.messageId));
+        };
+
+        const handleDeletedForEveryone = (payload: { chatUserId?: string; messageId?: number; deletedAt?: string }) => {
+          if (
+            String(payload.chatUserId || "") !== String(safeTargetUserId)
+            || !payload.messageId
+            || !payload.deletedAt
+          ) {
+            return;
+          }
+
+          setMessages((prev) => applyDeleteForEveryone(prev, payload.messageId as number, payload.deletedAt as string));
+        };
+
+        socket.on("chat:message_created", handleCreated);
+        socket.on("chat:message_updated", handleUpdated);
+        socket.on("chat:message_deleted_for_me", handleDeletedForMe);
+        socket.on("chat:message_deleted_for_everyone", handleDeletedForEveryone);
+
+        detachHandlers = () => {
+          socket.off("chat:message_created", handleCreated);
+          socket.off("chat:message_updated", handleUpdated);
+          socket.off("chat:message_deleted_for_me", handleDeletedForMe);
+          socket.off("chat:message_deleted_for_everyone", handleDeletedForEveryone);
+        };
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      detachHandlers?.();
+    };
+  }, [safeTargetUserId]);
 
   useEffect(() => {
     if (!safeTargetUserId) {
@@ -430,27 +588,7 @@ export default function ChatScreen() {
     try {
       setMessageActionLoading(true);
       await deleteChatMessageForEveryone(safeTargetUserId, selectedMessage.id);
-      setMessages((prev) =>
-        prev.map((item) => {
-          if (item.id === selectedMessage.id) {
-            return {
-              ...item,
-              content: "Mensagem apagada",
-              deleted_for_everyone_at: new Date().toISOString(),
-              reply_to_message_id: null,
-              reply_to_content: null,
-              reply_to_sender_id: null,
-              edited_at: null,
-            };
-          }
-
-          if (item.reply_to_message_id === selectedMessage.id) {
-            return { ...item, reply_to_message_id: null, reply_to_content: null, reply_to_sender_id: null };
-          }
-
-          return item;
-        })
-      );
+      setMessages((prev) => applyDeleteForEveryone(prev, selectedMessage.id, new Date().toISOString()));
 
       if (replyToMessage?.id === selectedMessage.id) {
         setReplyToMessage(null);
@@ -654,8 +792,14 @@ export default function ChatScreen() {
                   </Pressable>
                 ) : null}
 
+                <Pressable style={styles.messageModalAction} onPress={handleCopyMessage} disabled={messageActionLoading}>
+                  <Text style={styles.messageModalActionText}>Copiar mensagem</Text>
+                </Pressable>
+
+                <View style={styles.messageModalDivider} />
+
                 <Pressable style={styles.messageModalAction} onPress={handleDeleteForMe} disabled={messageActionLoading}>
-                  <Text style={styles.messageModalActionText}>Excluir só para você</Text>
+                  <Text style={[styles.messageModalActionText, styles.messageModalAccentText]}>Excluir so para voce</Text>
                 </Pressable>
 
                 {selectedMessage.sender_id !== safeTargetUserId ? (
@@ -664,13 +808,11 @@ export default function ChatScreen() {
                     onPress={handleDeleteForEveryone}
                     disabled={messageActionLoading}
                   >
-                    <Text style={styles.messageModalActionText}>Excluir para todos</Text>
+                    <Text style={[styles.messageModalActionText, styles.messageModalDangerText]}>
+                      Excluir para todos
+                    </Text>
                   </Pressable>
                 ) : null}
-
-                <Pressable style={styles.messageModalAction} onPress={handleCopyMessage} disabled={messageActionLoading}>
-                  <Text style={styles.messageModalActionText}>Copiar mensagem</Text>
-                </Pressable>
 
                 <Pressable style={styles.messageModalCancel} onPress={closeMessageActions} disabled={messageActionLoading}>
                   {messageActionLoading ? (
@@ -943,6 +1085,18 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.text,
       fontSize: 15,
       fontWeight: "600",
+    },
+    messageModalAccentText: {
+      color: theme.colors.buttonGradient[0],
+    },
+    messageModalDangerText: {
+      color: theme.colors.error,
+    },
+    messageModalDivider: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+      opacity: 0.8,
+      marginVertical: 4,
     },
     messageModalCancel: {
       minHeight: 46,

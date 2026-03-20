@@ -1,4 +1,5 @@
 const chatService = require('../service/chatService');
+const { emitToUser } = require('../socket');
 
 const getUserId = (req) => req.user?.userId || req.user?.id || null;
 
@@ -15,6 +16,13 @@ exports.getMessages = async (req, res) => {
       targetUserId,
       limit: req.query.limit,
       offset: req.query.offset,
+    });
+
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      "Surrogate-Control": "no-store",
     });
 
     return res.status(200).json(data);
@@ -51,6 +59,15 @@ exports.sendMessage = async (req, res) => {
       targetUserId,
       content,
       replyToMessageId,
+    });
+
+    emitToUser(userId, 'chat:message_created', {
+      chatUserId: String(targetUserId),
+      message: data.message,
+    });
+    emitToUser(targetUserId, 'chat:message_created', {
+      chatUserId: String(userId),
+      message: data.message,
     });
 
     return res.status(201).json(data);
@@ -101,6 +118,15 @@ exports.updateMessage = async (req, res) => {
       content,
     });
 
+    emitToUser(userId, 'chat:message_updated', {
+      chatUserId: String(targetUserId),
+      message: data.message,
+    });
+    emitToUser(targetUserId, 'chat:message_updated', {
+      chatUserId: String(userId),
+      message: data.message,
+    });
+
     return res.status(200).json(data);
   } catch (err) {
     if (err.message === 'USER_NOT_FOUND') {
@@ -141,6 +167,10 @@ exports.deleteMessageForMe = async (req, res) => {
 
     const { targetUserId, messageId } = req.params;
     await chatService.deleteMessageForMe({ userId, targetUserId, messageId });
+    emitToUser(userId, 'chat:message_deleted_for_me', {
+      chatUserId: String(targetUserId),
+      messageId: Number(messageId),
+    });
 
     return res.status(200).json({ message: 'Mensagem excluída para você.' });
   } catch (err) {
@@ -166,6 +196,17 @@ exports.deleteMessageForEveryone = async (req, res) => {
 
     const { targetUserId, messageId } = req.params;
     await chatService.deleteMessageForEveryone({ userId, targetUserId, messageId });
+    const deletedAt = new Date().toISOString();
+    emitToUser(userId, 'chat:message_deleted_for_everyone', {
+      chatUserId: String(targetUserId),
+      messageId: Number(messageId),
+      deletedAt,
+    });
+    emitToUser(targetUserId, 'chat:message_deleted_for_everyone', {
+      chatUserId: String(userId),
+      messageId: Number(messageId),
+      deletedAt,
+    });
 
     return res.status(200).json({ message: 'Mensagem excluída para todos.' });
   } catch (err) {
