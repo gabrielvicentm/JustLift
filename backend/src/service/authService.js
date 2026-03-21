@@ -236,7 +236,12 @@ exports.logar = async (identifier, senha) => {
 };
 
 exports.refreshToken = async (refreshToken) => {
-  const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  } catch (err) {
+    throw new Error('INVALID_REFRESH_TOKEN');
+  }
 
   const user = await db.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
 
@@ -277,7 +282,12 @@ exports.refreshToken = async (refreshToken) => {
 };
 
 exports.logout = async (refreshToken) => {
-  const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  } catch (err) {
+    throw new Error('INVALID_REFRESH_TOKEN');
+  }
 
   const user = await db.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
 
