@@ -16,7 +16,9 @@ import {
   fetchNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  sendTestPush,
 } from "@/app/features/notifications/service";
+import { registerPushTokenIfPossible } from "@/app/features/notifications/push";
 import type { NotificationItem } from "@/app/features/notifications/types";
 import type { AppTheme } from "@/theme/theme";
 
@@ -80,6 +82,16 @@ export default function NotificacoesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [testMessage, setTestMessage] = useState("");
+  const [testingPush, setTestingPush] = useState(false);
+  const [pushStatus, setPushStatus] = useState("");
+  const [checkingPush, setCheckingPush] = useState(false);
+
+  const maskToken = (token?: string) => {
+    if (!token) return null;
+    if (token.length <= 20) return token;
+    return `${token.slice(0, 10)}...${token.slice(-10)}`;
+  };
 
   const loadNotifications = useCallback(async (isRefresh = false) => {
     try {
@@ -143,19 +155,65 @@ export default function NotificacoesScreen() {
     }
   };
 
+  const handleTestPush = async () => {
+    setError("");
+    setTestMessage("");
+    setTestingPush(true);
+    try {
+      const result = await sendTestPush();
+      const status = result?.result?.status || "unknown";
+      const reason = result?.result?.reason;
+      const details = reason ? ` (${reason})` : "";
+      setTestMessage(`Teste enviado: ${status}${details}`);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "enviar push de teste"));
+    } finally {
+      setTestingPush(false);
+    }
+  };
+
+  const handleCheckPush = async () => {
+    setError("");
+    setPushStatus("");
+    setCheckingPush(true);
+    try {
+      const result = await registerPushTokenIfPossible();
+      const reason = result.reason ? ` | ${result.reason}` : "";
+      setPushStatus(`Status push: ${result.status}${result.token ? ` (${maskToken(result.token)})` : ""}${reason}`);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "checar push"));
+    } finally {
+      setCheckingPush(false);
+    }
+  };
+
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Notificacoes</Text>
-        <Pressable style={styles.readAllButton} onPress={handleMarkAllAsRead} disabled={unreadCount === 0}>
-          <Text style={[styles.readAllText, unreadCount === 0 ? styles.readAllTextDisabled : null]}>
-            Marcar tudo como lida
-          </Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.readAllButton} onPress={handleMarkAllAsRead} disabled={unreadCount === 0}>
+            <Text style={[styles.readAllText, unreadCount === 0 ? styles.readAllTextDisabled : null]}>
+              Marcar tudo como lida
+            </Text>
+          </Pressable>
+          <Pressable style={styles.testButton} onPress={handleTestPush} disabled={testingPush}>
+            <Text style={[styles.testButtonText, testingPush ? styles.testButtonTextDisabled : null]}>
+              Testar push
+            </Text>
+          </Pressable>
+          <Pressable style={styles.checkButton} onPress={handleCheckPush} disabled={checkingPush}>
+            <Text style={[styles.checkButtonText, checkingPush ? styles.testButtonTextDisabled : null]}>
+              Checar push
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {testMessage ? <Text style={styles.successText}>{testMessage}</Text> : null}
+      {pushStatus ? <Text style={styles.pushStatus}>{pushStatus}</Text> : null}
 
       {loading ? (
         <View style={styles.centerBox}>
@@ -215,6 +273,11 @@ function createStyles(theme: AppTheme) {
       marginBottom: 12,
       gap: 8,
     },
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
     title: {
       fontSize: 24,
       fontWeight: "700",
@@ -236,9 +299,49 @@ function createStyles(theme: AppTheme) {
     readAllTextDisabled: {
       color: theme.colors.mutedText,
     },
+    testButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.button,
+      backgroundColor: "transparent",
+    },
+    testButtonText: {
+      color: theme.colors.button,
+      fontWeight: "700",
+      fontSize: 12,
+    },
+    testButtonTextDisabled: {
+      color: theme.colors.mutedText,
+    },
+    checkButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+    },
+    checkButtonText: {
+      color: theme.colors.text,
+      fontWeight: "700",
+      fontSize: 12,
+    },
     errorText: {
       color: theme.colors.error,
       marginBottom: 8,
+    },
+    successText: {
+      color: theme.colors.success,
+      marginBottom: 8,
+      fontWeight: "600",
+    },
+    pushStatus: {
+      color: theme.colors.mutedText,
+      marginBottom: 8,
+      fontWeight: "600",
+      fontSize: 12,
     },
     centerBox: {
       flex: 1,

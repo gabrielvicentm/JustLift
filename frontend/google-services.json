@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "886895445272",
+    "project_id": "justlift-eb7a0",
+    "storage_bucket": "justlift-eb7a0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:886895445272:android:aad7cb955c5eb3c2760a6d",
+        "android_client_info": {
+          "package_name": "com.gabrielvicentm.app_treino"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJQwGwPy3v6MjPMsXcmHt42oXuD_dJaI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +12,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,8 +35,14 @@ export default function PostDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const postIdRaw = Array.isArray(params.id) ? params.id[0] : params.id;
   const postId = Number(postIdRaw);
+  const mediaIndexParam = useLocalSearchParams<{ mediaIndex?: string | string[] }>();
+  const mediaIndexRaw = Array.isArray(mediaIndexParam.mediaIndex)
+    ? mediaIndexParam.mediaIndex[0]
+    : mediaIndexParam.mediaIndex;
+  const initialMediaIndex = Math.max(0, Number(mediaIndexRaw) || 0);
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { width } = useWindowDimensions();
 
   const [post, setPost] = useState<PostDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,6 +56,8 @@ export default function PostDetailScreen() {
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showAllComments, setShowAllComments] = useState(false);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(initialMediaIndex);
+  const mediaListRef = useRef<FlatList<PostDetail["midias"][number]> | null>(null);
 
   const loadPost = useCallback(async () => {
     if (!Number.isInteger(postId) || postId <= 0) {
@@ -282,18 +292,45 @@ export default function PostDetailScreen() {
         </View>
 
         <View style={styles.postCard}>
-          {(post.midias ?? []).map((media) => (
-            <View key={media.id} style={styles.mediaCard}>
-              {media.type === "image" ? (
-                <Image source={{ uri: media.url }} style={styles.media} />
-              ) : (
-                <View style={[styles.media, styles.videoPlaceholder]}>
-                  <Ionicons name="videocam" size={24} color={theme.colors.buttonText} />
-                  <Text style={styles.videoPlaceholderText}>Video</Text>
+          <View style={styles.mediaWrapper}>
+            <FlatList
+              ref={mediaListRef}
+              data={post.midias ?? []}
+              keyExtractor={(item) => String(item.id)}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={Math.min(initialMediaIndex, Math.max((post.midias?.length || 1) - 1, 0))}
+              getItemLayout={(_, index) => ({
+                length: width,
+                offset: width * index,
+                index,
+              })}
+              onMomentumScrollEnd={(event) => {
+                const index = Math.round(event.nativeEvent.contentOffset.x / width);
+                setActiveMediaIndex(index);
+              }}
+              renderItem={({ item }) => (
+                <View style={[styles.mediaCard, { width }]}>
+                  {item.type === "image" ? (
+                    <Image source={{ uri: item.url }} style={styles.media} />
+                  ) : (
+                    <View style={[styles.media, styles.videoPlaceholder]}>
+                      <Ionicons name="videocam" size={24} color={theme.colors.buttonText} />
+                      <Text style={styles.videoPlaceholderText}>Video</Text>
+                    </View>
+                  )}
                 </View>
               )}
-            </View>
-          ))}
+            />
+            {post.midias?.length ? (
+              <View style={styles.mediaCounter}>
+                <Text style={styles.mediaCounterText}>
+                  {Math.min(activeMediaIndex + 1, post.midias.length)}/{post.midias.length}
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
           <View style={styles.actionsRow}>
             <Pressable onPress={handleToggleLike} disabled={togglingLike}>
@@ -551,6 +588,10 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.surface,
       marginHorizontal: -16,
     },
+    mediaWrapper: {
+      position: "relative",
+      marginHorizontal: -16,
+    },
     media: {
       width: "100%",
       height: 320,
@@ -565,6 +606,20 @@ function createStyles(theme: AppTheme) {
     videoPlaceholderText: {
       color: theme.colors.buttonText,
       fontWeight: "700",
+    },
+    mediaCounter: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      backgroundColor: "rgba(0, 0, 0, 0.55)",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
+    mediaCounterText: {
+      color: "#ffffff",
+      fontWeight: "700",
+      fontSize: 12,
     },
     actionsRow: {
       flexDirection: "row",

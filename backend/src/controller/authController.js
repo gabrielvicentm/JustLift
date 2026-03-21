@@ -79,8 +79,11 @@ exports.resendRegisterCode = async (req, res) => {
       return res.status(400).json({ message: 'Email e obrigatorio.' });
     }
 
-    await authService.resendVerificationCode(email);
-    return res.status(200).json({ message: 'Novo codigo enviado para o email informado.' });
+    const result = await authService.resendVerificationCode(email);
+    const message = result?.expired
+      ? 'Codigo expirado. Enviamos um novo codigo para o email informado.'
+      : 'Novo codigo enviado para o email informado.';
+    return res.status(200).json({ message });
   } catch (err) {
     if (err.message === 'VERIFICATION_NOT_FOUND') {
       return res.status(404).json({ message: 'Solicitacao de verificacao nao encontrada para este email.' });
