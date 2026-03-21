@@ -159,6 +159,11 @@ export async function createPostComment(postId: number, comentario: string): Pro
   return response.data.comment;
 }
 
+export async function deletePostComment(postId: number, commentId: number): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/posts/${postId}/comments/${commentId}`, { headers });
+}
+
 export async function toggleCommentLike(
   postId: number,
   commentId: number,

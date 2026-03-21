@@ -14,6 +14,7 @@ const followRoutes = require('./src/routes/followRoutes');
 const postRoutes = require('./src/routes/postRoutes');
 const dailyRoutes = require('./src/routes/dailyRoutes');
 const treinoPostRoutes = require('./src/routes/treinoPostRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
 const conversasRoutes = require('./src/routes/conversasRoutes');
 const chatRoutes = require('./src/routes/chatRoutes');
 
@@ -41,6 +42,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/daily', dailyRoutes);
 app.use('/api/treino-posts', treinoPostRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 
 module.exports = app;

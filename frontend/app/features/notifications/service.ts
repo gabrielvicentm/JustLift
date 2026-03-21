@@ -26,3 +26,16 @@ export async function fetchUnreadNotificationsCount(): Promise<number> {
   const response = await api.get<{ unreadCount: number }>("/notifications/unread-count", { headers });
   return Number(response.data.unreadCount || 0);
 }
+
+export async function sendTestPush(title?: string, body?: string) {
+  const headers = await getAuthHeader();
+  const response = await api.post(
+    "/notifications/test",
+    {
+      title: title ?? "Teste Push",
+      body: body ?? "Se chegou, esta ok.",
+    },
+    { headers },
+  );
+  return response.data;
+}
