@@ -39,13 +39,16 @@ export async function uploadMediaToR2(
   size?: number,
 ): Promise<{ url: string; key: string }> {
   const headers = await getAuthHeader();
+  const resolvedSize = size && size > 0
+    ? size
+    : ((await FileSystem.getInfoAsync(uri, { size: true })) as { size?: number }).size ?? 0;
 
   const presignResponse = await api.post<PresignResponse>(
     "/media/presign",
     {
       filename,
       contentType,
-      size: size ?? 0,
+      size: resolvedSize,
     },
     { headers },
   );
@@ -69,7 +72,7 @@ export async function uploadMediaToR2(
     {
       key,
       contentType,
-      size: size ?? 0,
+      size: resolvedSize,
     },
     { headers },
   );
