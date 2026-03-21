@@ -108,6 +108,28 @@ ON follow_requests(target_user_id, created_at DESC);
 CREATE INDEX idx_follow_requests_requester_created
 ON follow_requests(requester_id, created_at DESC);
 
+CREATE TABLE chat (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sender_id UUID NOT NULL,
+  recipient_id UUID NOT NULL,
+  content TEXT NOT NULL,
+  read_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_chat_sender
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_chat_recipient
+    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_chat_not_self
+    CHECK (sender_id <> recipient_id)
+);
+
+CREATE INDEX idx_chat_sender_recipient_created_at
+ON chat(sender_id, recipient_id, created_at DESC);
+
+CREATE INDEX idx_chat_recipient_sender_created_at
+ON chat(recipient_id, sender_id, created_at DESC);
+
 -- A
 CREATE TABLE account_change_verifications (
   user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
