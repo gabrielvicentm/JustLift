@@ -14,6 +14,7 @@ router.post('/:postId/like', authMiddleware, postController.toggleLike);
 router.post('/:postId/save', authMiddleware, postController.toggleSave);
 router.post('/:postId/report', authMiddleware, postController.reportPost);
 router.post('/:postId/comments', authMiddleware, postController.createComment);
+router.delete('/:postId/comments/:commentId', authMiddleware, postController.deleteComment);
 router.post('/:postId/comments/:commentId/like', authMiddleware, postController.toggleCommentLike);
 
 module.exports = router;

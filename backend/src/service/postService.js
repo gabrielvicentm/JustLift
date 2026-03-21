@@ -847,3 +847,31 @@ exports.toggleCommentLike = async ({ postId, commentId, userId }) => {
     likes_count: likesCount.rows[0]?.likes_count || 0,
   };
 };
+
+exports.deleteComment = async ({ postId, commentId, userId }) => {
+  const owner = await getCommentOwner(commentId);
+  if (!owner || owner.post_id !== postId) {
+    return null;
+  }
+
+  const postOwnerId = await getPostOwnerId(postId);
+  if (!postOwnerId) {
+    return null;
+  }
+
+  if (owner.user_id !== userId && postOwnerId !== userId) {
+    return { deleted: false, reason: 'FORBIDDEN' };
+  }
+
+  const deleted = await db.query(
+    `
+      DELETE FROM post_comments
+      WHERE id = $1
+        AND post_id = $2
+      RETURNING id
+    `,
+    [commentId, postId],
+  );
+
+  return deleted.rowCount > 0 ? { deleted: true } : null;
+};
