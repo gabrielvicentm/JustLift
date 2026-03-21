@@ -61,6 +61,10 @@ CREATE TABLE users_profile (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_users_profile_nome_trgm
+ON users_profile
+USING gin (nome_exibicao gin_trgm_ops);
+
 CREATE TABLE user_follows (
   follower_id UUID NOT NULL,
   following_id UUID NOT NULL,
@@ -103,6 +107,28 @@ ON follow_requests(target_user_id, created_at DESC);
 
 CREATE INDEX idx_follow_requests_requester_created
 ON follow_requests(requester_id, created_at DESC);
+
+CREATE TABLE chat (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sender_id UUID NOT NULL,
+  recipient_id UUID NOT NULL,
+  content TEXT NOT NULL,
+  read_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_chat_sender
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_chat_recipient
+    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_chat_not_self
+    CHECK (sender_id <> recipient_id)
+);
+
+CREATE INDEX idx_chat_sender_recipient_created_at
+ON chat(sender_id, recipient_id, created_at DESC);
+
+CREATE INDEX idx_chat_recipient_sender_created_at
+ON chat(recipient_id, sender_id, created_at DESC);
 
 -- A
 CREATE TABLE account_change_verifications (
@@ -542,6 +568,10 @@ CREATE TABLE posts (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE INDEX idx_posts_descricao_trgm
+ON posts
+USING gin (descricao gin_trgm_ops);
+
 CREATE TABLE post_photos (
   photo_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   post_id INT NOT NULL,
@@ -659,6 +689,9 @@ WHERE type = 'user_follow';
 CREATE UNIQUE INDEX uq_notifications_follow_request_once
 ON notifications(recipient_user_id, actor_user_id, type)
 WHERE type = 'follow_request';
+
+CREATE INDEX idx_notifications_recipient_created
+ON notifications(recipient_user_id, created_at DESC);
 
 CREATE INDEX idx_comment_likes_comment_created_at ON comment_likes(comment_id, created_at DESC);
 

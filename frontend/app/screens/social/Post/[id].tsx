@@ -5,6 +5,8 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -16,6 +18,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import { fetchMyProfile, getApiErrorMessage } from "@/app/features/profile/service";
@@ -42,7 +45,8 @@ export default function PostDetailScreen() {
   const initialMediaIndex = Math.max(0, Number(mediaIndexRaw) || 0);
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const mediaWidth = Math.max(windowWidth - 30, 280);
 
   const [post, setPost] = useState<PostDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,9 +85,30 @@ export default function PostDetailScreen() {
 
   const isOwner = Boolean(post && viewerUserId && post.user_id === viewerUserId);
 
+  const createdAtLabel = useMemo(() => {
+    if (!post?.created_at) {
+      return "";
+    }
+
+    const parsed = new Date(post.created_at);
+    if (Number.isNaN(parsed.getTime())) {
+      return "";
+    }
+
+    return parsed.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }, [post?.created_at]);
+
   useEffect(() => {
     loadPost();
   }, [loadPost, postIdRaw]);
+
+  useEffect(() => {
+    setActiveMediaIndex(0);
+  }, [post?.id]);
 
   const handleToggleLike = async () => {
     if (!post || togglingLike) return;
@@ -211,6 +236,24 @@ export default function PostDetailScreen() {
     ]);
   };
 
+  const handleOpenProfile = () => {
+    if (!post?.username) {
+      return;
+    }
+
+    router.push({ pathname: "/screens/social/[username]", params: { username: post.username } } as never);
+  };
+
+
+  const handleMediaScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!post?.midias?.length) {
+      return;
+    }
+
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / mediaWidth);
+    setActiveMediaIndex(Math.max(0, Math.min(nextIndex, post.midias.length - 1)));
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -230,6 +273,8 @@ export default function PostDetailScreen() {
       </View>
     );
   }
+
+  const hasTreino = post.tipo === "treino" && post.treino;
 
   return (
     <KeyboardAvoidingView
@@ -258,36 +303,134 @@ export default function PostDetailScreen() {
           ) : null}
         </View>
 
-        <View style={styles.profileSection}>
-          <View style={styles.bannerWrapper}>
+        <LinearGradient
+          colors={[theme.colors.surface, theme.colors.inputBackground]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.authorCard}
+        >
+          <Pressable style={styles.authorRow} onPress={handleOpenProfile}>
             {post.foto_perfil ? (
-              <Image source={{ uri: post.foto_perfil }} style={styles.bannerImage} />
+              <Image source={{ uri: post.foto_perfil }} style={styles.avatar} />
             ) : (
-              <View style={styles.bannerPlaceholder} />
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarFallbackText}>
+                  {(post.nome_exibicao || post.username || "U").slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.authorInfo}>
+              <Text style={styles.authorName}>{post.nome_exibicao || post.username}</Text>
+              <Text style={styles.authorUser}>@{post.username}</Text>
+            </View>
+            {createdAtLabel ? <Text style={styles.postDate}>{createdAtLabel}</Text> : null}
+          </Pressable>
+        </LinearGradient>
+
+        <View style={styles.postCard}>
+          <View style={styles.mediaFrame}>
+            {(post.midias ?? []).length === 0 ? (
+              <View style={[styles.media, styles.mediaEmpty]}>
+                <Ionicons name="images-outline" size={26} color={theme.colors.mutedText} />
+                <Text style={styles.mediaEmptyText}>Sem midia</Text>
+              </View>
+            ) : (
+              <>
+                <ScrollView
+                  horizontal
+                  pagingEnabled
+                  nestedScrollEnabled
+                  showsHorizontalScrollIndicator={false}
+                  scrollEventThrottle={16}
+                  onMomentumScrollEnd={handleMediaScroll}
+                  scrollEnabled={(post.midias?.length ?? 0) > 1}
+                  style={styles.mediaCarousel}
+                >
+                  {(post.midias ?? []).map((media) => (
+                    <View key={media.id} style={[styles.mediaCard, { width: mediaWidth }]}>
+                      {media.type === "image" ? (
+                        <Image source={{ uri: media.url }} style={styles.media} />
+                      ) : (
+                        <View style={[styles.media, styles.videoPlaceholder]}>
+                          <Ionicons name="videocam" size={28} color={theme.colors.buttonText} />
+                          <Text style={styles.videoPlaceholderText}>Video</Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
+
+                {(post.midias?.length ?? 0) > 1 ? (
+                  <>
+                    <View style={styles.mediaCounterBadge}>
+                      <Text style={styles.mediaCounterText}>{activeMediaIndex + 1}/{post.midias.length}</Text>
+                    </View>
+                    <View style={styles.mediaDots}>
+                      {(post.midias ?? []).map((media, index) => (
+                        <View
+                          key={media.id}
+                          style={[
+                            styles.mediaDot,
+                            index === activeMediaIndex && styles.mediaDotActive,
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </>
+                ) : null}
+              </>
             )}
           </View>
 
-          <View style={styles.profileTopRow}>
-            <View style={styles.avatarOverlap}>
-              <View style={styles.avatarRing}>
-                {post.foto_perfil ? (
-                  <Image source={{ uri: post.foto_perfil }} style={styles.avatarLarge} />
-                ) : (
-                  <View style={[styles.avatarLarge, styles.avatarFallback]}>
-                    <Text style={styles.avatarFallbackText}>
-                      {(post.nome_exibicao || post.username || "U").slice(0, 1).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-              </View>
+          <View style={styles.postBody}>
+            <View style={styles.actionsRow}>
+              <Pressable style={styles.actionButton} onPress={handleToggleLike} disabled={togglingLike}>
+                <Ionicons
+                  name={post.viewer_liked ? "heart" : "heart-outline"}
+                  size={22}
+                  color={post.viewer_liked ? theme.colors.error : theme.colors.text}
+                />
+              </Pressable>
+              <Pressable style={styles.actionButton} onPress={() => commentInputRef.current?.focus()}>
+                <Ionicons name="chatbubble-outline" size={22} color={theme.colors.text} />
+              </Pressable>
+              <View style={styles.actionSpacer} />
+              <Pressable style={styles.actionButton} onPress={handleToggleSave} disabled={togglingSave}>
+                <Ionicons
+                  name={post.viewer_saved ? "bookmark" : "bookmark-outline"}
+                  size={22}
+                  color={theme.colors.text}
+                />
+              </Pressable>
             </View>
 
-            <View style={styles.profileInfo}>
-              <View style={styles.nameBlock}>
-                <Text style={styles.nameText}>{post.nome_exibicao || post.username}</Text>
-                <Text style={styles.userText}>@{post.username}</Text>
-              </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.likesText}>{post.likes_count} curtidas</Text>
+              <Text style={styles.commentsMeta}>{post.comments_count} comentarios</Text>
             </View>
+
+            {post.descricao ? (
+              <View style={styles.descriptionCard}>
+                <Text style={styles.description}>
+                  <Text style={styles.descriptionAuthor}>{post.nome_exibicao || post.username}</Text>{" "}
+                  {post.descricao}
+                </Text>
+              </View>
+            ) : null}
+
+            {hasTreino ? (
+              <View style={styles.treinoResumo}>
+                <Text style={styles.treinoBadge}>Treino compartilhado</Text>
+                <View style={styles.treinoMetrics}>
+                  <Text style={styles.treinoMetricText}>
+                    Duracao {post.treino?.duracao ? Math.round(post.treino.duracao / 60) : 0} min
+                  </Text>
+                  <Text style={styles.treinoMetricText}>Peso {Number(post.treino?.peso_total ?? 0).toFixed(1)}kg</Text>
+                  <Text style={styles.treinoMetricText}>Series {post.treino?.total_series ?? 0}</Text>
+                  <Text style={styles.treinoMetricText}>Exercicios {post.treino?.total_exercicios ?? 0}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -353,77 +496,89 @@ export default function PostDetailScreen() {
                 size={22}
                 color={theme.colors.text}
               />
+        <View style={styles.commentsSection}>
+          <LinearGradient
+            colors={[theme.colors.surface, theme.colors.inputBackground]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.commentsHeaderCard}
+          >
+            <View style={styles.commentsHeader}>
+              <Text style={styles.commentsTitle}>Comentarios</Text>
+              <Text style={styles.commentsCountBadge}>{post.comments_count}</Text>
+            </View>
+          </LinearGradient>
+
+            <View style={styles.commentComposer}>
+            <TextInput
+              ref={commentInputRef}
+              value={commentInput}
+              onChangeText={setCommentInput}
+              style={styles.commentInput}
+              placeholder="Adicione um comentario..."
+              placeholderTextColor={theme.colors.mutedText}
+              editable={!sendingComment}
+              maxLength={400}
+            />
+            <Pressable style={styles.sendButton} onPress={handleCreateComment} disabled={sendingComment}>
+              {sendingComment ? (
+                <ActivityIndicator color={theme.colors.buttonText} />
+              ) : (
+                <Text style={styles.sendButtonText}>Publicar</Text>
+              )}
             </Pressable>
           </View>
-
-          <>
-            <Text style={styles.likesText}>{post.likes_count} curtidas</Text>
-            {post.descricao ? (
-              <Text style={styles.description}>
-                <Text style={styles.descriptionAuthor}>
-                  {post.nome_exibicao || post.username}
-                </Text>{" "}
-                {post.descricao}
-              </Text>
-            ) : null}
-          </>
-        </View>
-
-        <View style={styles.commentComposer}>
-          <TextInput
-            value={commentInput}
-            onChangeText={setCommentInput}
-            style={styles.commentInput}
-            placeholder="Adicione um comentario..."
-            placeholderTextColor={theme.colors.mutedText}
-            editable={!sendingComment}
-            maxLength={400}
-          />
-          <Pressable style={styles.sendButton} onPress={handleCreateComment} disabled={sendingComment}>
-            {sendingComment ? (
-              <ActivityIndicator color={theme.colors.buttonText} />
-            ) : (
-              <Text style={styles.sendButtonText}>Publicar</Text>
-            )}
-          </Pressable>
-        </View>
 
         {post.comments_count > 0 ? (
           <Pressable style={styles.viewAll} onPress={() => setShowAllComments((prev) => !prev)}>
             <Text style={styles.viewAllText}>
-              {showAllComments
-                ? "Ocultar comentários"
-                : `Ver todos os ${post.comments_count} comentários`}
+              {showAllComments ? "Ocultar comentarios" : `Ver todos os ${post.comments_count} comentarios`}
             </Text>
           </Pressable>
         ) : null}
+
         {post.comentarios.length === 0 ? <Text style={styles.emptyComment}>Nenhum comentario ainda.</Text> : null}
+
         {(showAllComments ? post.comentarios : post.comentarios.slice(0, 2)).map((comment) => (
           <View key={comment.id} style={styles.commentCard}>
-            <View style={styles.commentTop}>
-              <Text style={styles.commentAuthor}>{comment.nome_exibicao || comment.username || "Usuario"}</Text>
-              <Pressable
-                style={styles.commentLikeButton}
-                onPress={() => handleToggleCommentLike(comment.id)}
-                disabled={togglingCommentLike[comment.id]}
-              >
-                <Ionicons
-                  name={comment.viewer_liked ? "heart" : "heart-outline"}
-                  size={14}
-                  color={theme.colors.text}
-                />
-                <Text style={styles.commentLikeText}>{comment.likes_count}</Text>
-              </Pressable>
+            {comment.foto_perfil ? (
+              <Image source={{ uri: comment.foto_perfil }} style={styles.commentAvatar} />
+            ) : (
+              <View style={[styles.commentAvatar, styles.commentAvatarFallback]}>
+                <Text style={styles.commentAvatarFallbackText}>
+                  {(comment.nome_exibicao || comment.username || "U").slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.commentBody}>
+              <View style={styles.commentTop}>
+                <Text style={styles.commentAuthor}>{comment.nome_exibicao || comment.username || "Usuario"}</Text>
+                <Pressable
+                  style={styles.commentLikeButton}
+                  onPress={() => handleToggleCommentLike(comment.id)}
+                  disabled={togglingCommentLike[comment.id]}
+                >
+                  <Ionicons
+                    name={comment.viewer_liked ? "heart" : "heart-outline"}
+                    size={14}
+                    color={theme.colors.text}
+                  />
+                  <Text style={styles.commentLikeText}>{comment.likes_count}</Text>
+                </Pressable>
+              </View>
+              {comment.username ? <Text style={styles.commentUser}>@{comment.username}</Text> : null}
+              <Text style={styles.commentText}>{comment.comentario}</Text>
             </View>
-            <Text style={styles.commentText}>{comment.comentario}</Text>
           </View>
         ))}
 
-        <View style={styles.extraActions}>
-          <Pressable style={styles.reportButton} onPress={handleReport} disabled={reporting}>
-            <Ionicons name="flag-outline" size={16} color={theme.colors.text} />
-            <Text style={styles.reportText}>Denunciar</Text>
-          </Pressable>
+          <View style={styles.extraActions}>
+            <Pressable style={styles.reportButton} onPress={handleReport} disabled={reporting}>
+              <Ionicons name="flag-outline" size={16} color={theme.colors.text} />
+              <Text style={styles.reportText}>Denunciar</Text>
+            </Pressable>
+          </View>
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -439,9 +594,10 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.background,
     },
     contentContainer: {
-      padding: 16,
-      gap: 12,
-      paddingBottom: 44,
+      paddingHorizontal: 14,
+      paddingTop: 16,
+      gap: 16,
+      paddingBottom: 52,
     },
     center: {
       flex: 1,
@@ -459,103 +615,50 @@ function createStyles(theme: AppTheme) {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
+      marginBottom: 6,
     },
     backButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
       alignItems: "center",
       justifyContent: "center",
-    },
-    manageButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    profileSection: {
-      gap: 10,
-      borderRadius: 16,
       backgroundColor: theme.colors.surface,
-      padding: 14,
-      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
-    bannerWrapper: {
-      width: "100%",
-      height: 90,
-      borderRadius: 12,
-      overflow: "hidden",
-      backgroundColor: theme.colors.inputBackground,
-    },
-    bannerImage: {
-      width: "100%",
-      height: "100%",
-    },
-    bannerPlaceholder: {
-      flex: 1,
-      backgroundColor: theme.colors.inputBackground,
-    },
-    profileTopRow: {
-      flexDirection: "row",
-      gap: 14,
-      alignItems: "flex-end",
-      marginTop: 12,
-    },
-    avatarOverlap: {
-      marginTop: -72,
-      zIndex: 2,
-    },
-    avatarRing: {
-      width: 104,
-      height: 104,
-      borderRadius: 52,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.inputBackground,
-      position: "relative",
-    },
-    avatarLarge: {
-      width: 94,
-      height: 94,
-      borderRadius: 47,
-      backgroundColor: theme.colors.inputBackground,
-    },
-    profileInfo: {
-      flex: 1,
-      minHeight: 104,
-      justifyContent: "space-between",
-      paddingBottom: 4,
-      gap: 6,
-    },
-    nameBlock: {
-      gap: 2,
-    },
-    nameText: {
+    backButtonText: {
       color: theme.colors.text,
-      fontSize: 17,
       fontWeight: "700",
     },
-    userText: {
-      color: theme.colors.mutedText,
-      fontSize: 12,
+    manageButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
-    postCard: {
-      borderWidth: 0,
-      backgroundColor: "transparent",
-      paddingHorizontal: 0,
-      gap: 10,
+    authorCard: {
+      borderRadius: 22,
+      padding: 1,
     },
     authorRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 21,
+      backgroundColor: theme.colors.surface,
+      paddingLeft: 12,
+      paddingRight: 12,
     },
     avatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: theme.colors.inputBackground,
     },
     avatarFallback: {
@@ -571,22 +674,50 @@ function createStyles(theme: AppTheme) {
     },
     authorInfo: {
       gap: 2,
+      flex: 1,
     },
     authorName: {
       color: theme.colors.text,
-      fontWeight: "700",
+      fontWeight: "800",
       fontSize: 15,
     },
     authorUser: {
       color: theme.colors.mutedText,
-      fontSize: 12,
+      fontSize: 11,
+    },
+    postDate: {
+      color: theme.colors.mutedText,
+      fontSize: 10,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      backgroundColor: theme.colors.inputBackground,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      overflow: "hidden",
+    },
+    postCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      overflow: "hidden",
+      shadowColor: "#000000",
+      shadowOpacity: 0.22,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 10,
+    },
+    mediaFrame: {
+      backgroundColor: "#05070B",
+      position: "relative",
+    },
+    mediaCarousel: {
+      width: "100%",
     },
     mediaCard: {
-      borderWidth: 0,
-      borderRadius: 0,
       overflow: "hidden",
-      backgroundColor: theme.colors.surface,
-      marginHorizontal: -16,
+      backgroundColor: "#05070B",
     },
     mediaWrapper: {
       position: "relative",
@@ -594,8 +725,55 @@ function createStyles(theme: AppTheme) {
     },
     media: {
       width: "100%",
-      height: 320,
-      backgroundColor: theme.colors.inputBackground,
+      height: 460,
+      backgroundColor: "#05070B",
+    },
+    mediaCounterBadge: {
+      position: "absolute",
+      top: 14,
+      right: 14,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: "rgba(0, 0, 0, 0.58)",
+    },
+    mediaCounterText: {
+      color: "#FFFFFF",
+      fontSize: 11,
+      fontWeight: "700",
+    },
+    mediaDots: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 14,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 6,
+    },
+    mediaDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: "rgba(255, 255, 255, 0.38)",
+    },
+    mediaDotActive: {
+      width: 18,
+      backgroundColor: theme.colors.button,
+    },
+    mediaEmpty: {
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    mediaEmptyText: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+      fontWeight: "600",
     },
     videoPlaceholder: {
       alignItems: "center",
@@ -620,57 +798,156 @@ function createStyles(theme: AppTheme) {
       color: "#ffffff",
       fontWeight: "700",
       fontSize: 12,
+    postBody: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 18,
+      gap: 14,
+      backgroundColor: theme.colors.surface,
     },
     actionsRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 14,
-      paddingHorizontal: 16,
+      gap: 8,
+      padding: 8,
+      borderRadius: 16,
+      backgroundColor: theme.colors.inputBackground,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    actionButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     actionSpacer: {
       flex: 1,
     },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingBottom: 2,
+      paddingHorizontal: 2,
+    },
     likesText: {
       color: theme.colors.text,
-      fontWeight: "700",
+      fontWeight: "800",
       fontSize: 13,
-      paddingHorizontal: 16,
+    },
+    descriptionCard: {
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      borderRadius: 18,
+      backgroundColor: theme.colors.inputBackground,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    commentsMeta: {
+      color: theme.colors.mutedText,
+      fontSize: 11,
+      fontWeight: "700",
     },
     description: {
       color: theme.colors.text,
       fontSize: 14,
-      lineHeight: 20,
-      paddingHorizontal: 16,
+      lineHeight: 22,
     },
     descriptionAuthor: {
       fontWeight: "700",
       color: theme.colors.text,
     },
+    treinoResumo: {
+      gap: 8,
+      padding: 14,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.inputBackground,
+    },
+    treinoBadge: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: theme.colors.text,
+    },
+    treinoMetrics: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    treinoMetricText: {
+      fontSize: 11,
+      color: theme.colors.mutedText,
+      fontWeight: "600",
+    },
+    commentsSection: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 22,
+      backgroundColor: theme.colors.surface,
+      padding: 14,
+      gap: 12,
+      shadowColor: "#000000",
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
+    },
+    commentsHeaderCard: {
+      borderRadius: 18,
+      padding: 1,
+    },
+    commentsHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    commentsTitle: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+    commentsCountBadge: {
+      minWidth: 28,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: theme.colors.inputBackground,
+      color: theme.colors.text,
+      textAlign: "center",
+      fontSize: 11,
+      fontWeight: "800",
+    },
     commentComposer: {
       flexDirection: "row",
       gap: 8,
       alignItems: "center",
-      paddingHorizontal: 16,
     },
     commentInput: {
       flex: 1,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: 12,
+      borderRadius: 14,
       backgroundColor: theme.colors.inputBackground,
       color: theme.colors.text,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      minHeight: 44,
+      minHeight: 46,
     },
     sendButton: {
-      height: 44,
-      borderRadius: 12,
-      paddingHorizontal: 14,
+      height: 46,
+      borderRadius: 14,
+      paddingHorizontal: 16,
       backgroundColor: theme.colors.button,
       alignItems: "center",
       justifyContent: "center",
-      minWidth: 92,
+      minWidth: 96,
     },
     sendButtonText: {
       color: theme.colors.buttonText,
@@ -680,8 +957,7 @@ function createStyles(theme: AppTheme) {
       letterSpacing: 0.6,
     },
     viewAll: {
-      paddingHorizontal: 16,
-      paddingTop: 6,
+      paddingTop: 2,
     },
     viewAllText: {
       color: theme.colors.mutedText,
@@ -692,26 +968,56 @@ function createStyles(theme: AppTheme) {
       fontSize: 13,
     },
     commentCard: {
-      borderWidth: 0,
-      backgroundColor: "transparent",
-      borderRadius: 0,
-      paddingHorizontal: 16,
-      paddingVertical: 6,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.inputBackground,
+      borderRadius: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    commentAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.colors.surface,
+    },
+    commentAvatarFallback: {
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    commentAvatarFallbackText: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+    commentBody: {
+      flex: 1,
       gap: 4,
     },
     commentTop: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
+      gap: 10,
     },
     commentAuthor: {
       color: theme.colors.text,
-      fontWeight: "700",
+      fontWeight: "800",
       fontSize: 13,
+    },
+    commentUser: {
+      color: theme.colors.mutedText,
+      fontSize: 11,
     },
     commentText: {
       color: theme.colors.text,
       fontSize: 14,
+      lineHeight: 20,
     },
     commentLikeButton: {
       flexDirection: "row",
@@ -725,16 +1031,18 @@ function createStyles(theme: AppTheme) {
     },
     extraActions: {
       alignItems: "flex-start",
-      paddingHorizontal: 16,
+      paddingTop: 4,
     },
     reportButton: {
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
-      borderWidth: 0,
-      paddingHorizontal: 0,
-      paddingVertical: 6,
-      backgroundColor: "transparent",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: theme.colors.inputBackground,
     },
     reportText: {
       color: theme.colors.text,

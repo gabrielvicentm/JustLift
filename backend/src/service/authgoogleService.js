@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const db = require('../utils/db');
 
@@ -72,7 +73,7 @@ exports.registerWithGoogle = async (username, googleIdToken, providedGoogleId) =
     throw new Error('DUPLICATE_USER');
   }
 
-  const randomPassword = `google_${googleId}_${Date.now()}`;
+  const randomPassword = crypto.randomBytes(32).toString('hex');
   const hashedPassword = bcrypt.hashSync(randomPassword, 10);
 
   const createdUser = await db.query(

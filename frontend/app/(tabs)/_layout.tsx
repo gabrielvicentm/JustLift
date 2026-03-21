@@ -41,8 +41,9 @@ export default function TabsLayout() {
         },
       })}
     >
-      <Tabs.Screen name="home_tab" options={{ title: "Home" }} />
-      <Tabs.Screen name="diario_tab" options={{ title: "Diario" }} />
+      <Tabs.Screen name="home_tab" options={{ title: "Início" }} />
+      <Tabs.Screen name="conversas_tab" options={{ title: "Conversas" }} />
+      <Tabs.Screen name="diario_tab" options={{ title: "Diário" }} />
       <Tabs.Screen
         name="perfil_tab"
         options={{
@@ -63,6 +64,8 @@ function getIconName(routeName: string): keyof typeof Ionicons.glyphMap {
   switch (routeName) {
     case "home_tab":
       return "home";
+    case "conversas_tab":
+      return "chatbubbles";
     case "diario_tab":
       return "barbell";
     case "perfil_tab":

@@ -190,8 +190,7 @@ export default function PerfilScreen() {
             )}
           </View>
 
-          <View style={styles.profileTopRow}>
-            <View style={styles.avatarOverlap}>
+          <View style={styles.avatarOverlap}>
               <Pressable
                 style={styles.avatarRing}
                 onPress={handleOpenDaily}
@@ -210,10 +209,13 @@ export default function PerfilScreen() {
               </Pressable>
             </View>
 
+          <View style={styles.profileTopRow}>
             <View style={styles.profileInfo}>
               <View style={styles.nameBlock}>
-                <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Seu perfil"}</Text>
-                {profile?.username ? <Text style={styles.userText}>@{profile.username}</Text> : null}
+                <View style={styles.nameRow}>
+                  <Text style={styles.nameText}>{profile?.nome_exibicao || profile?.username || "Seu perfil"}</Text>
+                  {profile?.username ? <Text style={styles.userText}>@{profile.username}</Text> : null}
+                </View>
               </View>
 
               <View style={styles.statsRow}>
@@ -319,61 +321,43 @@ export default function PerfilScreen() {
               </Text>
             </View>
           ) : null}
+          <View style={styles.postsGrid}>
+            {visiblePosts.map((item) => {
+              const firstMedia = item.midias?.[0];
+              const isTreino = item.tipo === "treino" && item.treino;
+              const isVideo = firstMedia?.type !== "image";
 
-          {visiblePosts.map((item) => {
-            const firstMedia = item.midias?.[0];
-            const isTreino = item.tipo === "treino" && item.treino;
-
-            return (
-              <Pressable
-                key={item.id}
-                style={styles.postCard}
-                onPress={() => router.push(`/screens/social/Post/${item.id}` as never)}
-              >
-                {firstMedia ? (
-                  firstMedia.type === "image" ? (
-                    <Image source={{ uri: firstMedia.url }} style={styles.postPreview} />
+              return (
+                <Pressable
+                  key={item.id}
+                  style={styles.gridItem}
+                  onPress={() => router.push(`/screens/social/Post/${item.id}` as never)}
+                >
+                  {firstMedia ? (
+                    firstMedia.type === "image" ? (
+                      <Image source={{ uri: firstMedia.url }} style={styles.gridPreview} />
+                    ) : (
+                      <View style={[styles.gridPreview, styles.gridPlaceholder]}>
+                        <Ionicons name="videocam" size={20} color={theme.colors.buttonText} />
+                      </View>
+                    )
                   ) : (
-                    <View style={[styles.postPreview, styles.videoPreview]}>
-                      <Ionicons name="videocam" size={20} color={theme.colors.buttonText} />
-                      <Text style={styles.videoPreviewText}>Video</Text>
+                    <View style={[styles.gridPreview, styles.gridPlaceholder]}>
+                      <Ionicons name="images-outline" size={20} color={theme.colors.buttonText} />
                     </View>
-                  )
-                ) : null}
+                  )}
 
-                {isTreino ? (
-                  <View style={styles.treinoResumo}>
-                    <Text style={styles.treinoBadge}>Treino compartilhado</Text>
-                    <View style={styles.treinoMetrics}>
-                      <Text style={styles.treinoMetricText}>
-                        Duracao {item.treino?.duracao ? Math.round(item.treino.duracao / 60) : 0} min
-                      </Text>
-                      <Text style={styles.treinoMetricText}>
-                        Peso {Number(item.treino?.peso_total ?? 0).toFixed(1)}kg
-                      </Text>
-                      <Text style={styles.treinoMetricText}>Series {item.treino?.total_series ?? 0}</Text>
-                      <Text style={styles.treinoMetricText}>
-                        Exercicios {item.treino?.total_exercicios ?? 0}
-                      </Text>
+                  {isVideo || isTreino ? (
+                    <View style={styles.gridBadge}>
+                      {isVideo ? <Ionicons name="play" size={11} color={theme.colors.buttonText} /> : null}
+                      {isTreino ? <Ionicons name="barbell-outline" size={11} color={theme.colors.buttonText} /> : null}
                     </View>
-                  </View>
-                ) : null}
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
 
-                {item.descricao ? <Text style={styles.postDescription}>{item.descricao}</Text> : null}
-
-                <View style={styles.postMetaRow}>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="heart-outline" size={14} color={theme.colors.mutedText} />
-                    <Text style={styles.postMetaText}>{item.likes_count}</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="chatbubble-outline" size={14} color={theme.colors.mutedText} />
-                    <Text style={styles.postMetaText}>{item.comments_count}</Text>
-                  </View>
-                </View>
-              </Pressable>
-            );
-          })}
         </View>
       </ScrollView>
       <PremiumAdModal
@@ -427,15 +411,18 @@ function createStyles(theme: AppTheme) {
       backgroundColor: theme.colors.surface,
     },
     profileSection: {
-      gap: 10,
+      gap: 0,
       borderRadius: 16,
       backgroundColor: theme.colors.surface,
       padding: 14,
+      position: "relative",
     },
     bannerWrapper: {
-      width: "100%",
-      height: 90,
-      borderRadius: 12,
+      marginHorizontal: -14,
+      marginTop: -14,
+      height: 136,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
       overflow: "hidden",
       backgroundColor: theme.colors.inputBackground,
     },
@@ -449,23 +436,29 @@ function createStyles(theme: AppTheme) {
     },
     profileTopRow: {
       flexDirection: "row",
-      gap: 14,
-      alignItems: "flex-end",
+      alignItems: "flex-start",
       marginTop: 12,
+      paddingLeft: 118,
     },
     avatarOverlap: {
-      marginTop: -90,
+      position: "absolute",
+      left: 14,
+      top: 88,
       zIndex: 2,
     },
     profileInfo: {
       flex: 1,
-      minHeight: 104,
-      justifyContent: "space-between",
-      paddingBottom: 4,
-      gap: 6,
+      paddingTop: 10,
+      gap: 10,
     },
     nameBlock: {
-      gap: 2,
+      gap: 0,
+    },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: 6,
+      flexWrap: "wrap",
     },
     avatarRing: {
       width: 104,
@@ -509,25 +502,27 @@ function createStyles(theme: AppTheme) {
     statsRow: {
       flexDirection: "row",
       justifyContent: "flex-start",
-      gap: 20,
-      marginTop: 2,
+      alignItems: "flex-start",
+      gap: 18,
     },
     statItem: {
+      flexDirection: "row",
       alignItems: "center",
-      gap: 2,
-      minWidth: 72,
+      gap: 6,
+      minWidth: 0,
     },
     statValue: {
       color: theme.colors.text,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: "800",
     },
     statLabel: {
       color: theme.colors.mutedText,
-      fontSize: 11,
+      fontSize: 9,
       fontWeight: "600",
       textTransform: "uppercase",
-      letterSpacing: 0.4,
+      letterSpacing: 0.2,
+      lineHeight: 12,
     },
     nameText: {
       color: theme.colors.text,
@@ -536,13 +531,16 @@ function createStyles(theme: AppTheme) {
     },
     userText: {
       color: theme.colors.mutedText,
-      fontSize: 12,
+      fontSize: 11,
     },
     bioText: {
-      color: theme.colors.text,
+      color: theme.colors.mutedText,
       fontSize: 13,
-      lineHeight: 18,
-      marginTop: 2,
+      lineHeight: 20,
+      marginTop: 12,
+      paddingLeft: 10,
+      borderLeftWidth: 2,
+      borderLeftColor: theme.colors.border,
     },
     actionRow: {
       flexDirection: "row",
@@ -674,72 +672,39 @@ function createStyles(theme: AppTheme) {
       gap: 8,
       paddingVertical: 10,
     },
-    postCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 14,
-      backgroundColor: theme.colors.surface,
-      overflow: "hidden",
-      padding: 12,
-      gap: 10,
+    postsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      rowGap: 8,
     },
-    postPreview: {
-      width: "100%",
-      height: 190,
+    gridItem: {
+      width: "32%",
+      aspectRatio: 1,
       borderRadius: 10,
+      overflow: "hidden",
+    },
+    gridPreview: {
+      width: "100%",
+      height: "100%",
       backgroundColor: theme.colors.inputBackground,
     },
-    videoPreview: {
+    gridPlaceholder: {
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.colors.button,
+    },
+    gridBadge: {
+      position: "absolute",
+      top: 6,
+      right: 6,
+      flexDirection: "row",
+      alignItems: "center",
       gap: 4,
-    },
-    videoPreviewText: {
-      color: theme.colors.buttonText,
-      fontWeight: "700",
-    },
-    treinoResumo: {
-      gap: 6,
-      padding: 10,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.inputBackground,
-    },
-    treinoBadge: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: theme.colors.text,
-    },
-    treinoMetrics: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 6,
-    },
-    treinoMetricText: {
-      fontSize: 11,
-      color: theme.colors.mutedText,
-      fontWeight: "600",
-    },
-    postDescription: {
-      color: theme.colors.text,
-      fontSize: 14,
-    },
-    postMetaRow: {
-      flexDirection: "row",
-      gap: 12,
-      alignItems: "center",
-    },
-    metaItem: {
-      flexDirection: "row",
-      gap: 6,
-      alignItems: "center",
-    },
-    postMetaText: {
-      color: theme.colors.mutedText,
-      fontSize: 12,
-      fontWeight: "600",
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: "rgba(0,0,0,0.55)",
     },
   });
 }
