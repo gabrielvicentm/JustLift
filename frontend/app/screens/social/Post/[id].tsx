@@ -32,6 +32,12 @@ import {
 } from "@/app/features/social/service";
 import type { PostDetail } from "@/app/features/social/types";
 
+const HERO_GRADIENT = ["#07101D", "#16112F", "#290F35"] as const;
+const SURFACE_GRADIENT = ["rgba(91, 231, 255, 0.22)", "rgba(124, 92, 255, 0.18)", "rgba(255, 75, 216, 0.2)"] as const;
+const GLOW_GRADIENT = ["rgba(91, 231, 255, 0.28)", "rgba(255, 75, 216, 0.16)", "transparent"] as const;
+const ACTION_GRADIENT = ["rgba(91, 231, 255, 0.16)", "rgba(124, 92, 255, 0.14)"] as const;
+const COMMENT_CARD_GRADIENT = ["rgba(12, 16, 28, 0.96)", "rgba(19, 12, 37, 0.96)"] as const;
+
 export default function PostDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -238,7 +244,6 @@ export default function PostDetailScreen() {
     router.push({ pathname: "/screens/social/[username]", params: { username: post.username } } as never);
   };
 
-
   const handleMediaScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!post?.midias?.length) {
       return;
@@ -269,6 +274,7 @@ export default function PostDetailScreen() {
   }
 
   const hasTreino = post.tipo === "treino" && post.treino;
+  const visibleComments = showAllComments ? post.comentarios : post.comentarios.slice(0, 2);
 
   return (
     <KeyboardAvoidingView
@@ -281,6 +287,10 @@ export default function PostDetailScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
+        <View pointerEvents="none" style={styles.orbPrimary} />
+        <View pointerEvents="none" style={styles.orbSecondary} />
+        <View pointerEvents="none" style={styles.gridOverlay} />
+
         <View style={styles.topRow}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
@@ -297,13 +307,9 @@ export default function PostDetailScreen() {
           ) : null}
         </View>
 
-        <LinearGradient
-          colors={[theme.colors.surface, theme.colors.inputBackground]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.authorCard}
-        >
-          <Pressable style={styles.authorRow} onPress={handleOpenProfile}>
+        <LinearGradient colors={SURFACE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.authorCard}>
+          <LinearGradient colors={GLOW_GRADIENT} style={styles.authorGlow} />
+          <Pressable style={styles.authorShellCompact} onPress={handleOpenProfile}>
             {post.foto_perfil ? (
               <Image source={{ uri: post.foto_perfil }} style={styles.avatar} />
             ) : (
@@ -321,127 +327,150 @@ export default function PostDetailScreen() {
           </Pressable>
         </LinearGradient>
 
-        <View style={styles.postCard}>
-          <View style={styles.mediaFrame}>
-            {(post.midias ?? []).length === 0 ? (
-              <View style={[styles.media, styles.mediaEmpty]}>
-                <Ionicons name="images-outline" size={26} color={theme.colors.mutedText} />
-                <Text style={styles.mediaEmptyText}>Sem midia</Text>
-              </View>
-            ) : (
-              <>
-                <ScrollView
-                  horizontal
-                  pagingEnabled
-                  nestedScrollEnabled
-                  showsHorizontalScrollIndicator={false}
-                  scrollEventThrottle={16}
-                  onMomentumScrollEnd={handleMediaScroll}
-                  scrollEnabled={(post.midias?.length ?? 0) > 1}
-                  style={styles.mediaCarousel}
-                >
-                  {(post.midias ?? []).map((media) => (
-                    <View key={media.id} style={[styles.mediaCard, { width: mediaWidth }]}>
-                      {media.type === "image" ? (
-                        <Image source={{ uri: media.url }} style={styles.media} />
-                      ) : (
-                        <View style={[styles.media, styles.videoPlaceholder]}>
-                          <Ionicons name="videocam" size={28} color={theme.colors.buttonText} />
-                          <Text style={styles.videoPlaceholderText}>Video</Text>
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </ScrollView>
-
-                {(post.midias?.length ?? 0) > 1 ? (
-                  <>
-                    <View style={styles.mediaCounterBadge}>
-                      <Text style={styles.mediaCounterText}>{activeMediaIndex + 1}/{post.midias.length}</Text>
-                    </View>
-                    <View style={styles.mediaDots}>
-                      {(post.midias ?? []).map((media, index) => (
-                        <View
-                          key={media.id}
-                          style={[
-                            styles.mediaDot,
-                            index === activeMediaIndex && styles.mediaDotActive,
-                          ]}
-                        />
-                      ))}
-                    </View>
-                  </>
-                ) : null}
-              </>
-            )}
-          </View>
-
-          <View style={styles.postBody}>
-            <View style={styles.actionsRow}>
-              <Pressable style={styles.actionButton} onPress={handleToggleLike} disabled={togglingLike}>
-                <Ionicons
-                  name={post.viewer_liked ? "heart" : "heart-outline"}
-                  size={22}
-                  color={post.viewer_liked ? theme.colors.error : theme.colors.text}
-                />
-              </Pressable>
-              <Pressable style={styles.actionButton} onPress={() => commentInputRef.current?.focus()}>
-                <Ionicons name="chatbubble-outline" size={22} color={theme.colors.text} />
-              </Pressable>
-              <View style={styles.actionSpacer} />
-              <Pressable style={styles.actionButton} onPress={handleToggleSave} disabled={togglingSave}>
-                <Ionicons
-                  name={post.viewer_saved ? "bookmark" : "bookmark-outline"}
-                  size={22}
-                  color={theme.colors.text}
-                />
-              </Pressable>
-            </View>
-
-            <View style={styles.metaRow}>
-              <Text style={styles.likesText}>{post.likes_count} curtidas</Text>
-              <Text style={styles.commentsMeta}>{post.comments_count} comentarios</Text>
-            </View>
-
-            {post.descricao ? (
-              <View style={styles.descriptionCard}>
-                <Text style={styles.description}>
-                  <Text style={styles.descriptionAuthor}>{post.nome_exibicao || post.username}</Text>{" "}
-                  {post.descricao}
-                </Text>
-              </View>
-            ) : null}
-
-            {hasTreino ? (
-              <View style={styles.treinoResumo}>
-                <Text style={styles.treinoBadge}>Treino compartilhado</Text>
-                <View style={styles.treinoMetrics}>
-                  <Text style={styles.treinoMetricText}>
-                    Duracao {post.treino?.duracao ? Math.round(post.treino.duracao / 60) : 0} min
-                  </Text>
-                  <Text style={styles.treinoMetricText}>Peso {Number(post.treino?.peso_total ?? 0).toFixed(1)}kg</Text>
-                  <Text style={styles.treinoMetricText}>Series {post.treino?.total_series ?? 0}</Text>
-                  <Text style={styles.treinoMetricText}>Exercicios {post.treino?.total_exercicios ?? 0}</Text>
+        <LinearGradient colors={SURFACE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.postCardBorder}>
+          <View style={styles.postCard}>
+            <View style={styles.mediaFrame}>
+              <LinearGradient colors={HERO_GRADIENT} style={styles.mediaBackdrop} />
+              {(post.midias ?? []).length === 0 ? (
+                <View style={[styles.media, styles.mediaEmpty]}>
+                  <Ionicons name="images-outline" size={26} color={theme.colors.mutedText} />
+                  <Text style={styles.mediaEmptyText}>Sem midia</Text>
                 </View>
+              ) : (
+                <>
+                  <ScrollView
+                    horizontal
+                    pagingEnabled
+                    nestedScrollEnabled
+                    showsHorizontalScrollIndicator={false}
+                    scrollEventThrottle={16}
+                    onMomentumScrollEnd={handleMediaScroll}
+                    scrollEnabled={(post.midias?.length ?? 0) > 1}
+                    style={styles.mediaCarousel}
+                  >
+                    {(post.midias ?? []).map((media) => (
+                      <View key={media.id} style={[styles.mediaCard, { width: mediaWidth }]}> 
+                        {media.type === "image" ? (
+                          <Image source={{ uri: media.url }} style={styles.media} />
+                        ) : (
+                          <View style={[styles.media, styles.videoPlaceholder]}>
+                            <Ionicons name="videocam" size={28} color={theme.colors.buttonText} />
+                            <Text style={styles.videoPlaceholderText}>Video</Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </ScrollView>
+
+                  {(post.midias?.length ?? 0) > 1 ? (
+                    <>
+                      <View style={styles.mediaCounterBadge}>
+                        <Ionicons name="images-outline" size={12} color="#FFFFFF" />
+                        <Text style={styles.mediaCounterText}>{activeMediaIndex + 1}/{post.midias.length}</Text>
+                      </View>
+                      <View style={styles.mediaDots}>
+                        {(post.midias ?? []).map((media, index) => (
+                          <View
+                            key={media.id}
+                            style={[styles.mediaDot, index === activeMediaIndex && styles.mediaDotActive]}
+                          />
+                        ))}
+                      </View>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </View>
+
+            <View style={styles.postBody}>
+              <View style={styles.actionsRow}>
+                <Pressable style={styles.actionButton} onPress={handleToggleLike} disabled={togglingLike}>
+                  <LinearGradient
+                    colors={post.viewer_liked ? (["rgba(244, 63, 94, 0.32)", "rgba(255, 75, 216, 0.22)"] as const) : ACTION_GRADIENT}
+                    style={styles.actionButtonInner}
+                  >
+                    <Ionicons
+                      name={post.viewer_liked ? "heart" : "heart-outline"}
+                      size={17}
+                      color={post.viewer_liked ? "#FF6CAB" : theme.colors.text}
+                    />
+                  </LinearGradient>
+                </Pressable>
+                <Pressable style={[styles.actionButton, styles.commentActionButton]} onPress={() => commentInputRef.current?.focus()}>
+                  <LinearGradient colors={ACTION_GRADIENT} style={[styles.actionButtonInner, styles.commentActionInner]}>
+                    <Ionicons name="chatbubble-outline" size={17} color={theme.colors.text} />
+                    <Text style={styles.commentActionCount}>{post.comments_count}</Text>
+                  </LinearGradient>
+                </Pressable>
+                <View style={styles.actionSpacer} />
+                <Pressable style={styles.actionButton} onPress={handleToggleSave} disabled={togglingSave}>
+                  <LinearGradient
+                    colors={post.viewer_saved ? (["rgba(255, 214, 10, 0.28)", "rgba(255, 149, 0, 0.18)"] as const) : ACTION_GRADIENT}
+                    style={styles.actionButtonInner}
+                  >
+                    <Ionicons
+                      name={post.viewer_saved ? "bookmark" : "bookmark-outline"}
+                      size={17}
+                      color={post.viewer_saved ? "#FFD60A" : theme.colors.text}
+                    />
+                  </LinearGradient>
+                </Pressable>
               </View>
-            ) : null}
+
+              <View style={styles.metaRow}>
+                <Text style={styles.likesText}>{post.likes_count} curtidas</Text>
+                <Text style={styles.commentsMeta}>{post.comments_count} comentarios</Text>
+              </View>
+
+              {post.descricao ? (
+                <View style={styles.descriptionCard}>
+                  <Text style={styles.descriptionEyebrow}>Legenda</Text>
+                  <Text style={styles.description}>
+                    <Text style={styles.descriptionAuthor}>{post.nome_exibicao || post.username}</Text>{" "}
+                    {post.descricao}
+                  </Text>
+                </View>
+              ) : null}
+
+              {hasTreino ? (
+                <View style={styles.treinoResumo}>
+                  <View style={styles.treinoHeader}>
+                    <Text style={styles.treinoBadge}>Treino compartilhado</Text>
+                    <Ionicons name="flame" size={16} color="#FF8A00" />
+                  </View>
+                  <View style={styles.treinoMetrics}>
+                    <View style={styles.metricChip}>
+                      <Text style={styles.metricChipText}>
+                        Duracao {post.treino?.duracao ? Math.round(post.treino.duracao / 60) : 0} min
+                      </Text>
+                    </View>
+                    <View style={styles.metricChip}>
+                      <Text style={styles.metricChipText}>Peso {Number(post.treino?.peso_total ?? 0).toFixed(1)}kg</Text>
+                    </View>
+                    <View style={styles.metricChip}>
+                      <Text style={styles.metricChipText}>Series {post.treino?.total_series ?? 0}</Text>
+                    </View>
+                    <View style={styles.metricChip}>
+                      <Text style={styles.metricChipText}>Exercicios {post.treino?.total_exercicios ?? 0}</Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+            </View>
           </View>
-        </View>
+        </LinearGradient>
 
         <View style={styles.commentsSection}>
-          <LinearGradient
-            colors={[theme.colors.surface, theme.colors.inputBackground]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.commentsHeaderCard}
-          >
-            <View style={styles.commentsHeader}>
-              <Text style={styles.commentsTitle}>Comentarios</Text>
-              <Text style={styles.commentsCountBadge}>{post.comments_count}</Text>
+          <LinearGradient colors={SURFACE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.commentsHeaderCard}>
+            <View style={styles.commentsHeaderShell}>
+              <View style={styles.commentsHeader}>
+                <Text style={styles.commentsTitle}>Comentarios</Text>
+                <Text style={styles.commentsCountBadge}>{post.comments_count}</Text>
+              </View>
             </View>
           </LinearGradient>
 
-            <View style={styles.commentComposer}>
+          <View style={styles.commentComposer}>
             <TextInput
               ref={commentInputRef}
               value={commentInput}
@@ -452,58 +481,63 @@ export default function PostDetailScreen() {
               editable={!sendingComment}
               maxLength={400}
             />
-            <Pressable style={styles.sendButton} onPress={handleCreateComment} disabled={sendingComment}>
-              {sendingComment ? (
-                <ActivityIndicator color={theme.colors.buttonText} />
-              ) : (
-                <Text style={styles.sendButtonText}>Publicar</Text>
-              )}
+            <Pressable onPress={handleCreateComment} disabled={sendingComment} style={styles.sendButton}>
+              <LinearGradient colors={theme.colors.buttonGradient as [string, string, ...string[]]} style={styles.sendButtonInner}>
+                {sendingComment ? (
+                  <ActivityIndicator color={theme.colors.buttonText} />
+                ) : (
+                  <>
+                    <Ionicons name="paper-plane" size={14} color={theme.colors.buttonText} />
+                    <Text style={styles.sendButtonText}>Publicar</Text>
+                  </>
+                )}
+              </LinearGradient>
             </Pressable>
           </View>
 
-        {post.comments_count > 0 ? (
-          <Pressable style={styles.viewAll} onPress={() => setShowAllComments((prev) => !prev)}>
-            <Text style={styles.viewAllText}>
-              {showAllComments ? "Ocultar comentarios" : `Ver todos os ${post.comments_count} comentarios`}
-            </Text>
-          </Pressable>
-        ) : null}
+          {post.comments_count > 0 ? (
+            <Pressable style={styles.viewAll} onPress={() => setShowAllComments((prev) => !prev)}>
+              <Text style={styles.viewAllText}>
+                {showAllComments ? "Ocultar comentarios" : `Ver todos os ${post.comments_count} comentarios`}
+              </Text>
+            </Pressable>
+          ) : null}
 
-        {post.comentarios.length === 0 ? <Text style={styles.emptyComment}>Nenhum comentario ainda.</Text> : null}
+          {post.comentarios.length === 0 ? <Text style={styles.emptyComment}>Nenhum comentario ainda.</Text> : null}
 
-        {(showAllComments ? post.comentarios : post.comentarios.slice(0, 2)).map((comment) => (
-          <View key={comment.id} style={styles.commentCard}>
-            {comment.foto_perfil ? (
-              <Image source={{ uri: comment.foto_perfil }} style={styles.commentAvatar} />
-            ) : (
-              <View style={[styles.commentAvatar, styles.commentAvatarFallback]}>
-                <Text style={styles.commentAvatarFallbackText}>
-                  {(comment.nome_exibicao || comment.username || "U").slice(0, 1).toUpperCase()}
-                </Text>
+          {visibleComments.map((comment) => (
+            <LinearGradient key={comment.id} colors={COMMENT_CARD_GRADIENT} style={styles.commentCard}>
+              {comment.foto_perfil ? (
+                <Image source={{ uri: comment.foto_perfil }} style={styles.commentAvatar} />
+              ) : (
+                <View style={[styles.commentAvatar, styles.commentAvatarFallback]}>
+                  <Text style={styles.commentAvatarFallbackText}>
+                    {(comment.nome_exibicao || comment.username || "U").slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.commentBody}>
+                <View style={styles.commentTop}>
+                  <Text style={styles.commentAuthor}>{comment.nome_exibicao || comment.username || "Usuario"}</Text>
+                  <Pressable
+                    style={styles.commentLikeButton}
+                    onPress={() => handleToggleCommentLike(comment.id)}
+                    disabled={togglingCommentLike[comment.id]}
+                  >
+                    <Ionicons
+                      name={comment.viewer_liked ? "heart" : "heart-outline"}
+                      size={14}
+                      color={comment.viewer_liked ? "#FF6CAB" : theme.colors.text}
+                    />
+                    <Text style={styles.commentLikeText}>{comment.likes_count}</Text>
+                  </Pressable>
+                </View>
+                {comment.username ? <Text style={styles.commentUser}>@{comment.username}</Text> : null}
+                <Text style={styles.commentText}>{comment.comentario}</Text>
               </View>
-            )}
-
-            <View style={styles.commentBody}>
-              <View style={styles.commentTop}>
-                <Text style={styles.commentAuthor}>{comment.nome_exibicao || comment.username || "Usuario"}</Text>
-                <Pressable
-                  style={styles.commentLikeButton}
-                  onPress={() => handleToggleCommentLike(comment.id)}
-                  disabled={togglingCommentLike[comment.id]}
-                >
-                  <Ionicons
-                    name={comment.viewer_liked ? "heart" : "heart-outline"}
-                    size={14}
-                    color={theme.colors.text}
-                  />
-                  <Text style={styles.commentLikeText}>{comment.likes_count}</Text>
-                </Pressable>
-              </View>
-              {comment.username ? <Text style={styles.commentUser}>@{comment.username}</Text> : null}
-              <Text style={styles.commentText}>{comment.comentario}</Text>
-            </View>
-          </View>
-        ))}
+            </LinearGradient>
+          ))}
 
           <View style={styles.extraActions}>
             <Pressable style={styles.reportButton} onPress={handleReport} disabled={reporting}>
@@ -530,6 +564,33 @@ function createStyles(theme: AppTheme) {
       paddingTop: 16,
       gap: 16,
       paddingBottom: 52,
+      position: "relative",
+      overflow: "hidden",
+    },
+    orbPrimary: {
+      position: "absolute",
+      top: 36,
+      right: -54,
+      width: 180,
+      height: 180,
+      borderRadius: 999,
+      backgroundColor: "rgba(91, 231, 255, 0.14)",
+    },
+    orbSecondary: {
+      position: "absolute",
+      top: 212,
+      left: -76,
+      width: 220,
+      height: 220,
+      borderRadius: 999,
+      backgroundColor: "rgba(255, 75, 216, 0.12)",
+    },
+    gridOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.14,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: "rgba(91, 231, 255, 0.08)",
     },
     center: {
       flex: 1,
@@ -548,61 +609,78 @@ function createStyles(theme: AppTheme) {
       justifyContent: "space-between",
       alignItems: "center",
       marginBottom: 6,
+      zIndex: 2,
     },
     backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(10, 16, 28, 0.84)",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(91, 231, 255, 0.26)",
     },
     backButtonText: {
       color: theme.colors.text,
       fontWeight: "700",
     },
     manageButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(10, 16, 28, 0.84)",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(255, 75, 216, 0.26)",
     },
     authorCard: {
-      borderRadius: 22,
+      borderRadius: 26,
       padding: 1,
+      position: "relative",
+      overflow: "hidden",
+    },
+    authorGlow: {
+      position: "absolute",
+      top: -36,
+      right: -26,
+      width: 180,
+      height: 180,
+      borderRadius: 999,
+    },
+    authorShellCompact: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderRadius: 25,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: "rgba(7, 10, 18, 0.94)",
     },
     authorRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
-      paddingVertical: 10,
-      borderRadius: 21,
-      backgroundColor: theme.colors.surface,
-      paddingLeft: 12,
-      paddingRight: 12,
+      gap: 12,
     },
     avatar: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 50,
+      height: 50,
+      borderRadius: 25,
       backgroundColor: theme.colors.inputBackground,
+      borderWidth: 2,
+      borderColor: "rgba(91, 231, 255, 0.32)",
     },
     avatarFallback: {
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(91, 231, 255, 0.28)",
     },
     avatarFallbackText: {
-      color: theme.colors.mutedText,
+      color: theme.colors.text,
       fontWeight: "700",
-      fontSize: 14,
+      fontSize: 17,
     },
     authorInfo: {
       gap: 2,
@@ -611,38 +689,46 @@ function createStyles(theme: AppTheme) {
     authorName: {
       color: theme.colors.text,
       fontWeight: "800",
-      fontSize: 15,
+      fontSize: 16,
     },
     authorUser: {
-      color: theme.colors.mutedText,
-      fontSize: 11,
+      color: "rgba(229, 231, 235, 0.72)",
+      fontSize: 12,
     },
     postDate: {
-      color: theme.colors.mutedText,
+      color: theme.colors.text,
       fontSize: 10,
       fontWeight: "700",
       textTransform: "uppercase",
-      backgroundColor: theme.colors.inputBackground,
+      backgroundColor: "rgba(255, 75, 216, 0.14)",
       borderRadius: 999,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       overflow: "hidden",
+      borderWidth: 1,
+      borderColor: "rgba(255, 75, 216, 0.24)",
+    },
+    postCardBorder: {
+      borderRadius: 28,
+      padding: 1,
     },
     postCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 24,
-      backgroundColor: theme.colors.surface,
+      borderRadius: 27,
+      backgroundColor: "#080C14",
       overflow: "hidden",
       shadowColor: "#000000",
-      shadowOpacity: 0.22,
-      shadowRadius: 24,
+      shadowOpacity: 0.32,
+      shadowRadius: 28,
       shadowOffset: { width: 0, height: 12 },
       elevation: 10,
     },
     mediaFrame: {
       backgroundColor: "#05070B",
       position: "relative",
+    },
+    mediaBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.9,
     },
     mediaCarousel: {
       width: "100%",
@@ -660,10 +746,15 @@ function createStyles(theme: AppTheme) {
       position: "absolute",
       top: 14,
       right: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 999,
-      backgroundColor: "rgba(0, 0, 0, 0.58)",
+      backgroundColor: "rgba(7, 10, 18, 0.78)",
+      borderWidth: 1,
+      borderColor: "rgba(91, 231, 255, 0.24)",
     },
     mediaCounterText: {
       color: "#FFFFFF",
@@ -688,7 +779,7 @@ function createStyles(theme: AppTheme) {
     },
     mediaDotActive: {
       width: 18,
-      backgroundColor: theme.colors.button,
+      backgroundColor: "#5BE7FF",
     },
     mediaEmpty: {
       alignItems: "center",
@@ -696,7 +787,7 @@ function createStyles(theme: AppTheme) {
       gap: 6,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(91, 231, 255, 0.22)",
     },
     mediaEmptyText: {
       color: theme.colors.mutedText,
@@ -715,30 +806,45 @@ function createStyles(theme: AppTheme) {
     },
     postBody: {
       paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 18,
+      paddingTop: 14,
+      paddingBottom: 20,
       gap: 14,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "#080C14",
     },
     actionsRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
-      padding: 8,
-      borderRadius: 16,
-      backgroundColor: theme.colors.inputBackground,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
     },
     actionButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 42,
+      height: 42,
+      borderRadius: 14,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surface,
+      overflow: "hidden",
+    },
+    actionButtonInner: {
+      flex: 1,
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 14,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(255, 255, 255, 0.08)",
+    },
+    commentActionButton: {
+      width: 62,
+    },
+    commentActionInner: {
+      flexDirection: "row",
+      gap: 6,
+      paddingHorizontal: 10,
+    },
+    commentActionCount: {
+      color: theme.colors.text,
+      fontSize: 11,
+      fontWeight: "800",
     },
     actionSpacer: {
       flex: 1,
@@ -748,26 +854,33 @@ function createStyles(theme: AppTheme) {
       alignItems: "center",
       justifyContent: "space-between",
       gap: 10,
-      paddingBottom: 2,
       paddingHorizontal: 2,
     },
     likesText: {
-      color: theme.colors.text,
+      color: "#FFFFFF",
       fontWeight: "800",
-      fontSize: 13,
+      fontSize: 14,
     },
     descriptionCard: {
       paddingHorizontal: 14,
       paddingVertical: 14,
-      borderRadius: 18,
-      backgroundColor: theme.colors.inputBackground,
+      borderRadius: 22,
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(255, 255, 255, 0.08)",
     },
     commentsMeta: {
-      color: theme.colors.mutedText,
-      fontSize: 11,
+      color: "rgba(229, 231, 235, 0.7)",
+      fontSize: 12,
       fontWeight: "700",
+    },
+    descriptionEyebrow: {
+      color: theme.colors.mutedText,
+      fontSize: 10,
+      fontWeight: "800",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 8,
     },
     description: {
       color: theme.colors.text,
@@ -780,43 +893,62 @@ function createStyles(theme: AppTheme) {
     },
     treinoResumo: {
       gap: 8,
-      padding: 14,
-      borderRadius: 18,
+      padding: 16,
+      borderRadius: 22,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.inputBackground,
+      borderColor: "rgba(255, 149, 0, 0.2)",
+      backgroundColor: "rgba(255, 138, 0, 0.08)",
+    },
+    treinoHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
     },
     treinoBadge: {
       fontSize: 12,
       fontWeight: "800",
-      color: theme.colors.text,
+      color: "#FFD7A1",
     },
     treinoMetrics: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 6,
+      gap: 8,
     },
-    treinoMetricText: {
+    metricChip: {
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: "rgba(0, 0, 0, 0.22)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.08)",
+    },
+    metricChipText: {
       fontSize: 11,
-      color: theme.colors.mutedText,
-      fontWeight: "600",
+      color: "#FFF1D6",
+      fontWeight: "700",
     },
     commentsSection: {
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 22,
-      backgroundColor: theme.colors.surface,
+      borderColor: "rgba(91, 231, 255, 0.14)",
+      borderRadius: 28,
+      backgroundColor: "#090D16",
       padding: 14,
       gap: 12,
       shadowColor: "#000000",
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 3,
+      shadowOpacity: 0.14,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 6,
     },
     commentsHeaderCard: {
-      borderRadius: 18,
+      borderRadius: 22,
       padding: 1,
+    },
+    commentsHeaderShell: {
+      borderRadius: 21,
+      backgroundColor: "rgba(7, 10, 18, 0.92)",
+      paddingHorizontal: 14,
+      paddingVertical: 14,
     },
     commentsHeader: {
       flexDirection: "row",
@@ -825,19 +957,21 @@ function createStyles(theme: AppTheme) {
     },
     commentsTitle: {
       color: theme.colors.text,
-      fontSize: 15,
-      fontWeight: "800",
+      fontSize: 20,
+      fontWeight: "900",
     },
     commentsCountBadge: {
-      minWidth: 28,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
+      minWidth: 34,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       borderRadius: 999,
-      backgroundColor: theme.colors.inputBackground,
+      backgroundColor: "rgba(255, 75, 216, 0.16)",
       color: theme.colors.text,
       textAlign: "center",
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: "800",
+      borderWidth: 1,
+      borderColor: "rgba(255, 75, 216, 0.22)",
     },
     commentComposer: {
       flexDirection: "row",
@@ -847,22 +981,27 @@ function createStyles(theme: AppTheme) {
     commentInput: {
       flex: 1,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 14,
-      backgroundColor: theme.colors.inputBackground,
+      borderColor: "rgba(91, 231, 255, 0.16)",
+      borderRadius: 18,
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
       color: theme.colors.text,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      minHeight: 46,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      minHeight: 50,
     },
     sendButton: {
-      height: 46,
-      borderRadius: 14,
-      paddingHorizontal: 16,
-      backgroundColor: theme.colors.button,
+      height: 50,
+      borderRadius: 18,
+      minWidth: 104,
+      overflow: "hidden",
+    },
+    sendButtonInner: {
+      flex: 1,
+      flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      minWidth: 96,
+      gap: 8,
+      paddingHorizontal: 16,
     },
     sendButtonText: {
       color: theme.colors.buttonText,
@@ -877,6 +1016,7 @@ function createStyles(theme: AppTheme) {
     viewAllText: {
       color: theme.colors.mutedText,
       fontSize: 13,
+      fontWeight: "700",
     },
     emptyComment: {
       color: theme.colors.mutedText,
@@ -887,23 +1027,24 @@ function createStyles(theme: AppTheme) {
       alignItems: "flex-start",
       gap: 10,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.inputBackground,
-      borderRadius: 18,
+      borderColor: "rgba(255, 255, 255, 0.08)",
+      borderRadius: 22,
       paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingVertical: 12,
     },
     commentAvatar: {
       width: 36,
       height: 36,
       borderRadius: 18,
       backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: "rgba(91, 231, 255, 0.22)",
     },
     commentAvatarFallback: {
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(91, 231, 255, 0.18)",
     },
     commentAvatarFallbackText: {
       color: theme.colors.mutedText,
@@ -923,10 +1064,10 @@ function createStyles(theme: AppTheme) {
     commentAuthor: {
       color: theme.colors.text,
       fontWeight: "800",
-      fontSize: 13,
+      fontSize: 14,
     },
     commentUser: {
-      color: theme.colors.mutedText,
+      color: "rgba(229, 231, 235, 0.62)",
       fontSize: 11,
     },
     commentText: {
@@ -938,11 +1079,15 @@ function createStyles(theme: AppTheme) {
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
     },
     commentLikeText: {
-      color: theme.colors.mutedText,
+      color: theme.colors.text,
       fontSize: 12,
-      fontWeight: "600",
+      fontWeight: "700",
     },
     extraActions: {
       alignItems: "flex-start",
@@ -953,11 +1098,11 @@ function createStyles(theme: AppTheme) {
       alignItems: "center",
       gap: 6,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: "rgba(255, 75, 216, 0.22)",
       paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 999,
-      backgroundColor: theme.colors.inputBackground,
+      backgroundColor: "rgba(255, 75, 216, 0.1)",
     },
     reportText: {
       color: theme.colors.text,
