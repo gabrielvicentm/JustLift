@@ -753,10 +753,10 @@ function createStyles(theme: AppTheme) {
       color: "#F43F5E",
       fontWeight: "600",
     },
-  });
-}
     gridRow: {
       gap: 6,
       marginBottom: 6,
       justifyContent: "space-between",
     },
+  });
+}
