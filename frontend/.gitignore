@@ -43,4 +43,4 @@ app-example
 /android
 
 #google
-client_secret_1095255863830-notvl6coeenvp3uk2ouvmjvdpinae68b.apps.googleusercontent.com.json
+google-services.json

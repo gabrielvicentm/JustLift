@@ -72,7 +72,7 @@ async function removeInvalidTokens(tokens) {
 
 exports.sendPushToUser = async ({ userId, title, body, data }) => {
   if (!userId) {
-    return;
+    return { status: 'skipped', reason: 'missing_user' };
   }
 
   const tokens = await db.query(
@@ -85,7 +85,7 @@ exports.sendPushToUser = async ({ userId, title, body, data }) => {
   );
 
   if (!tokens.rows.length) {
-    return;
+    return { status: 'skipped', reason: 'no_tokens' };
   }
 
   const messages = tokens.rows.map((row) => ({
@@ -110,4 +110,11 @@ exports.sendPushToUser = async ({ userId, title, body, data }) => {
   if (invalidTokens.length > 0) {
     await removeInvalidTokens(invalidTokens);
   }
+
+  return {
+    status: 'sent',
+    sent: messages.length,
+    invalidTokens,
+    ticketData,
+  };
 };

@@ -10,13 +10,15 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
+import { LinearGradient } from "expo-linear-gradient";
 import { fetchMyProfile, getApiErrorMessage } from "@/app/features/profile/service";
-import { fetchPostById, updatePost, uploadMediaToR2 } from "@/app/features/social/service";
+import { deletePost, deletePostComment, fetchPostById, updatePost, uploadMediaToR2 } from "@/app/features/social/service";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import type { PostDetail } from "@/app/features/social/types";
@@ -41,6 +43,7 @@ export default function EditarPostScreen() {
   const postId = Number(postIdRaw);
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { width } = useWindowDimensions();
 
   const [post, setPost] = useState<PostDetail | null>(null);
   const [descricao, setDescricao] = useState("");
@@ -48,6 +51,13 @@ export default function EditarPostScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [deletingPost, setDeletingPost] = useState(false);
+  const [deletingComment, setDeletingComment] = useState<Record<number, boolean>>({});
+
+  const gridSpacing = 6;
+  const horizontalPadding = 16;
+  const baseWidth = width && width > 0 ? width : 360;
+  const tileSize = Math.floor((baseWidth - horizontalPadding * 2 - gridSpacing * 2) / 3);
 
   const mapExistingMedia = (data: PostDetail) => {
     return data.midias.map((item) => ({
@@ -214,6 +224,59 @@ export default function EditarPostScreen() {
     }
   };
 
+  const handleDeletePost = async () => {
+    if (!post || deletingPost) return;
+    Alert.alert("Excluir post", "Tem certeza que deseja excluir este post?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setDeletingPost(true);
+            await deletePost(post.id);
+            Alert.alert("Post excluido", "Seu post foi removido.");
+            router.back();
+          } catch (err) {
+            setError(getApiErrorMessage(err, "excluir post"));
+          } finally {
+            setDeletingPost(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!post || deletingComment[commentId]) return;
+    Alert.alert("Excluir comentario", "Deseja remover este comentario?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setDeletingComment((prev) => ({ ...prev, [commentId]: true }));
+            await deletePostComment(post.id, commentId);
+            setPost((current) =>
+              current
+                ? {
+                    ...current,
+                    comments_count: Math.max(0, current.comments_count - 1),
+                    comentarios: current.comentarios.filter((comment) => comment.id !== commentId),
+                  }
+                : current,
+            );
+          } catch (err) {
+            setError(getApiErrorMessage(err, "excluir comentario"));
+          } finally {
+            setDeletingComment((prev) => ({ ...prev, [commentId]: false }));
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -234,11 +297,21 @@ export default function EditarPostScreen() {
     );
   }
 
-  const renderMediaItem = ({ item, drag, isActive }: RenderItemParams<EditableMedia>) => (
+  const renderMediaItem = ({ item, drag, isActive, getIndex }: RenderItemParams<EditableMedia>) => {
+    const index = getIndex?.() ?? 0;
+    return (
     <Pressable
+      onPress={() => {
+        if (!post) return;
+        router.push(`/screens/social/Post/${post.id}?mediaIndex=${index}` as never);
+      }}
       onLongPress={drag}
       disabled={saving}
-      style={[styles.mediaCard, isActive && styles.mediaCardActive]}
+      style={[
+        styles.mediaCard,
+        { width: tileSize, height: tileSize },
+        isActive && styles.mediaCardActive,
+      ]}
     >
       {item.type === "image" ? (
         <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
@@ -248,16 +321,21 @@ export default function EditarPostScreen() {
         </View>
       )}
 
+      <View style={styles.mediaBadge}>
+        <Ionicons name="play" size={12} color="#E0E0E0" />
+      </View>
+
       <Pressable style={styles.removeButton} onPress={() => handleRemoveMedia(item.id)} disabled={saving}>
-        <Ionicons name="close" size={14} color={theme.colors.buttonText} />
+        <Ionicons name="close" size={14} color="#E0E0E0" />
       </Pressable>
 
       <View style={styles.dragHint}>
-        <Ionicons name="reorder-three-outline" size={16} color={theme.colors.buttonText} />
+        <Ionicons name="reorder-three-outline" size={16} color="#E0E0E0" />
         <Text style={styles.dragHintText}>Segure e arraste</Text>
       </View>
     </Pressable>
-  );
+    );
+  };
 
   return (
     <KeyboardAvoidingView
@@ -270,25 +348,50 @@ export default function EditarPostScreen() {
         keyExtractor={(item) => item.id}
         onDragEnd={({ data }) => setMidias(data)}
         renderItem={renderMediaItem}
+        numColumns={3}
         activationDistance={14}
         contentContainerStyle={styles.container}
+        columnWrapperStyle={styles.gridRow}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         ListHeaderComponent={
           <>
             <View style={styles.topRow}>
-              <Pressable style={styles.backButton} onPress={() => router.back()} disabled={saving}>
-                <Text style={styles.backButtonText}>Voltar</Text>
-              </Pressable>
+              <LinearGradient
+                colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+                start={{ x: 0, y: 0.2 }}
+                end={{ x: 1, y: 0.8 }}
+                style={styles.backBorder}
+              >
+                <Pressable style={styles.backButton} onPress={() => router.back()} disabled={saving}>
+                  <Text style={styles.backButtonText}>Voltar</Text>
+                </Pressable>
+              </LinearGradient>
             </View>
 
-            <Text style={styles.title}>Editar post</Text>
-            <Text style={styles.subtitle}>Altere descricao e quantidade de midias (maximo de 9).</Text>
+            <LinearGradient
+              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.heroBorder}
+            >
+              <View style={styles.heroCard}>
+                <Text style={styles.title}>Editar post</Text>
+                <Text style={styles.subtitle}>Altere descricao e quantidade de midias (maximo de 9).</Text>
+              </View>
+            </LinearGradient>
 
-            <Pressable style={styles.addButton} onPress={handleAddMedia} disabled={saving || midias.length >= MAX_MIDIAS}>
-              <Ionicons name="images-outline" size={18} color={theme.colors.buttonText} />
-              <Text style={styles.addButtonText}>Adicionar midia</Text>
-            </Pressable>
+            <LinearGradient
+              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.addBorder}
+            >
+              <Pressable style={styles.addButton} onPress={handleAddMedia} disabled={saving || midias.length >= MAX_MIDIAS}>
+                <Ionicons name="images-outline" size={18} color="#E0E0E0" />
+                <Text style={styles.addButtonText}>Adicionar midia</Text>
+              </Pressable>
+            </LinearGradient>
 
             <Text style={styles.counter}>{midias.length}/{MAX_MIDIAS} midias</Text>
           </>
@@ -311,9 +414,55 @@ export default function EditarPostScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <Pressable style={[styles.saveButton, saving && styles.disabled]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color={theme.colors.buttonText} /> : <Text style={styles.saveButtonText}>Salvar alteracoes</Text>}
+            <LinearGradient
+              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.saveBorder}
+            >
+              <Pressable style={[styles.saveButton, saving && styles.disabled]} onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator color="#E0E0E0" /> : <Text style={styles.saveButtonText}>Salvar alteracoes</Text>}
+              </Pressable>
+            </LinearGradient>
+
+            <Pressable
+              style={[styles.deletePostButton, deletingPost && styles.disabled]}
+              onPress={handleDeletePost}
+              disabled={deletingPost}
+            >
+              {deletingPost ? (
+                <ActivityIndicator color="#E0E0E0" />
+              ) : (
+                <Text style={styles.deletePostButtonText}>Excluir post</Text>
+              )}
             </Pressable>
+
+            <Text style={styles.sectionTitle}>Comentarios</Text>
+            {post.comentarios.length === 0 ? (
+              <Text style={styles.emptyComments}>Sem comentarios neste post.</Text>
+            ) : (
+              post.comentarios.map((comment) => (
+                <View key={comment.id} style={styles.commentCard}>
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentAuthor}>
+                      {comment.nome_exibicao || comment.username || "Usuario"}
+                    </Text>
+                    <Pressable
+                      style={[styles.commentDeleteButton, deletingComment[comment.id] && styles.disabled]}
+                      onPress={() => handleDeleteComment(comment.id)}
+                      disabled={deletingComment[comment.id]}
+                    >
+                      {deletingComment[comment.id] ? (
+                        <ActivityIndicator color={theme.colors.buttonText} />
+                      ) : (
+                        <Text style={styles.commentDeleteText}>Excluir</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                  <Text style={styles.commentText}>{comment.comentario}</Text>
+                </View>
+              ))
+            )}
           </>
         }
       />
@@ -325,7 +474,7 @@ function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "#0B0E18",
     },
     container: {
       padding: 16,
@@ -334,83 +483,123 @@ function createStyles(theme: AppTheme) {
     },
     center: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "#0B0E18",
       alignItems: "center",
       justifyContent: "center",
       padding: 16,
       gap: 8,
     },
     loadingText: {
-      color: theme.colors.text,
+      color: "#E0E0E0",
       fontWeight: "600",
     },
     topRow: {
       flexDirection: "row",
       justifyContent: "flex-start",
     },
+    backBorder: {
+      borderRadius: 12,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
     backButton: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       borderRadius: 10,
-      paddingHorizontal: 12,
+      paddingHorizontal: 14,
       paddingVertical: 8,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
     },
     backButtonText: {
-      color: theme.colors.text,
-      fontWeight: "600",
+      color: "#E0E0E0",
+      fontWeight: "700",
+    },
+    heroBorder: {
+      borderRadius: 18,
+      padding: 1.5,
+      shadowColor: "#74D3FF",
+      shadowOpacity: 0.45,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+      marginTop: 10,
+    },
+    heroCard: {
+      borderRadius: 16,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      padding: 16,
+      gap: 6,
     },
     title: {
-      fontSize: 24,
-      fontWeight: "700",
-      color: theme.colors.text,
+      fontSize: 26,
+      fontWeight: "800",
+      color: "#E0E0E0",
+      textShadowColor: "rgba(0, 255, 255, 0.65)",
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 10,
     },
     subtitle: {
-      color: theme.colors.mutedText,
+      color: "#7FE7FF",
       fontSize: 13,
+      textShadowColor: "rgba(0, 255, 255, 0.35)",
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 8,
+    },
+    addBorder: {
+      borderRadius: 14,
+      padding: 1.5,
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+      marginTop: 10,
     },
     addButton: {
-      height: 44,
-      borderRadius: 10,
-      backgroundColor: theme.colors.button,
+      height: 46,
+      borderRadius: 12,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
       flexDirection: "row",
       gap: 8,
     },
     addButtonText: {
-      color: theme.colors.buttonText,
-      fontWeight: "700",
+      color: "#E0E0E0",
+      fontWeight: "800",
     },
     counter: {
-      color: theme.colors.mutedText,
+      color: "#7FE7FF",
       fontSize: 12,
       fontWeight: "600",
     },
     mediaCard: {
-      width: "100%",
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       borderRadius: 12,
       overflow: "hidden",
-      backgroundColor: theme.colors.surface,
-      marginBottom: 8,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
     },
     mediaCardActive: {
       opacity: 0.85,
     },
     mediaPreview: {
       width: "100%",
-      height: 180,
-      backgroundColor: theme.colors.inputBackground,
+      height: "100%",
+      backgroundColor: "#0B0E18",
     },
     videoPreview: {
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.button,
+      backgroundColor: "#7C5CFF",
     },
     videoText: {
-      color: theme.colors.buttonText,
+      color: "#0B0E18",
       fontWeight: "700",
       fontSize: 12,
     },
@@ -421,7 +610,20 @@ function createStyles(theme: AppTheme) {
       width: 22,
       height: 22,
       borderRadius: 11,
-      backgroundColor: "#00000099",
+      backgroundColor: "rgba(124, 92, 255, 0.9)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    mediaBadge: {
+      position: "absolute",
+      top: 6,
+      left: 6,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: "rgba(11, 14, 24, 0.7)",
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.6)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -432,52 +634,129 @@ function createStyles(theme: AppTheme) {
       flexDirection: "row",
       gap: 6,
       alignItems: "center",
-      backgroundColor: "#00000099",
+      backgroundColor: "rgba(124, 92, 255, 0.85)",
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderRadius: 999,
     },
     dragHintText: {
-      color: theme.colors.buttonText,
+      color: "#E0E0E0",
       fontSize: 11,
       fontWeight: "700",
     },
     emptyMidia: {
-      color: theme.colors.mutedText,
+      color: "#7FE7FF",
       fontSize: 13,
     },
     label: {
-      color: theme.colors.text,
-      fontWeight: "600",
+      color: "#E0E0E0",
+      fontWeight: "700",
     },
     input: {
       minHeight: 140,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       borderRadius: 10,
-      backgroundColor: theme.colors.inputBackground,
-      color: theme.colors.text,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      color: "#E0E0E0",
       paddingHorizontal: 12,
       paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+    },
+    saveBorder: {
+      borderRadius: 14,
+      padding: 1.5,
+      shadowColor: "#74D3FF",
+      shadowOpacity: 0.4,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 7,
+      marginTop: 8,
     },
     saveButton: {
-      height: 46,
-      borderRadius: 10,
-      backgroundColor: theme.colors.button,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
       alignItems: "center",
       justifyContent: "center",
     },
     saveButtonText: {
-      color: theme.colors.buttonText,
+      color: "#E0E0E0",
+      fontWeight: "800",
+      fontSize: 16,
+    },
+    deletePostButton: {
+      height: 46,
+      borderRadius: 12,
+      backgroundColor: "rgba(255, 75, 216, 0.25)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 75, 216, 0.7)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 4,
+    },
+    deletePostButtonText: {
+      color: "#FF4BD8",
+      fontWeight: "800",
+      fontSize: 16,
+    },
+    sectionTitle: {
+      color: "#E0E0E0",
       fontWeight: "700",
       fontSize: 16,
+      marginTop: 8,
+    },
+    emptyComments: {
+      color: "#7FE7FF",
+      fontSize: 13,
+    },
+    commentCard: {
+      borderRadius: 10,
+      padding: 10,
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      gap: 6,
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.35)",
+    },
+    commentHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    commentAuthor: {
+      color: "#E0E0E0",
+      fontWeight: "700",
+      fontSize: 13,
+      flex: 1,
+    },
+    commentText: {
+      color: "#E0E0E0",
+      fontSize: 14,
+    },
+    commentDeleteButton: {
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: "rgba(255, 75, 216, 0.2)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 75, 216, 0.6)",
+    },
+    commentDeleteText: {
+      color: "#FF4BD8",
+      fontWeight: "800",
+      fontSize: 12,
     },
     disabled: {
       opacity: 0.7,
     },
     error: {
-      color: theme.colors.error,
+      color: "#F43F5E",
       fontWeight: "600",
+    },
+    gridRow: {
+      gap: 6,
+      marginBottom: 6,
+      justifyContent: "space-between",
     },
   });
 }

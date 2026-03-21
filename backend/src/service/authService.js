@@ -111,7 +111,7 @@ exports.createUser = async (username, email, senha) => {
         email, username, senha_hash, verification_code_hash, attempts, expires_at, last_sent_at, updated_at
       )
       VALUES (
-        $1, $2, $3, $4, 0, NOW() + ($5::INT * INTERVAL '10 minute'), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        $1, $2, $3, $4, 0, NOW() + ($5::INT * INTERVAL '1 minute'), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
       ON CONFLICT (email)
       DO UPDATE SET
@@ -137,9 +137,8 @@ exports.verifyEmailAndCreateUser = async (email, code) => {
     throw new Error('VERIFICATION_NOT_FOUND');
   }
 
-  if (new Date(pending.expires_at) .getTime() < Date.now()) {
-    await db.query('DELETE FROM email_verifications WHERE email = $1', [email]);
-    throw new Error('VERIFICATION_EXPIRED')
+  if (new Date(pending.expires_at).getTime() < Date.now()) {
+    throw new Error('VERIFICATION_EXPIRED');
   }
 
   const providedHash = hashVerificationCode(code);
@@ -177,6 +176,7 @@ exports.resendVerificationCode = async (email) => {
     throw new Error('VERIFICATION_NOT_FOUND');
   }
 
+  const isExpired = new Date(pending.expires_at).getTime() < Date.now();
   const lastSent = new Date(pending.last_sent_at).getTime();
   const secondsSinceLastSend = Math.floor((Date.now() - lastSent) / 1000);
   if (secondsSinceLastSend < VERIFICATION_RESEND_COOLDOWN_SECONDS) {
@@ -192,7 +192,7 @@ exports.resendVerificationCode = async (email) => {
       SET
         verification_code_hash = $2,
         attempts = 0,
-        expires_at = NOW() + ($3::INT * INTERVAL '10 minute'),
+        expires_at = NOW() + ($3::INT * INTERVAL '1 minute'),
         last_sent_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
       WHERE email = $1
@@ -201,6 +201,7 @@ exports.resendVerificationCode = async (email) => {
   );
 
   await sendVerificationEmail(email, pending.username, code);
+  return { expired: isExpired };
 };
 
 exports.logar = async (identifier, senha) => {
@@ -235,7 +236,12 @@ exports.logar = async (identifier, senha) => {
 };
 
 exports.refreshToken = async (refreshToken) => {
-  const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  } catch (err) {
+    throw new Error('INVALID_REFRESH_TOKEN');
+  }
 
   const user = await db.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
 
@@ -276,7 +282,12 @@ exports.refreshToken = async (refreshToken) => {
 };
 
 exports.logout = async (refreshToken) => {
-  const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+  } catch (err) {
+    throw new Error('INVALID_REFRESH_TOKEN');
+  }
 
   const user = await db.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
 

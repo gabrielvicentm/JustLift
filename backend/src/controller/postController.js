@@ -303,6 +303,37 @@ exports.createComment = async (req, res) => {
   }
 };
 
+exports.deleteComment = async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuario nao autenticado' });
+    }
+
+    const postId = Number(req.params?.postId);
+    const commentId = Number(req.params?.commentId);
+    if (!Number.isInteger(postId) || postId <= 0) {
+      return res.status(400).json({ message: 'postId invalido' });
+    }
+    if (!Number.isInteger(commentId) || commentId <= 0) {
+      return res.status(400).json({ message: 'commentId invalido' });
+    }
+
+    const result = await postService.deleteComment({ postId, commentId, userId });
+    if (!result) {
+      return res.status(404).json({ message: 'Comentario nao encontrado' });
+    }
+    if (result.reason === 'FORBIDDEN') {
+      return res.status(403).json({ message: 'Sem permissao para remover comentario' });
+    }
+
+    return res.status(200).json({ message: 'Comentario removido' });
+  } catch (err) {
+    console.error('Erro ao remover comentario:', err);
+    return res.status(500).json({ message: 'Erro ao remover comentario' });
+  }
+};
+
 exports.toggleCommentLike = async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
