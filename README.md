@@ -412,6 +412,6 @@ SOFTWARE.
 
 Feito com 💪 por <a href="https://github.com/gabrielvicentm">gabrielvicentm</a>,
 <a href="https://github.com/Kennedys-Leon">Kennedys-Leon</a>,
-<a href="https://github.com/gouveazs">Gouveasz</a> e
+<a href="https://github.com/gouveazs">Gouveazs</a> e
 <a href="https://github.com/RichardMarinho">RichardMarinho</a>
 </div>
