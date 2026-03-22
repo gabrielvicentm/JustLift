@@ -68,10 +68,11 @@ JustLift/
 | `Login.tsx` | Login com email/username + senha ou Google |
 | `Register.tsx` | Cadastro com verificação de email por código |
 
-### 🏠 Home
+### 🏠 Home & Explorar
 | Tela | Descrição |
 |------|-----------|
-| `Home.tsx` | Tela principal com atalhos para criar post e buscar usuários |
+| `Home.tsx` | Feed principal com posts e dailys (stories) |
+| `Explorar.tsx` | Feed explorar em grid + barra de pesquisa |
 
 ### 📓 Diário de Treino
 | Tela | Descrição |
@@ -97,7 +98,9 @@ JustLift/
 | `Perfil.tsx` | Perfil do usuário logado |
 | `[username].tsx` | Perfil público de outro usuário |
 | `FollowersFollowing.tsx` | Listas de seguidores e seguindo |
-| `SearchUsers.tsx` | Busca de usuários |
+| `SearchUsers.tsx` | Busca de usuários e posts |
+| `Conversas.tsx` | Lista de conversas |
+| `Chat.tsx` | Conversa 1:1 |
 | `CriarPost.tsx` | Criar post com texto e mídia |
 | `EditarPost.tsx` | Editar post existente |
 | `Post/[id].tsx` | Visualizar post e comentários |
@@ -111,7 +114,7 @@ JustLift/
 | `Configuracoes.tsx` | Tela de configurações geral |
 | `Conta.tsx` | Gestão de conta (email, senha, username) |
 | `Notificacoes.tsx` | Notificações e histórico |
-| `GerenciarPosts.tsx` | Gestão dos posts do usuário |
+| `GerenciarPosts.tsx` | Gestão de posts e dailys do usuário |
 | `Premium.tsx` | Status e gestão de assinatura premium |
 
 ---
@@ -173,6 +176,14 @@ HTTP → server.js → app.js → Middleware (Auth JWT) → Routes → Controlle
 | DELETE | `/following/:targetUserId` | Deixar de seguir |
 | DELETE | `/followers/:followerUserId` | Remover seguidor |
 
+### 🧭 Feed — `/api/feed`
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/home` | Feed principal (60% seguidos, 40% discovery) |
+| GET | `/explore` | Feed explorar (90% discovery) |
+| GET | `/suggested-users` | Sugestões de usuários para seguir |
+
 ### 📝 Posts — `/api/posts`
 
 | Método | Rota | Descrição |
@@ -186,7 +197,15 @@ HTTP → server.js → app.js → Middleware (Auth JWT) → Routes → Controlle
 | POST | `/:postId/save` | Salvar/desfavoritar post |
 | POST | `/:postId/report` | Reportar post |
 | POST | `/:postId/comments` | Comentar post |
+| DELETE | `/:postId/comments/:commentId` | Excluir comentário |
 | POST | `/:postId/comments/:commentId/like` | Curtir comentário |
+
+### 🏋️ Posts de Treino — `/api/treino-posts`
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | `/` | Criar post de treino |
+| GET | `/preview/:treinoId` | Prévia/resumo do treino para postar |
 
 ### 📸 Daily (Stories) — `/api/daily`
 
@@ -197,221 +216,42 @@ HTTP → server.js → app.js → Middleware (Auth JWT) → Routes → Controlle
 | GET | `/user/:userId/summary` | Resumo: total ativo e não vistos |
 | POST | `/:dailyId/like` | Curtir/descurtir daily |
 | POST | `/:dailyId/view` | Marcar daily como visto |
+| DELETE | `/:dailyId` | Excluir daily |
 
-### 🏋️ Diário de Treino — `/api/diario`
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| POST | `/salvar` | Salvar treino finalizado (transação completa) |
-| GET | `/exercicios` | Listar exercícios com músculos e equipamentos |
-| POST | `/custom` | Criar exercício personalizado |
-| GET | `/custom` | Listar exercícios personalizados |
-| GET | `/ultimas-series` | Últimas séries por exercício |
-| GET | `/repetir-treino/lista` | Lista de treinos para repetir |
-| GET | `/repetir-treino/template/:treinoId` | Template de treino para repetir |
-
-### 📊 Gráficos — `/api/diario/graficos`
+### 🔍 Busca — `/api/search`
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/volume-treino` | Distribuição de séries por músculo |
-| GET | `/exercicios` | Exercícios com recordes e última data |
-| GET | `/exercicios/evolucao` | Evolução de carga de um exercício |
+| GET | `/users` | Buscar usuários |
+| GET | `/posts` | Buscar posts |
 
-### 🔍 Detalhe e Retrospectiva — `/api/detalhe-treino`
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/dias` | Dias com treino registrado |
-| GET | `/detalhe` | Detalhe do treino por data |
-| GET | `/retrospectiva` | Resumo semanal/mensal/anual (mensal exige premium) |
-
-### 🏆 Gamificação — `/api/diario/gamificacao`
+### ☁️ Mídia — `/api/media`
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/me` | Pontos, posição global e patente atual |
-| GET | `/patentes` | Roadmap de patentes da temporada |
-| GET | `/historico` | Histórico de pontuação (paginado) |
-| GET | `/temporadas` | Histórico de temporadas encerradas |
-| GET | `/ranking` | Ranking global |
+| POST | `/presign` | Gerar URL de upload (presigned) |
+| POST | `/complete` | Confirmar upload |
 
-> **Sistema de pontos:** Temporadas de 6 meses. Pontuação baseada no volume do treino. Premium recebe 2x de pontos (teto 600 por treino). Normal tem teto de 300 por treino.
+### 💬 Conversas/Chat — `/api/conversas` e `/api/chat`
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | `/chat/:targetUserId/messages` | Enviar mensagem |
+| POST | `/conversas/:targetUserId/hide` | Ocultar conversa |
+| POST | `/conversas/:targetUserId/pin` | Fixar conversa |
+| POST | `/conversas/:targetUserId/block` | Bloquear conversa |
 
 ### 🔔 Notificações — `/api/notifications`
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/list-notifications` | Lista de notificações |
-| GET | `/unread-count` | Contagem de não lidas |
-| PATCH | `/read-all` | Marcar todas como lidas |
-| PATCH | `/:notificationId/read` | Marcar uma como lida |
-| POST | `/push-token` | Registrar token Expo push |
-| DELETE | `/push-token` | Remover token push |
-
-**Tipos de notificação:** `USER_FOLLOW` · `FOLLOW_REQUEST` · `FOLLOW_ACCEPTED` · `POST_LIKE` · `POST_SAVE` · `POST_COMMENT` · `COMMENT_LIKE` · `MENTION`
+| POST | `/push-token` | Registrar token de push |
+| POST | `/test` | Teste de envio |
 
 ### 💎 Premium — `/api/premium`
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/status` | Status da assinatura |
-| POST | `/sync` | Sincronizar com RevenueCat |
-
-### 🔎 Busca — `/api/search`
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/users` | Busca de usuários por username ou nome |
-
-### 🖼️ Mídia — `/api/media`
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| POST | `/presign` | Gerar URL assinada para upload no Cloudflare R2 |
-| POST | `/complete` | Confirmar upload concluído |
+| POST | `/sync` | Sincronizar assinatura premium |
 
 ---
-
-## 🚀 Como Rodar
-
-### Pré-requisitos
-
-- [Node.js](https://nodejs.org/) v18+
-- [PostgreSQL](https://www.postgresql.org/) v14+
-- [Expo CLI](https://docs.expo.dev/get-started/installation/)
-
-### Instalação
-
-```bash
-# Clone o repositório
-git clone https://github.com/gabrielvicentm/JustLift.git
-cd JustLift
-
-# Instalar dependências do backend
-cd backend && npm install
-
-# Instalar dependências do frontend
-cd ../frontend && npm install
-```
-
-### Variáveis de Ambiente
-
-Crie um `.env` na pasta `backend/`:
-
-```env
-# Servidor
-PORT=3000
-
-# Banco de dados
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=seu_usuario
-DB_PASSWORD=sua_senha
-DB_NAME=justlift
-
-# JWT
-JWT_SECRET=seu_jwt_secret
-
-# Google OAuth
-GOOGLE_CLIENT_ID=seu_google_client_id
-
-# Resend (email)
-RESEND_API_KEY=sua_resend_api_key
-
-# Cloudflare R2
-R2_ACCOUNT_ID=seu_account_id
-R2_ACCESS_KEY_ID=sua_access_key
-R2_SECRET_ACCESS_KEY=sua_secret_key
-R2_BUCKET=seu_bucket
-
-# RevenueCat
-REVENUECAT_SECRET_KEY=sua_revenuecat_key
-```
-
-Crie um `.env` na pasta `frontend/`:
-
-```env
-EXPO_PUBLIC_API_URL=http://localhost:3000
-```
-
-### Rodando
-
-```bash
-# Backend — carregar exercícios no banco (execute uma vez)
-cd backend
-node preload.js
-
-# Backend — iniciar o servidor
-node server.js
-
-# Frontend (outro terminal)
-cd ../frontend
-npx expo start
-```
-
----
-
-## 🔄 Fluxos Principais
-
-```
-Cadastro   →  POST /register → email com código → POST /register/verify → usuário criado
-Login      →  POST /login → JWT access + refresh → Authorization: Bearer <token>
-Treino     →  POST /diario/salvar → transação → calcula volume → grantWorkoutPoints
-Post       →  POST /posts/create-post → mídias + menções → notificações + push
-Follow     →  POST /follows/following/:id → user_follows → notificação USER_FOLLOW
-Daily      →  POST /daily (batch) → GET /daily/user/:id → likes e views
-Premium    →  POST /premium/sync → RevenueCat → user_subscriptions → users.is_premium
-```
-
----
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Para contribuir:
-
-1. Fork o projeto
-2. Crie sua branch (`git checkout -b feature/sua-feature`)
-3. Commit suas mudanças (`git commit -m 'feat: adiciona sua feature'`)
-4. Push para a branch (`git push origin feature/sua-feature`)
-5. Abra um Pull Request
-
----
-
-## 📄 Licença
-
-Este projeto está licenciado sob a [MIT License](LICENSE).
-
-```
-MIT License
-
-Copyright (c) 2025 gabrielvicentm
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-<div align="center">
-
-Feito com 💪 por <a href="https://github.com/gabrielvicentm">gabrielvicentm</a>,
-<a href="https://github.com/Kennedys-Leon">Kennedys-Leon</a>,
-<a href="https://github.com/gouveazs">Gouveazs</a> e
-<a href="https://github.com/RichardMarinho">RichardMarinho</a>
-</div>
