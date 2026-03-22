@@ -24,8 +24,8 @@ import type { FollowListItem, PublicProfileResponse } from "@/app/features/profi
 import {
   fetchProfileByUsername,
   followUser,
-  fetchFollowers,
-  fetchFollowing,
+  fetchFollowersByUserId,
+  fetchFollowingByUserId,
   getApiErrorMessage,
   removeFollowing,
 } from "@/app/features/profile/service";
@@ -74,8 +74,8 @@ export default function PublicProfileScreen() {
       setFollowError("");
       try {
         const data = tab === "followers"
-          ? await fetchFollowers("", 50, 0)
-          : await fetchFollowing("", 50, 0);
+          ? await fetchFollowersByUserId(profile.user_id, "", 50, 0)
+          : await fetchFollowingByUserId(profile.user_id, "", 50, 0);
         setFollowItems(data);
       } catch (err) {
         setFollowError(getApiErrorMessage(err, "carregar lista"));

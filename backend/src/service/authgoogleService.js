@@ -5,6 +5,12 @@ const db = require('../utils/db');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const normalizeUsername = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+  return raw.replace(/\s+/g, '_').replace(/[^a-z0-9_\.]/g, '');
+};
+
 const verifyGoogleIdToken = async (googleIdToken, providedGoogleId) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
     throw new Error('CONFIG_ERROR');
@@ -58,7 +64,7 @@ exports.loginWithGoogle = async (googleIdToken, providedGoogleId) => {
 exports.registerWithGoogle = async (username, googleIdToken, providedGoogleId) => {
   const { googleId, email, googleName } = await verifyGoogleIdToken(googleIdToken, providedGoogleId);
 
-  const safeUsername = (username || googleName || email.split('@')[0] || '').trim();
+  const safeUsername = normalizeUsername(username || googleName || email.split('@')[0] || '');
 
   if (!safeUsername) {
     throw new Error('INVALID_USERNAME');
