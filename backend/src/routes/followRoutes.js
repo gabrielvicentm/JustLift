@@ -6,6 +6,8 @@ const router = express.Router();
 
 router.get('/followers', authMiddleware, followController.getFollowers);
 router.get('/following', authMiddleware, followController.getFollowing);
+router.get('/user/:userId/followers', authMiddleware, followController.getFollowersByUser);
+router.get('/user/:userId/following', authMiddleware, followController.getFollowingByUser);
 router.get('/requests', authMiddleware, followController.listFollowRequests);
 router.post('/following/:targetUserId', authMiddleware, followController.follow);
 router.post('/requests/:targetUserId', authMiddleware, followController.requestFollow);

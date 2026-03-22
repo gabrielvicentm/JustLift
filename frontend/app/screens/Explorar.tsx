@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -37,37 +37,44 @@ export default function ExplorarScreen() {
   const [error, setError] = useState("");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const offsetRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
 
-  const loadFeed = useCallback(
-    async (reset = false) => {
+  const loadFeed = useCallback(async (reset = false) => {
       if (reset) {
         setLoading(true);
         setError("");
         setOffset(0);
         setHasMore(true);
-      } else if (loadingMore || !hasMore) {
+        offsetRef.current = 0;
+        hasMoreRef.current = true;
+      } else if (loadingMoreRef.current || !hasMoreRef.current) {
         return;
       } else {
         setLoadingMore(true);
+        loadingMoreRef.current = true;
       }
 
-      const requestOffset = reset ? 0 : offset;
+      const requestOffset = reset ? 0 : offsetRef.current;
 
       try {
         const data = await fetchExploreFeed(PAGE_SIZE, requestOffset);
         setPosts((prev) => (reset ? data.posts : [...prev, ...data.posts]));
-        setOffset(requestOffset + data.posts.length);
-        setHasMore(data.posts.length === PAGE_SIZE);
+        const nextOffset = requestOffset + data.posts.length;
+        offsetRef.current = nextOffset;
+        hasMoreRef.current = data.posts.length === PAGE_SIZE;
+        setOffset(nextOffset);
+        setHasMore(hasMoreRef.current);
       } catch (err) {
         setError(getApiErrorMessage(err, "carregar feed"));
       } finally {
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
+        loadingMoreRef.current = false;
       }
-    },
-    [hasMore, loadingMore, offset],
-  );
+    }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -81,10 +88,10 @@ export default function ExplorarScreen() {
   }, [loadFeed]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore) {
+    if (!loadingMoreRef.current && hasMoreRef.current) {
       loadFeed(false);
     }
-  }, [hasMore, loadFeed, loadingMore]);
+  }, [loadFeed]);
 
   const gridSpacing = 8;
   const horizontalPadding = 16;

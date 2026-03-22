@@ -44,6 +44,58 @@ exports.getFollowing = async (req, res) => {
   }
 };
 
+exports.getFollowersByUser = async (req, res) => {
+  try {
+    const viewerUserId = getUserId(req);
+    if (!viewerUserId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const userId = String(req.params?.userId || '').trim();
+    if (!userId) {
+      return res.status(400).json({ message: 'userId obrigatorio' });
+    }
+
+    const users = await followService.listFollowers({
+      userId,
+      search: req.query.q,
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+
+    return res.status(200).json(users);
+  } catch (err) {
+    console.error('Erro ao listar seguidores por usuario:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao listar seguidores.' });
+  }
+};
+
+exports.getFollowingByUser = async (req, res) => {
+  try {
+    const viewerUserId = getUserId(req);
+    if (!viewerUserId) {
+      return res.status(401).json({ message: 'Token invalido' });
+    }
+
+    const userId = String(req.params?.userId || '').trim();
+    if (!userId) {
+      return res.status(400).json({ message: 'userId obrigatorio' });
+    }
+
+    const users = await followService.listFollowing({
+      userId,
+      search: req.query.q,
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+
+    return res.status(200).json(users);
+  } catch (err) {
+    console.error('Erro ao listar seguindo por usuario:', err);
+    return res.status(500).json({ message: 'Erro no servidor ao listar seguindo.' });
+  }
+};
+
 exports.unfollow = async (req, res) => {
   try {
     const userId = getUserId(req);

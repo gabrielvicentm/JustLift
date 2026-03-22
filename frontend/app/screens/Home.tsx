@@ -45,6 +45,9 @@ export default function HomeScreen() {
   const [followingUserId, setFollowingUserId] = useState<string | null>(null);
   const [loadingStories, setLoadingStories] = useState(false);
   const isMountedRef = useRef(true);
+  const offsetRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -53,8 +56,7 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const loadFeed = useCallback(
-    async (reset = false) => {
+  const loadFeed = useCallback(async (reset = false) => {
       if (reset) {
         if (isMountedRef.current) {
           setLoading(true);
@@ -62,15 +64,18 @@ export default function HomeScreen() {
           setOffset(0);
           setHasMore(true);
         }
-      } else if (loadingMore || !hasMore) {
+        offsetRef.current = 0;
+        hasMoreRef.current = true;
+      } else if (loadingMoreRef.current || !hasMoreRef.current) {
         return;
       } else {
         if (isMountedRef.current) {
           setLoadingMore(true);
         }
+        loadingMoreRef.current = true;
       }
 
-      const requestOffset = reset ? 0 : offset;
+      const requestOffset = reset ? 0 : offsetRef.current;
 
       try {
         const data = await fetchHomeFeed(PAGE_SIZE, requestOffset);
@@ -86,8 +91,11 @@ export default function HomeScreen() {
           if (reset) {
             setSuggestedUsers(data.suggested_users ?? []);
           }
-          setOffset(requestOffset + data.posts.length);
-          setHasMore(data.posts.length === PAGE_SIZE);
+          const nextOffset = requestOffset + data.posts.length;
+          offsetRef.current = nextOffset;
+          hasMoreRef.current = data.posts.length === PAGE_SIZE;
+          setOffset(nextOffset);
+          setHasMore(hasMoreRef.current);
         }
       } catch (err) {
         if (isMountedRef.current) {
@@ -99,10 +107,9 @@ export default function HomeScreen() {
           setRefreshing(false);
           setLoadingMore(false);
         }
+        loadingMoreRef.current = false;
       }
-    },
-    [hasMore, loadingMore, offset],
-  );
+    }, []);
 
   const loadDailyStories = useCallback(async () => {
     if (isMountedRef.current) {
@@ -159,10 +166,10 @@ export default function HomeScreen() {
   }, [loadDailyStories, loadFeed]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore) {
+    if (!loadingMoreRef.current && hasMoreRef.current) {
       loadFeed(false);
     }
-  }, [hasMore, loadFeed, loadingMore]);
+  }, [loadFeed]);
 
   const handleFollowSuggested = useCallback(
     async (user: SuggestedUser) => {
