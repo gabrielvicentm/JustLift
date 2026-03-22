@@ -8,12 +8,15 @@ import {
   Text,
   View,
   useWindowDimensions,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { fetchMyProfile, getApiErrorMessage } from "@/app/features/profile/service";
+import { deleteDaily, fetchActiveDailyByUser } from "@/app/features/daily/service";
+import type { DailyItem } from "@/app/features/daily/types";
 import { fetchPostsByUser } from "@/app/features/social/service";
 import type { PostSummary } from "@/app/features/social/types";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -26,8 +29,11 @@ export default function GerenciarPostsScreen() {
   const { width } = useWindowDimensions();
 
   const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [dailyItems, setDailyItems] = useState<DailyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [dailyError, setDailyError] = useState("");
+  const [deletingDailyId, setDeletingDailyId] = useState<number | null>(null);
 
   const gridSpacing = 6;
   const horizontalPadding = 16;
@@ -37,10 +43,23 @@ export default function GerenciarPostsScreen() {
   const loadPosts = useCallback(async () => {
     setLoading(true);
     setError("");
+    setDailyError("");
     try {
       const profile = await fetchMyProfile();
-      const data = await fetchPostsByUser(profile.user_id);
-      setPosts(data);
+      const [postsResult, dailyResult] = await Promise.allSettled([
+        fetchPostsByUser(profile.user_id),
+        fetchActiveDailyByUser(profile.user_id),
+      ]);
+      if (postsResult.status === "fulfilled") {
+        setPosts(postsResult.value);
+      } else {
+        setError(getApiErrorMessage(postsResult.reason, "carregar seus posts"));
+      }
+      if (dailyResult.status === "fulfilled") {
+        setDailyItems(dailyResult.value);
+      } else {
+        setDailyError(getApiErrorMessage(dailyResult.reason, "carregar Daily"));
+      }
     } catch (err) {
       setError(getApiErrorMessage(err, "carregar seus posts"));
     } finally {
@@ -52,6 +71,30 @@ export default function GerenciarPostsScreen() {
     useCallback(() => {
       loadPosts();
     }, [loadPosts]),
+  );
+
+  const handleDeleteDaily = useCallback(
+    (dailyId: number) => {
+      Alert.alert("Excluir Daily", "Tem certeza que deseja excluir este Daily?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingDailyId(dailyId);
+            try {
+              await deleteDaily(dailyId);
+              setDailyItems((prev) => prev.filter((item) => item.id !== dailyId));
+            } catch (err) {
+              setDailyError(getApiErrorMessage(err, "excluir Daily"));
+            } finally {
+              setDeletingDailyId(null);
+            }
+          },
+        },
+      ]);
+    },
+    [],
   );
 
   const headerContent = (
@@ -84,6 +127,53 @@ export default function GerenciarPostsScreen() {
       </LinearGradient>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {dailyError ? <Text style={styles.error}>{dailyError}</Text> : null}
+
+      <View style={styles.dailySection}>
+        <Text style={styles.sectionTitle}>Daily ativos</Text>
+        {dailyItems.length === 0 ? (
+          <Text style={styles.emptyText}>Nenhum Daily ativo.</Text>
+        ) : (
+          <View style={styles.dailyRow}>
+            {dailyItems.map((item) => {
+              const isVideo = item.media_type === "video";
+              const isDeleting = deletingDailyId === item.id;
+
+              return (
+                <Pressable
+                  key={item.id}
+                  style={styles.dailyCard}
+                  onPress={() =>
+                    router.push({ pathname: "/screens/social/VerDaily", params: { userId: item.user_id } } as never)
+                  }
+                >
+                  {item.media_type === "image" ? (
+                    <Image source={{ uri: item.media_url }} style={styles.dailyThumb} />
+                  ) : (
+                    <View style={[styles.dailyThumb, styles.dailyPlaceholder]}>
+                      <Ionicons name="videocam" size={20} color={theme.colors.buttonText} />
+                    </View>
+                  )}
+
+                  {isVideo ? (
+                    <View style={styles.dailyBadge}>
+                      <Ionicons name="play" size={12} color={theme.colors.buttonText} />
+                    </View>
+                  ) : null}
+
+                  <Pressable
+                    style={[styles.dailyDeleteButton, isDeleting && styles.disabled]}
+                    onPress={() => handleDeleteDaily(item.id)}
+                    disabled={isDeleting}
+                  >
+                    <Ionicons name="trash-outline" size={14} color={theme.colors.buttonText} />
+                  </Pressable>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </View>
     </>
   );
 
@@ -207,6 +297,75 @@ function createStyles(theme: AppTheme) {
       textShadowColor: "rgba(0, 255, 255, 0.35)",
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 8,
+    },
+    sectionTitle: {
+      color: "#E0E0E0",
+      fontSize: 16,
+      fontWeight: "700",
+      paddingHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 8,
+    },
+    dailySection: {
+      marginTop: 4,
+      marginBottom: 12,
+      paddingHorizontal: 16,
+      gap: 10,
+    },
+    dailyRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    dailyCard: {
+      width: 96,
+      height: 128,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.5)",
+      backgroundColor: "rgba(11, 14, 24, 0.92)",
+      overflow: "hidden",
+      shadowColor: "#7C5CFF",
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    dailyThumb: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+      backgroundColor: "#0B0E18",
+    },
+    dailyPlaceholder: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#0B0E18",
+    },
+    dailyBadge: {
+      position: "absolute",
+      right: 8,
+      bottom: 8,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      paddingVertical: 4,
+    },
+    dailyDeleteButton: {
+      position: "absolute",
+      top: 6,
+      right: 6,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: "rgba(124, 92, 255, 0.6)",
+    },
+    disabled: {
+      opacity: 0.6,
     },
     loadingWrap: {
       flexDirection: "row",

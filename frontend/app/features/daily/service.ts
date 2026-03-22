@@ -42,3 +42,8 @@ export async function markDailyViewed(dailyId: number): Promise<{ viewed: boolea
   const response = await api.post<{ viewed: boolean }>(`/daily/${dailyId}/view`, {}, { headers });
   return response.data;
 }
+
+export async function deleteDaily(dailyId: number): Promise<void> {
+  const headers = await getAuthHeader();
+  await api.delete(`/daily/${dailyId}`, { headers });
+}
