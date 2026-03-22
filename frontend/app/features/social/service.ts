@@ -2,11 +2,13 @@ import * as FileSystem from "expo-file-system/legacy";
 import { api } from "@/app/config/api";
 import { getAuthHeader } from "@/app/features/profile/service";
 import type {
+  FeedResponse,
   PostCommentItem,
   PostDetail,
   PostMediaPayload,
   PostSummary,
   SearchPostResponseItem,
+  SuggestedUser,
   TreinoResumo,
 } from "./types";
 
@@ -151,6 +153,33 @@ export async function searchPostsByDescription(query: string, limit = 20) {
     params: { q: query, limit },
   });
   return response.data ?? [];
+}
+
+export async function fetchHomeFeed(limit = 20, offset = 0): Promise<FeedResponse> {
+  const headers = await getAuthHeader();
+  const response = await api.get<FeedResponse>("/feed/home", {
+    headers,
+    params: { limit, offset },
+  });
+  return response.data;
+}
+
+export async function fetchExploreFeed(limit = 30, offset = 0): Promise<FeedResponse> {
+  const headers = await getAuthHeader();
+  const response = await api.get<FeedResponse>("/feed/explore", {
+    headers,
+    params: { limit, offset },
+  });
+  return response.data;
+}
+
+export async function fetchSuggestedUsers(limit = 10): Promise<SuggestedUser[]> {
+  const headers = await getAuthHeader();
+  const response = await api.get<{ suggested_users: SuggestedUser[] }>("/feed/suggested-users", {
+    headers,
+    params: { limit },
+  });
+  return response.data.suggested_users ?? [];
 }
 
 export async function createPostComment(postId: number, comentario: string): Promise<PostCommentItem> {

@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   blockConversationUser,
   fetchConversas,
@@ -34,6 +35,7 @@ export default function ConversasScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const gradient = ["#5BE7FF", "#7C5CFF", "#FF4BD8"] as const;
 
   const [query, setQuery] = useState("");
   const [conversas, setConversas] = useState<ConversaListItem[]>([]);
@@ -231,42 +233,49 @@ export default function ConversasScreen() {
           };
 
           return (
-            <Pressable
-              style={styles.card}
-              onPress={handlePress}
-              onLongPress={() => {
-                skipNextPressRef.current = true;
-                setSelectedConversation(item);
-              }}
+            <LinearGradient
+              colors={gradient}
+              start={{ x: 0, y: 0.2 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.cardBorder}
             >
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarFallbackText}>{title.slice(0, 1).toUpperCase()}</Text>
-                </View>
-              )}
-
-              <View style={styles.cardInfo}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.profileMeta}>
-                    <Text style={styles.cardTitle}>{title}</Text>
-                    <Text style={styles.cardSubtitle}>@{item.username}</Text>
+              <Pressable
+                style={styles.card}
+                onPress={handlePress}
+                onLongPress={() => {
+                  skipNextPressRef.current = true;
+                  setSelectedConversation(item);
+                }}
+              >
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarFallback]}>
+                    <Text style={styles.avatarFallbackText}>{title.slice(0, 1).toUpperCase()}</Text>
                   </View>
-                  {item.is_pinned ? (
-                    <MaterialCommunityIcons name="pin" size={13} color="#FFFFFF" style={styles.pinIcon} />
+                )}
+
+                <View style={styles.cardInfo}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.profileMeta}>
+                      <Text style={styles.cardTitle}>{title}</Text>
+                      <Text style={styles.cardSubtitle}>@{item.username}</Text>
+                    </View>
+                    {item.is_pinned ? (
+                      <MaterialCommunityIcons name="pin" size={13} color="#FFFFFF" style={styles.pinIcon} />
+                    ) : null}
+                  </View>
+                  <Text numberOfLines={1} style={styles.preview}>
+                    {preview}
+                  </Text>
+                  {item.unread_count > 0 ? (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{item.unread_count}</Text>
+                    </View>
                   ) : null}
                 </View>
-                <Text numberOfLines={1} style={styles.preview}>
-                  {preview}
-                </Text>
-                {item.unread_count > 0 ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{item.unread_count}</Text>
-                  </View>
-                ) : null}
-              </View>
-            </Pressable>
+              </Pressable>
+            </LinearGradient>
           );
         }}
         ListFooterComponent={
@@ -406,14 +415,16 @@ function createStyles(theme: AppTheme) {
       marginTop: 20,
     },
     card: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
       borderRadius: 12,
       padding: 12,
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
+    },
+    cardBorder: {
+      borderRadius: 12,
+      padding: 1.5,
     },
     avatar: {
       width: 50,

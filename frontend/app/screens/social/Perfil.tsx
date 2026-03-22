@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useMyProfileQuery } from "@/app/features/profile/hooks";
-import { getApiErrorMessage } from "@/app/features/profile/service";
+import {
+  fetchFollowers,
+  fetchFollowing,
+  getApiErrorMessage,
+  removeFollower,
+  removeFollowing,
+} from "@/app/features/profile/service";
+import type { FollowListItem } from "@/app/features/profile/types";
 import { fetchPostsByUser } from "@/app/features/social/service";
 import type { PostSummary } from "@/app/features/social/types";
 import { fetchDailySummaryByUser } from "@/app/features/daily/service";
@@ -53,6 +61,12 @@ export default function PerfilScreen() {
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
   const [activeTab, setActiveTab] = useState<"posts" | "treinos" | "salvos">("posts");
   const [showPremiumAdModal, setShowPremiumAdModal] = useState(false);
+  const [followModalVisible, setFollowModalVisible] = useState(false);
+  const [followTab, setFollowTab] = useState<"followers" | "following">("followers");
+  const [followItems, setFollowItems] = useState<FollowListItem[]>([]);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [followError, setFollowError] = useState("");
+  const [removingFollowId, setRemovingFollowId] = useState<string | null>(null);
 
   const loading = profileQuery.isLoading;
   const refreshing = profileQuery.isRefetching;
@@ -65,6 +79,48 @@ export default function PerfilScreen() {
   const savedPosts = posts.filter((item) => item.viewer_saved);
   const visiblePosts =
     activeTab === "treinos" ? treinoPosts : activeTab === "salvos" ? savedPosts : posts;
+
+  const loadFollowItems = useCallback(
+    async (tab = followTab) => {
+      setFollowLoading(true);
+      setFollowError("");
+      try {
+        const data = tab === "followers" ? await fetchFollowers("", 50, 0) : await fetchFollowing("", 50, 0);
+        setFollowItems(data);
+      } catch (err) {
+        setFollowError(getApiErrorMessage(err, "carregar lista"));
+      } finally {
+        setFollowLoading(false);
+      }
+    },
+    [followTab],
+  );
+
+  useEffect(() => {
+    if (followModalVisible) {
+      loadFollowItems(followTab);
+    }
+  }, [followModalVisible, followTab, loadFollowItems]);
+
+  const handleRemoveFollow = useCallback(
+    async (userId: string) => {
+      if (!userId || removingFollowId) return;
+      setRemovingFollowId(userId);
+      try {
+        if (followTab === "followers") {
+          await removeFollower(userId);
+        } else {
+          await removeFollowing(userId);
+        }
+        setFollowItems((prev) => prev.filter((item) => item.user_id !== userId));
+      } catch (err) {
+        setFollowError(getApiErrorMessage(err, "remover usuario"));
+      } finally {
+        setRemovingFollowId(null);
+      }
+    },
+    [followTab, removingFollowId],
+  );
 
   const loadPosts = useCallback(async () => {
     const userId = profileQuery.data?.user_id;
@@ -219,14 +275,28 @@ export default function PerfilScreen() {
               </View>
 
               <View style={styles.statsRow}>
-                <View style={styles.statItem}>
+                <Pressable
+                  style={styles.statItem}
+                  onPress={() => {
+                    setFollowTab("followers");
+                    loadFollowItems("followers");
+                    setFollowModalVisible(true);
+                  }}
+                >
                   <Text style={styles.statValue}>{profile?.followers_count ?? 0}</Text>
                   <Text style={styles.statLabel}>seguidores</Text>
-                </View>
-                <View style={styles.statItem}>
+                </Pressable>
+                <Pressable
+                  style={styles.statItem}
+                  onPress={() => {
+                    setFollowTab("following");
+                    loadFollowItems("following");
+                    setFollowModalVisible(true);
+                  }}
+                >
                   <Text style={styles.statValue}>{profile?.following_count ?? 0}</Text>
                   <Text style={styles.statLabel}>seguindo</Text>
-                </View>
+                </Pressable>
               </View>
             </View>
           </View>
@@ -239,20 +309,6 @@ export default function PerfilScreen() {
             </Pressable>
           </View>
 
-          {hasActiveDaily ? (
-            <View style={styles.highlightsRow}>
-              <Pressable style={styles.highlightItem} onPress={handleOpenDaily}>
-                <View style={[styles.highlightCircle, hasUnseenDaily ? styles.highlightUnseen : styles.highlightSeen]}>
-                  {profile?.foto_perfil ? (
-                    <Image source={{ uri: profile.foto_perfil }} style={styles.highlightImage} />
-                  ) : (
-                    <View style={[styles.highlightImage, styles.highlightPlaceholder]} />
-                  )}
-                </View>
-                <Text style={styles.highlightLabel}>Daily</Text>
-              </Pressable>
-            </View>
-          ) : null}
         </View>
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
@@ -360,6 +416,95 @@ export default function PerfilScreen() {
 
         </View>
       </ScrollView>
+      <Modal
+        visible={followModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFollowModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {followTab === "followers" ? "Seguidores" : "Seguindo"}
+              </Text>
+              <Pressable onPress={() => setFollowModalVisible(false)} style={styles.modalClose}>
+                <Ionicons name="close" size={20} color={theme.colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={styles.modalTabs}>
+              <Pressable
+                onPress={() => setFollowTab("followers")}
+                style={[styles.modalTab, followTab === "followers" && styles.modalTabActive]}
+              >
+                <Text style={[styles.modalTabText, followTab === "followers" && styles.modalTabTextActive]}>
+                  Seguidores
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setFollowTab("following")}
+                style={[styles.modalTab, followTab === "following" && styles.modalTabActive]}
+              >
+                <Text style={[styles.modalTabText, followTab === "following" && styles.modalTabTextActive]}>
+                  Seguindo
+                </Text>
+              </Pressable>
+            </View>
+
+            {followError ? <Text style={styles.modalError}>{followError}</Text> : null}
+
+            {followLoading ? (
+              <View style={styles.modalLoading}>
+                <ActivityIndicator color={theme.colors.text} />
+                <Text style={styles.modalLoadingText}>Carregando...</Text>
+              </View>
+            ) : followItems.length === 0 ? (
+              <Text style={styles.modalEmptyText}>Nenhum usuario encontrado.</Text>
+            ) : (
+              <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+                {followItems.map((item) => {
+                  const removing = removingFollowId === item.user_id;
+                  return (
+                    <View key={item.user_id} style={styles.modalItem}>
+                      <Pressable
+                        style={styles.modalUser}
+                        onPress={() =>
+                          router.push({ pathname: "/screens/social/[username]", params: { username: item.username } } as never)
+                        }
+                      >
+                        {item.foto_perfil ? (
+                          <Image source={{ uri: item.foto_perfil }} style={styles.modalAvatar} />
+                        ) : (
+                          <View style={[styles.modalAvatar, styles.modalAvatarFallback]}>
+                            <Text style={styles.modalAvatarText}>
+                              {(item.nome_exibicao || item.username || "U").slice(0, 1).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.modalUserInfo}>
+                          <Text style={styles.modalUserName}>@{item.username}</Text>
+                          {item.nome_exibicao ? (
+                            <Text style={styles.modalUserSubtitle}>{item.nome_exibicao}</Text>
+                          ) : null}
+                        </View>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.modalRemoveButton, removing && styles.disabled]}
+                        onPress={() => handleRemoveFollow(item.user_id)}
+                        disabled={removing}
+                      >
+                        <Text style={styles.modalRemoveText}>{removing ? "Removendo..." : "Remover"}</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
       <PremiumAdModal
         visible={showPremiumAdModal}
         onClose={() => setShowPremiumAdModal(false)}
@@ -705,6 +850,153 @@ function createStyles(theme: AppTheme) {
       paddingVertical: 3,
       borderRadius: 999,
       backgroundColor: "rgba(0,0,0,0.55)",
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 16,
+    },
+    modalCard: {
+      width: "100%",
+      maxWidth: 420,
+      height: "80%",
+      borderRadius: 18,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      gap: 12,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    modalTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    modalClose: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.inputBackground,
+    },
+    modalTabs: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    modalTab: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: 12,
+      alignItems: "center",
+      backgroundColor: theme.colors.inputBackground,
+      borderWidth: 1,
+      borderColor: "transparent",
+    },
+    modalTabActive: {
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+    },
+    modalTabText: {
+      color: theme.colors.mutedText,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    modalTabTextActive: {
+      color: theme.colors.text,
+    },
+    modalError: {
+      color: theme.colors.error,
+      fontSize: 12,
+    },
+    modalLoading: {
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 20,
+    },
+    modalLoadingText: {
+      color: theme.colors.text,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    modalEmptyText: {
+      color: theme.colors.mutedText,
+      textAlign: "center",
+      paddingVertical: 20,
+    },
+    modalList: {
+      flex: 1,
+    },
+    modalListContent: {
+      gap: 10,
+      paddingBottom: 6,
+    },
+    modalItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      padding: 10,
+      borderRadius: 12,
+      backgroundColor: theme.colors.inputBackground,
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.04)",
+    },
+    modalUser: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    modalAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+    },
+    modalAvatarFallback: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    modalAvatarText: {
+      color: theme.colors.text,
+      fontWeight: "700",
+      fontSize: 12,
+    },
+    modalUserInfo: {
+      flex: 1,
+    },
+    modalUserName: {
+      color: theme.colors.text,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+    modalUserSubtitle: {
+      color: theme.colors.mutedText,
+      fontSize: 12,
+    },
+    modalRemoveButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+      backgroundColor: theme.colors.negativeGradient?.[0] ?? "#FF3B30",
+    },
+    modalRemoveText: {
+      color: theme.colors.negativeText,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    disabled: {
+      opacity: 0.6,
     },
   });
 }
