@@ -58,6 +58,29 @@ export type PostDetail = PostSummary & {
   comentarios: PostCommentItem[];
 };
 
+export type SuggestedUser = {
+  user_id: string;
+  username: string;
+  nome_exibicao: string | null;
+  foto_perfil: string | null;
+  followers_count?: number;
+  posts_count?: number;
+};
+
+export type FeedMeta = {
+  limit: number;
+  offset: number;
+  count: number;
+  source_mix: { following: number; discovery: number };
+  has_following?: boolean;
+};
+
+export type FeedResponse = {
+  posts: PostSummary[];
+  meta: FeedMeta;
+  suggested_users?: SuggestedUser[];
+};
+
 export type SearchPostResponseItem = {
   id: number;
   user_id: string;

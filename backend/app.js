@@ -17,6 +17,7 @@ const treinoPostRoutes = require('./src/routes/treinoPostRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const conversasRoutes = require('./src/routes/conversasRoutes');
 const chatRoutes = require('./src/routes/chatRoutes');
+const feedRoutes = require('./src/routes/feedRoutes');
 
 //const rateLimiter = require('./src/middleware/rateLimiter');
 
@@ -43,6 +44,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/daily', dailyRoutes);
 app.use('/api/treino-posts', treinoPostRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/feed', feedRoutes);
 
 
 module.exports = app;

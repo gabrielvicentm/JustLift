@@ -267,3 +267,17 @@ exports.markViewed = async ({ dailyId, userId }) => {
 
   return { viewed: true };
 };
+
+exports.deleteDaily = async ({ dailyId, userId }) => {
+  const deleted = await db.query(
+    `
+      DELETE FROM daily
+      WHERE daily_id = $1
+        AND user_id = $2
+      RETURNING daily_id
+    `,
+    [dailyId, userId],
+  );
+
+  return deleted.rowCount > 0;
+};

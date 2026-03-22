@@ -43,7 +43,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="home_tab" options={{ title: "Início" }} />
       <Tabs.Screen name="conversas_tab" options={{ title: "Conversas" }} />
-      <Tabs.Screen name="diario_tab" options={{ title: "Diário" }} />
+      <Tabs.Screen name="diario_tab" options={{ title: "Treino" }} />
       <Tabs.Screen
         name="perfil_tab"
         options={{

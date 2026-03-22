@@ -163,3 +163,27 @@ exports.markViewed = async (req, res) => {
     return res.status(500).json({ message: 'Erro ao marcar Daily como visto' });
   }
 };
+
+exports.deleteDaily = async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ message: 'Usuario nao autenticado' });
+    }
+
+    const dailyId = Number(req.params?.dailyId);
+    if (!Number.isInteger(dailyId) || dailyId <= 0) {
+      return res.status(400).json({ message: 'dailyId invalido' });
+    }
+
+    const deleted = await dailyService.deleteDaily({ dailyId, userId });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Daily nao encontrado' });
+    }
+
+    return res.status(200).json({ message: 'Daily removido' });
+  } catch (err) {
+    console.error('Erro ao excluir Daily:', err);
+    return res.status(500).json({ message: 'Erro ao excluir Daily' });
+  }
+};
