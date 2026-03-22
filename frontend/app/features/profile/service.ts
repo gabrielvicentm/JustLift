@@ -131,6 +131,24 @@ export async function fetchFollowing(query = "", limit = 50, offset = 0) {
   return response.data ?? [];
 }
 
+export async function fetchFollowersByUserId(userId: string, query = "", limit = 50, offset = 0) {
+  const headers = await getAuthHeader();
+  const response = await api.get<FollowListItem[]>(`/follows/user/${encodeURIComponent(userId)}/followers`, {
+    headers,
+    params: { q: query, limit, offset },
+  });
+  return response.data ?? [];
+}
+
+export async function fetchFollowingByUserId(userId: string, query = "", limit = 50, offset = 0) {
+  const headers = await getAuthHeader();
+  const response = await api.get<FollowListItem[]>(`/follows/user/${encodeURIComponent(userId)}/following`, {
+    headers,
+    params: { q: query, limit, offset },
+  });
+  return response.data ?? [];
+}
+
 export async function removeFollowing(targetUserId: string) {
   const headers = await getAuthHeader();
   await api.delete(`/follows/following/${targetUserId}`, { headers });
