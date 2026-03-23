@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
-
-const SECRET_KEY = 'pantufa';
+const { JWT_ACCESS_SECRET } = require('./config/security');
 
 //você só cria um servidor socket, evitando uma duplicacao de sevidor
 let ioInstance = null;
@@ -55,7 +54,7 @@ function initSocket(server) { //inicializa o Socket.IO no servido
         return next(new Error('SOCKET_UNAUTHORIZED'));
       }
 
-      const decoded = jwt.verify(token, SECRET_KEY);
+      const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
       const userId = resolveUserId(decoded);
       if (!userId) {
         return next(new Error('SOCKET_UNAUTHORIZED'));
