@@ -524,12 +524,3 @@ exports.markAllAsRead = async ({ recipientUserId }) => {
   );
 };
 
-exports.sendTestPush = async ({ recipientUserId, title, body }) => {
-  const result = await pushService.sendPushToUser({
-    userId: recipientUserId,
-    title,
-    body,
-    data: { type: 'test' },
-  });
-  return result;
-};

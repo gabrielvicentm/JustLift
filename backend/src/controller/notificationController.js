@@ -134,25 +134,3 @@ exports.unregisterPushToken = async (req, res) => {
   }
 };
 
-exports.testPush = async (req, res) => {
-  try {
-    const userId = getUserIdFromRequest(req);
-    if (!userId) {
-      return res.status(401).json({ message: 'Usuario nao autenticado' });
-    }
-
-    const title = String(req.body?.title || 'Teste de notificacao').trim();
-    const body = String(req.body?.body || 'Se voce recebeu isso, o push está ok.').trim();
-
-    const result = await notificationService.sendTestPush({
-      recipientUserId: userId,
-      title,
-      body,
-    });
-
-    return res.status(200).json({ message: 'Push disparado', result });
-  } catch (err) {
-    console.error('Erro ao enviar push de teste:', err);
-    return res.status(500).json({ message: 'Erro ao enviar push de teste' });
-  }
-};
