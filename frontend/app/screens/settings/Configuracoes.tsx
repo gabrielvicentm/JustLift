@@ -129,7 +129,7 @@ export default function ConfiguracoesScreen() {
           >
             <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Notificacoes")}>
               <View style={styles.optionTextWrap}>
-                <Text style={styles.optionText}>Notificacoes</Text>
+                <Text style={styles.optionText}>Notificações</Text>
                 {unreadNotificationsCount > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -160,7 +160,7 @@ export default function ConfiguracoesScreen() {
             end={{ x: 1, y: 0.8 }}
             style={styles.cardBorder}
           >
-            <Pressable style={styles.optionCard} onPress={goHome}>
+            <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/Suporte")}>
               <Text style={styles.optionText}>Suporte</Text>
               <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
             </Pressable>
@@ -173,7 +173,7 @@ export default function ConfiguracoesScreen() {
             style={styles.cardBorder}
           >
             <Pressable style={styles.optionCard} onPress={() => router.push("/screens/settings/GerenciarPosts")}>
-              <Text style={styles.optionText}>Gerenciar posts</Text>
+              <Text style={styles.optionText}>Gerenciar Posts e Dailys</Text>
               <MaterialCommunityIcons name="chevron-right" size={22} style={styles.chevron} />
             </Pressable>
           </LinearGradient>

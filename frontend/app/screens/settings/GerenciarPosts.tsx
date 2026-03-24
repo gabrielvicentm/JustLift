@@ -51,7 +51,7 @@ export default function GerenciarPostsScreen() {
         fetchActiveDailyByUser(profile.user_id),
       ]);
       if (postsResult.status === "fulfilled") {
-        setPosts(postsResult.value);
+        setPosts([...postsResult.value]);
       } else {
         setError(getApiErrorMessage(postsResult.reason, "carregar seus posts"));
       }
@@ -201,15 +201,20 @@ export default function GerenciarPostsScreen() {
 
             return (
               <Pressable
-                style={[styles.gridItem, { width: tileSize, height: tileSize }]}
-                onPress={() => router.push(`/screens/social/EditarPost?postId=${item.id}` as never)}
+                style={[
+                  styles.gridItem,
+                  { width: tileSize, height: tileSize },
+                ]}
+                onPress={() => {
+                  router.push(`/screens/social/EditarPost?postId=${item.id}` as never);
+                }}
               >
                 {firstMedia ? (
                   firstMedia.type === "image" ? (
                     <>
                       <Image source={{ uri: firstMedia.url }} style={styles.gridImage} />
                       <View style={styles.mediaBadge}>
-                        <Ionicons name="play" size={12} color="#E0E0E0" />
+                        <Ionicons name="image-outline" size={12} color="#E0E0E0" />
                       </View>
                     </>
                   ) : (

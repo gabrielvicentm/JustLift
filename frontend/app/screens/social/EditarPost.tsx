@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +16,6 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
 import { LinearGradient } from "expo-linear-gradient";
 import { fetchMyProfile, getApiErrorMessage } from "@/app/features/profile/service";
 import { deletePost, deletePostComment, fetchPostById, updatePost, uploadMediaToR2 } from "@/app/features/social/service";
@@ -277,6 +277,40 @@ export default function EditarPostScreen() {
     ]);
   };
 
+  const renderMediaItem = (item: EditableMedia, index: number) => {
+    return (
+      <Pressable
+        key={item.id}
+        onPress={() => {
+          if (!post) return;
+          router.push(`/screens/social/Post/${post.id}?mediaIndex=${index}` as never);
+        }}
+        disabled={saving}
+        style={[
+          styles.mediaCard,
+          { width: tileSize, height: tileSize },
+        ]}
+      >
+        {item.type === "image" ? (
+          <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
+        ) : (
+          <View style={[styles.mediaPreview, styles.videoPreview]}>
+            <Text style={styles.videoText}>Video</Text>
+          </View>
+        )}
+
+        <View style={styles.mediaBadge}>
+          <Ionicons name={item.type === "video" ? "play" : "image-outline"} size={12} color="#E0E0E0" />
+        </View>
+
+        <Pressable style={styles.removeButton} onPress={() => handleRemoveMedia(item.id)} disabled={saving}>
+          <Ionicons name="close" size={14} color="#E0E0E0" />
+        </Pressable>
+
+      </Pressable>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -297,175 +331,122 @@ export default function EditarPostScreen() {
     );
   }
 
-  const renderMediaItem = ({ item, drag, isActive, getIndex }: RenderItemParams<EditableMedia>) => {
-    const index = getIndex?.() ?? 0;
-    return (
-    <Pressable
-      onPress={() => {
-        if (!post) return;
-        router.push(`/screens/social/Post/${post.id}?mediaIndex=${index}` as never);
-      }}
-      onLongPress={drag}
-      disabled={saving}
-      style={[
-        styles.mediaCard,
-        { width: tileSize, height: tileSize },
-        isActive && styles.mediaCardActive,
-      ]}
-    >
-      {item.type === "image" ? (
-        <Image source={{ uri: item.uri }} style={styles.mediaPreview} />
-      ) : (
-        <View style={[styles.mediaPreview, styles.videoPreview]}>
-          <Text style={styles.videoText}>Video</Text>
-        </View>
-      )}
-
-      <View style={styles.mediaBadge}>
-        <Ionicons name="play" size={12} color="#E0E0E0" />
-      </View>
-
-      <Pressable style={styles.removeButton} onPress={() => handleRemoveMedia(item.id)} disabled={saving}>
-        <Ionicons name="close" size={14} color="#E0E0E0" />
-      </Pressable>
-
-      <View style={styles.dragHint}>
-        <Ionicons name="reorder-three-outline" size={16} color="#E0E0E0" />
-        <Text style={styles.dragHintText}>Segure e arraste</Text>
-      </View>
-    </Pressable>
-    );
-  };
-
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
     >
-      <DraggableFlatList
-        data={midias}
-        keyExtractor={(item) => item.id}
-        onDragEnd={({ data }) => setMidias(data)}
-        renderItem={renderMediaItem}
-        numColumns={3}
-        activationDistance={14}
-        contentContainerStyle={styles.container}
-        columnWrapperStyle={styles.gridRow}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-        ListHeaderComponent={
-          <>
-            <View style={styles.topRow}>
-              <LinearGradient
-                colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-                start={{ x: 0, y: 0.2 }}
-                end={{ x: 1, y: 0.8 }}
-                style={styles.backBorder}
-              >
-                <Pressable style={styles.backButton} onPress={() => router.back()} disabled={saving}>
-                  <Text style={styles.backButtonText}>Voltar</Text>
-                </Pressable>
-              </LinearGradient>
-            </View>
-
-            <LinearGradient
-              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-              start={{ x: 0, y: 0.2 }}
-              end={{ x: 1, y: 0.8 }}
-              style={styles.heroBorder}
-            >
-              <View style={styles.heroCard}>
-                <Text style={styles.title}>Editar post</Text>
-                <Text style={styles.subtitle}>Altere descricao e quantidade de midias (maximo de 9).</Text>
-              </View>
-            </LinearGradient>
-
-            <LinearGradient
-              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-              start={{ x: 0, y: 0.2 }}
-              end={{ x: 1, y: 0.8 }}
-              style={styles.addBorder}
-            >
-              <Pressable style={styles.addButton} onPress={handleAddMedia} disabled={saving || midias.length >= MAX_MIDIAS}>
-                <Ionicons name="images-outline" size={18} color="#E0E0E0" />
-                <Text style={styles.addButtonText}>Adicionar midia</Text>
-              </Pressable>
-            </LinearGradient>
-
-            <Text style={styles.counter}>{midias.length}/{MAX_MIDIAS} midias</Text>
-          </>
-        }
-        ListEmptyComponent={<Text style={styles.emptyMidia}>Nenhuma midia selecionada.</Text>}
-        ListFooterComponent={
-          <>
-            <Text style={styles.label}>Descricao</Text>
-            <TextInput
-              value={descricao}
-              onChangeText={setDescricao}
-              style={styles.input}
-              multiline
-              textAlignVertical="top"
-              maxLength={1000}
-              editable={!saving}
-              placeholder="Escreva a descricao do post..."
-              placeholderTextColor={theme.colors.mutedText}
-            />
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            <LinearGradient
-              colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
-              start={{ x: 0, y: 0.2 }}
-              end={{ x: 1, y: 0.8 }}
-              style={styles.saveBorder}
-            >
-              <Pressable style={[styles.saveButton, saving && styles.disabled]} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator color="#E0E0E0" /> : <Text style={styles.saveButtonText}>Salvar alteracoes</Text>}
-              </Pressable>
-            </LinearGradient>
-
-            <Pressable
-              style={[styles.deletePostButton, deletingPost && styles.disabled]}
-              onPress={handleDeletePost}
-              disabled={deletingPost}
-            >
-              {deletingPost ? (
-                <ActivityIndicator color="#E0E0E0" />
-              ) : (
-                <Text style={styles.deletePostButtonText}>Excluir post</Text>
-              )}
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.topRow}>
+          <LinearGradient
+            colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.8 }}
+            style={styles.backBorder}
+          >
+            <Pressable style={styles.backButton} onPress={() => router.back()} disabled={saving}>
+              <Text style={styles.backButtonText}>Voltar</Text>
             </Pressable>
+          </LinearGradient>
+        </View>
 
-            <Text style={styles.sectionTitle}>Comentarios</Text>
-            {post.comentarios.length === 0 ? (
-              <Text style={styles.emptyComments}>Sem comentarios neste post.</Text>
-            ) : (
-              post.comentarios.map((comment) => (
-                <View key={comment.id} style={styles.commentCard}>
-                  <View style={styles.commentHeader}>
-                    <Text style={styles.commentAuthor}>
-                      {comment.nome_exibicao || comment.username || "Usuario"}
-                    </Text>
-                    <Pressable
-                      style={[styles.commentDeleteButton, deletingComment[comment.id] && styles.disabled]}
-                      onPress={() => handleDeleteComment(comment.id)}
-                      disabled={deletingComment[comment.id]}
-                    >
-                      {deletingComment[comment.id] ? (
-                        <ActivityIndicator color={theme.colors.buttonText} />
-                      ) : (
-                        <Text style={styles.commentDeleteText}>Excluir</Text>
-                      )}
-                    </Pressable>
-                  </View>
-                  <Text style={styles.commentText}>{comment.comentario}</Text>
-                </View>
-              ))
-            )}
-          </>
-        }
-      />
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.heroBorder}
+        >
+          <View style={styles.heroCard}>
+            <Text style={styles.title}>Editar post</Text>
+            <Text style={styles.subtitle}>Altere descricao e quantidade de midias (maximo de 9).</Text>
+          </View>
+        </LinearGradient>
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.addBorder}
+        >
+          <Pressable style={styles.addButton} onPress={handleAddMedia} disabled={saving || midias.length >= MAX_MIDIAS}>
+            <Ionicons name="images-outline" size={18} color="#E0E0E0" />
+            <Text style={styles.addButtonText}>Adicionar midia</Text>
+          </Pressable>
+        </LinearGradient>
+
+        <Text style={styles.counter}>{midias.length}/{MAX_MIDIAS} midias</Text>
+
+        <View style={styles.gridContainer}>
+          {midias.length === 0 ? <Text style={styles.emptyMidia}>Nenhuma midia selecionada.</Text> : null}
+          {midias.map((item, index) => renderMediaItem(item, index))}
+        </View>
+
+        <Text style={styles.label}>Descricao</Text>
+        <TextInput
+          value={descricao}
+          onChangeText={setDescricao}
+          style={styles.input}
+          multiline
+          textAlignVertical="top"
+          maxLength={1000}
+          editable={!saving}
+          placeholder="Escreva a descricao do post..."
+          placeholderTextColor={theme.colors.mutedText}
+        />
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <LinearGradient
+          colors={["#5BE7FF", "#7C5CFF", "#FF4BD8"]}
+          start={{ x: 0, y: 0.2 }}
+          end={{ x: 1, y: 0.8 }}
+          style={styles.saveBorder}
+        >
+          <Pressable style={[styles.saveButton, saving && styles.disabled]} onPress={handleSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#E0E0E0" /> : <Text style={styles.saveButtonText}>Salvar alteracoes</Text>}
+          </Pressable>
+        </LinearGradient>
+
+        <Pressable
+          style={[styles.deletePostButton, deletingPost && styles.disabled]}
+          onPress={handleDeletePost}
+          disabled={deletingPost}
+        >
+          {deletingPost ? (
+            <ActivityIndicator color="#E0E0E0" />
+          ) : (
+            <Text style={styles.deletePostButtonText}>Excluir post</Text>
+          )}
+        </Pressable>
+
+        <Text style={styles.sectionTitle}>Comentarios</Text>
+        {post.comentarios.length === 0 ? (
+          <Text style={styles.emptyComments}>Sem comentarios neste post.</Text>
+        ) : (
+          post.comentarios.map((comment) => (
+            <View key={comment.id} style={styles.commentCard}>
+              <View style={styles.commentHeader}>
+                <Text style={styles.commentAuthor}>
+                  {comment.nome_exibicao || comment.username || "Usuario"}
+                </Text>
+                <Pressable
+                  style={[styles.commentDeleteButton, deletingComment[comment.id] && styles.disabled]}
+                  onPress={() => handleDeleteComment(comment.id)}
+                  disabled={deletingComment[comment.id]}
+                >
+                  {deletingComment[comment.id] ? (
+                    <ActivityIndicator color={theme.colors.buttonText} />
+                  ) : (
+                    <Text style={styles.commentDeleteText}>Excluir</Text>
+                  )}
+                </Pressable>
+              </View>
+              <Text style={styles.commentText}>{comment.comentario}</Text>
+            </View>
+          ))
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -627,22 +608,11 @@ function createStyles(theme: AppTheme) {
       alignItems: "center",
       justifyContent: "center",
     },
-    dragHint: {
-      position: "absolute",
-      left: 6,
-      bottom: 6,
+    gridContainer: {
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 6,
-      alignItems: "center",
-      backgroundColor: "rgba(124, 92, 255, 0.85)",
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 999,
-    },
-    dragHintText: {
-      color: "#E0E0E0",
-      fontSize: 11,
-      fontWeight: "700",
+      marginTop: 6,
     },
     emptyMidia: {
       color: "#7FE7FF",
@@ -752,11 +722,6 @@ function createStyles(theme: AppTheme) {
     error: {
       color: "#F43F5E",
       fontWeight: "600",
-    },
-    gridRow: {
-      gap: 6,
-      marginBottom: 6,
-      justifyContent: "space-between",
     },
   });
 }

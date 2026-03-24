@@ -121,7 +121,7 @@ export default function SearchUsersScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Procure usuários ou posts</Text>
+        <Text style={styles.title}>Procure por usuários ou posts</Text>
 
         <View style={styles.searchRow}>
           <Ionicons name="search" size={18} color={theme.colors.mutedText} />
