@@ -18,6 +18,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { AppTheme } from "@/theme/theme";
 import { fetchMyProfile, getApiErrorMessage } from "@/app/features/profile/service";
@@ -37,6 +38,104 @@ const SURFACE_GRADIENT = ["rgba(91, 231, 255, 0.22)", "rgba(124, 92, 255, 0.18)"
 const GLOW_GRADIENT = ["rgba(91, 231, 255, 0.28)", "rgba(255, 75, 216, 0.16)", "transparent"] as const;
 const ACTION_GRADIENT = ["rgba(91, 231, 255, 0.16)", "rgba(124, 92, 255, 0.14)"] as const;
 const COMMENT_CARD_GRADIENT = ["rgba(12, 16, 28, 0.96)", "rgba(19, 12, 37, 0.96)"] as const;
+
+function PostVideo({
+  uri,
+  style,
+  active,
+  uiStyles,
+}: {
+  uri: string;
+  style: any;
+  active: boolean;
+  uiStyles: any;
+}) {
+  const [userPaused, setUserPaused] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const player = useVideoPlayer({ uri }, (videoPlayer) => {
+    videoPlayer.loop = true;
+    videoPlayer.muted = false;
+    videoPlayer.volume = 1;
+    videoPlayer.audioMixingMode = "doNotMix";
+  });
+
+  useEffect(() => {
+    if (!active) {
+      player.pause();
+      return;
+    }
+    if (userPaused) return;
+    player.play();
+  }, [active, player, userPaused]);
+
+  useEffect(() => {
+    const sub = player.addListener("playingChange", ({ isPlaying: playing }) => {
+      setIsPlaying(playing);
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  const togglePlay = () => {
+    if (isPlaying) {
+      player.pause();
+      setUserPaused(true);
+    } else {
+      setUserPaused(false);
+      player.play();
+    }
+  };
+
+  const seekBySeconds = (deltaSeconds: number) => {
+    const current =
+      typeof player.currentTime === "number"
+        ? player.currentTime
+        : typeof player.position === "number"
+          ? player.position
+          : typeof player.positionMillis === "number"
+            ? player.positionMillis / 1000
+            : 0;
+    const next = Math.max(0, current + deltaSeconds);
+    if (typeof player.seekTo === "function") {
+      player.seekTo(next);
+      return;
+    }
+    if (typeof player.seekToTime === "function") {
+      player.seekToTime(next);
+      return;
+    }
+    if (typeof player.setPositionAsync === "function") {
+      player.setPositionAsync(next * 1000);
+      return;
+    }
+    if (typeof player.currentTime === "number") {
+      player.currentTime = next;
+    }
+  };
+
+  return (
+    <View style={style}>
+      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      <Pressable style={uiStyles.videoTapArea} onPress={togglePlay}>
+        {!isPlaying ? (
+          <View style={uiStyles.playBadge}>
+            <Ionicons name="play" size={20} color="#FFFFFF" />
+          </View>
+        ) : null}
+      </Pressable>
+      <View style={uiStyles.videoControls}>
+        <Pressable style={uiStyles.videoControlButton} onPress={() => seekBySeconds(-5)}>
+          <Ionicons name="play-back" size={16} color="#FFFFFF" />
+          <Text style={uiStyles.videoControlText}>5s</Text>
+        </Pressable>
+        <Pressable style={uiStyles.videoControlButton} onPress={() => seekBySeconds(5)}>
+          <Ionicons name="play-forward" size={16} color="#FFFFFF" />
+          <Text style={uiStyles.videoControlText}>5s</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 export default function PostDetailScreen() {
   const router = useRouter();
@@ -353,15 +452,17 @@ export default function PostDetailScreen() {
                     scrollEnabled={(post.midias?.length ?? 0) > 1}
                     style={styles.mediaCarousel}
                   >
-                    {(post.midias ?? []).map((media) => (
+                    {(post.midias ?? []).map((media, index) => (
                       <View key={media.id} style={[styles.mediaCard, { width: mediaWidth }]}> 
                         {media.type === "image" ? (
                           <Image source={{ uri: media.url }} style={styles.media} />
                         ) : (
-                          <View style={[styles.media, styles.videoPlaceholder]}>
-                            <Ionicons name="videocam" size={28} color={theme.colors.buttonText} />
-                            <Text style={styles.videoPlaceholderText}>Video</Text>
-                          </View>
+                          <PostVideo
+                            uri={media.url}
+                            style={styles.media}
+                            active={index === activeMediaIndex}
+                            uiStyles={styles}
+                          />
                         )}
                       </View>
                     ))}
@@ -750,6 +851,40 @@ function createStyles(theme: AppTheme) {
       width: "100%",
       height: 460,
       backgroundColor: "#05070B",
+    },
+    videoTapArea: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    playBadge: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0,0,0,0.45)",
+    },
+    videoControls: {
+      position: "absolute",
+      right: 12,
+      bottom: 12,
+      flexDirection: "row",
+      gap: 8,
+    },
+    videoControlButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: "rgba(0,0,0,0.55)",
+    },
+    videoControlText: {
+      color: "#ffffff",
+      fontWeight: "700",
+      fontSize: 12,
     },
     mediaCounterBadge: {
       position: "absolute",

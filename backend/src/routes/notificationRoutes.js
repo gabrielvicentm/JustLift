@@ -11,6 +11,5 @@ router.patch('/read-all', authMiddleware, notificationController.markAllNotifica
 router.patch('/:notificationId/read', authMiddleware, notificationController.markNotificationAsRead);
 router.post('/push-token', authMiddleware, notificationController.registerPushToken);
 router.delete('/push-token', authMiddleware, notificationController.unregisterPushToken);
-router.post('/test', authMiddleware, notificationController.testPush);
 
 module.exports = router;
